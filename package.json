@@ -1,6 +1,6 @@
 {
   "name": "waypoint",
-  "version": "0.8.3",
+  "version": "0.9.0",
   "private": true,
   "description": "Waypoint — maquette de l'application compagnon de voyage (web + APK Android via Capacitor).",
   "type": "module",
