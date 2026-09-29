@@ -1,0 +1,14 @@
+{
+  "appId": "com.escale.maquette",
+  "appName": "Escale",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#080B0C"
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK",
+      "insetsHandling": "css"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "Escale — compagnon de voyage",
+  "short_name": "Escale",
+  "description": "Maquette d'Escale : prépare et vis ton voyage, jour par jour.",
+  "lang": "fr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#080B0C",
+  "theme_color": "#080B0C",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Démarrer un voyage", "url": "./#demarrer", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] },
+    { "name": "Voyage d'exemple", "url": "./#exemple", "icons": [{ "src": "icons/icon-192.png", "sizes": "192x192" }] }
+  ]
+}
