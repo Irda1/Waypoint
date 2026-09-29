@@ -3,7 +3,7 @@
   "appName": "Waypoint",
   "webDir": "dist",
   "android": {
-    "backgroundColor": "#080B0C"
+    "backgroundColor": "#07090B"
   },
   "plugins": {
     "SystemBars": {
