@@ -182,7 +182,7 @@ export default function TripScreen() {
 
 const styles = StyleSheet.create({
   cover: { minHeight: 400, width: '100%' },
-  veil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(7, 9, 11, 0.5)' },
+  veil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(7, 9, 11, 0.5)' },
   coverInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xl, minHeight: 400, width: '100%', maxWidth: 880, alignSelf: 'center' },
   coverBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.sm, paddingTop: space.sm },
   glass: { minHeight: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: 'rgba(7, 9, 11, 0.45)', borderWidth: 1, borderColor: 'rgba(245, 245, 242, 0.25)' },

@@ -81,7 +81,7 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   hero: { minHeight: 460, width: '100%' },
-  veil: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(7, 9, 11, 0.52)' },
+  veil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(7, 9, 11, 0.52)' },
   heroInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xxl, minHeight: 460, width: '100%', maxWidth: 880, alignSelf: 'center' },
   heroBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: space.sm },
   brand: { fontFamily: fonts.serif, fontSize: 22, color: ON_PHOTO },

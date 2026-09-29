@@ -34,6 +34,7 @@
     "react-native-webview": "*"
   },
   "devDependencies": {
+    "@types/node": "^26.6.3",
     "@types/react": "*",
     "typescript": "*"
   }

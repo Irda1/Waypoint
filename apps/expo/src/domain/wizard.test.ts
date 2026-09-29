@@ -93,7 +93,7 @@ test('budget : niveau × jours × voyageurs, réparti sans perdre un euro', () =
   }
   assert.equal(splitBudget(1000).hebergement, 350);
   assert.equal(Object.keys(POSTE_SHARES).length, 5);
-  s = { ...s, budget: { level: 'montant' as never, amount: 1500, currency: 'EUR' } };
+  s = { ...s, budget: { level: 'montant' as never, amount: 1500, currency: 'EUR' } as never };
   assert.equal(budgetTotal(s), 1500);
   assert.equal(budgetTotal({ ...s, budget: { level: 'montant' as never, amount: null, currency: 'EUR' } }), null);
   assert.equal(budgetTotal(newWizard()), null);
