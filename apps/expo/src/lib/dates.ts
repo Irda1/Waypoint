@@ -40,3 +40,14 @@ export function dateRange(a: string, b: string): string {
   const sameMonth = a.slice(0, 7) === b.slice(0, 7);
   return sameMonth ? `${fmt(a, { day: 'numeric' })} – ${fmt(b, { day: 'numeric', month: 'short' })}` : `${fmt(a, { day: 'numeric', month: 'short' })} – ${fmt(b, { day: 'numeric', month: 'short' })}`;
 }
+
+export type TripStatus = { kind: 'undated' } | { kind: 'upcoming'; inDays: number } | { kind: 'ongoing'; day: number; total: number } | { kind: 'past' };
+
+/** Où en est un voyage par rapport à aujourd'hui (dates « AAAA-MM-JJ », fin comprise). */
+export function tripStatus(startsOn: string | null, endsOn: string | null, today: string): TripStatus {
+  if (!startsOn) return { kind: 'undated' };
+  const end = endsOn ?? startsOn;
+  if (today < startsOn) return { kind: 'upcoming', inDays: diffDays(today, startsOn) };
+  if (today > end) return { kind: 'past' };
+  return { kind: 'ongoing', day: diffDays(startsOn, today) + 1, total: diffDays(startsOn, end) + 1 };
+}

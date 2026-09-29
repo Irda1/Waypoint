@@ -19,3 +19,11 @@ export function parseAmount(v: string): number | null {
   const n = Number(v.trim().replace(',', '.'));
   return Number.isFinite(n) && n >= 0 && v.trim() !== '' ? Math.round(n * 100) / 100 : null;
 }
+
+/** Étiquette lisible d'un voyage : « Dans 12 jours », « Jour 2 sur 4 », « Terminé », « Dates à définir ». */
+export function tripStatusLabel(s: { kind: 'undated' } | { kind: 'upcoming'; inDays: number } | { kind: 'ongoing'; day: number; total: number } | { kind: 'past' }): string {
+  if (s.kind === 'undated') return 'Dates à définir';
+  if (s.kind === 'past') return 'Terminé';
+  if (s.kind === 'ongoing') return `Jour ${s.day} sur ${s.total}`;
+  return s.inDays === 1 ? 'Demain' : `Dans ${s.inDays} jours`;
+}

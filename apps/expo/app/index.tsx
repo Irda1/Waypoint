@@ -7,7 +7,10 @@ import { useRequireAuth } from '../src/auth/useRequireAuth';
 import { Button, Card, Columns, ErrorNote, Text } from '../src/ui';
 import { listTrips } from '../src/data/trips';
 import type { TripSummary } from '../src/data/trips';
-import { formatDay } from '../src/lib/format';
+import { formatDay, tripStatusLabel } from '../src/lib/format';
+import { todayIso, tripStatus } from '../src/lib/dates';
+import { photoKeyFor } from '../src/lib/photoKey';
+import { photos } from '../src/theme/photos';
 import { fonts, radius, space } from '../src/theme/tokens';
 import { useTheme } from '../src/theme/useTheme';
 
@@ -24,6 +27,7 @@ export default function Home() {
   const { colors } = useTheme();
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const today = todayIso();
 
   const refresh = useCallback(async () => {
     const res = await listTrips();
@@ -58,17 +62,24 @@ export default function Home() {
         <View style={styles.page}>
           <ErrorNote message={error} />
 
-          <Text variant="label">Mes voyages</Text>
+          <Text variant="label">{trips && trips.length > 0 ? `Mes voyages · ${trips.length}` : 'Mes voyages'}</Text>
           {trips === null ? <Text variant="muted">Chargement…</Text> : trips.length === 0 ? (
             <Card><Text variant="body">Aucun voyage pour l'instant. Démarre le premier avec le bouton ci-dessus, ou rejoins celui d'un ami avec son lien d'invitation.</Text></Card>
           ) : (
             <Columns>
               {trips.map((t) => (
-                <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={`Ouvrir ${t.title}`} onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}>
-                  <Card style={{ borderLeftWidth: 4, borderLeftColor: colors.accent }}>
-                    <Text variant="heading">{t.title}</Text>
-                    <Text variant="muted">{t.starts_on ? `${formatDay(t.starts_on)}${t.ends_on ? ` → ${formatDay(t.ends_on)}` : ''}` : 'Dates à définir'}</Text>
-                  </Card>
+                <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={`Ouvrir ${t.title}`} onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
+                  style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }], opacity: pressed ? 0.92 : 1 })}>
+                  <ImageBackground source={photos[photoKeyFor(t.title)]} resizeMode="cover" style={styles.tripCard} imageStyle={{ borderRadius: radius.card }}>
+                    <View style={styles.tripVeil} pointerEvents="none" />
+                    <View style={[styles.statusPill, { backgroundColor: colors.accent }]}>
+                      <RNText style={[styles.statusLabel, { color: colors.onAccent }]}>{tripStatusLabel(tripStatus(t.starts_on, t.ends_on, today))}</RNText>
+                    </View>
+                    <View style={{ gap: 2 }}>
+                      <RNText style={styles.tripTitle} numberOfLines={2}>{t.title}</RNText>
+                      <RNText style={styles.tripDates}>{t.starts_on ? `${formatDay(t.starts_on)}${t.ends_on ? ` → ${formatDay(t.ends_on)}` : ''}` : 'Dates à définir'}</RNText>
+                    </View>
+                  </ImageBackground>
                 </Pressable>
               ))}
             </Columns>
@@ -91,5 +102,11 @@ const styles = StyleSheet.create({
   eyebrow: { fontFamily: fonts.sansSemi, fontSize: 11.5, letterSpacing: 1.6, textTransform: 'uppercase' },
   poster: { fontFamily: fonts.serif, fontSize: 56, lineHeight: 60, color: ON_PHOTO },
   lead: { fontFamily: fonts.sans, fontSize: 16, lineHeight: 23, color: ON_PHOTO_SOFT, maxWidth: 440 },
+  tripCard: { minHeight: 168, borderRadius: radius.card, overflow: 'hidden', padding: space.lg, justifyContent: 'space-between', backgroundColor: '#101315' },
+  tripVeil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.card, backgroundColor: 'rgba(7, 9, 11, 0.5)' },
+  statusPill: { alignSelf: 'flex-start', minHeight: 28, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center' },
+  statusLabel: { fontFamily: fonts.sansSemi, fontSize: 12.5 },
+  tripTitle: { fontFamily: fonts.serif, fontSize: 24, lineHeight: 29, color: ON_PHOTO },
+  tripDates: { fontFamily: fonts.sans, fontSize: 14, color: ON_PHOTO_SOFT },
   page: { width: '100%', maxWidth: 880, alignSelf: 'center', padding: space.lg, paddingTop: space.xl, gap: space.lg },
 });
