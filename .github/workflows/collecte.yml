@@ -1,0 +1,74 @@
+name: Collecte de données
+
+on:
+  workflow_dispatch:
+    inputs:
+      pass:
+        description: "Passe à lancer"
+        type: choice
+        options: [queue, countries, cities, places, images]
+        default: queue
+      country:
+        description: "Villes : code pays ISO à charger (ex. PT). Vide = tous les pays"
+        required: false
+      city:
+        description: "Lieux : identifiant de la ville en base (ex. 12)"
+        required: false
+      max:
+        description: "File / images : nombre maximum de tâches"
+        required: false
+        default: "3"
+      dry_run:
+        description: "Simulation : lit et trie, n'écrit rien"
+        type: boolean
+        default: false
+  schedule:
+    - cron: "17 */3 * * *"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: collecte
+  cancel-in-progress: false
+
+jobs:
+  collecte:
+    if: ${{ github.event_name != 'schedule' || vars.COLLECTE_ACTIVE == 'true' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Tests du pipeline
+        run: node --test pipeline/test/*.test.mjs
+
+      - name: Collecte
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          PASS: ${{ inputs.pass || 'queue' }}
+          COUNTRY: ${{ inputs.country }}
+          CITY: ${{ inputs.city }}
+          MAX: ${{ inputs.max || '3' }}
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        run: |
+          set -euo pipefail
+          if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_SERVICE_ROLE_KEY:-}" ]; then
+            echo "::error::Secrets SUPABASE_URL et SUPABASE_SERVICE_ROLE_KEY manquants (voir docs/BACKEND.md)."
+            exit 1
+          fi
+          args=("$PASS")
+          case "$PASS" in
+            cities)  [ -n "$COUNTRY" ] && args+=(--country "$COUNTRY") ;;
+            places)  [ -n "$CITY" ] || { echo "::error::La passe places demande l'identifiant de la ville (champ city)."; exit 1; }
+                     args+=(--city "$CITY") ;;
+            images|queue) args+=(--max "$MAX") ;;
+          esac
+          [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
+          node pipeline/src/cli.mjs "${args[@]}"
