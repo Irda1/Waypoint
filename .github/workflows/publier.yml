@@ -1,0 +1,136 @@
+# Publie la maquette Waypoint à chaque push sur main :
+#   1. version web → GitHub Pages (https://<pseudo>.github.io/<dépôt>/)
+#   2. APK Android (Capacitor) → une Release GitHub « build-N » avec waypoint.apk
+# Lien stable vers le dernier APK : https://github.com/<pseudo>/<dépôt>/releases/latest/download/waypoint.apk
+name: Publier la maquette
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Version web (GitHub Pages)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Installer les dépendances
+        run: npm install --no-audit --no-fund
+
+      - name: Construire dist/
+        run: npm run build:web
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+      - name: Déployer sur GitHub Pages
+        id: deploiement
+        uses: actions/deploy-pages@v5
+
+  android:
+    name: APK Android
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write   # pour créer la Release
+    env:
+      KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Installer les dépendances
+        run: npm install --no-audit --no-fund
+
+      - name: Construire dist/
+        run: npm run build:web
+
+      - name: Créer le projet Android (s'il n'est pas dans le dépôt)
+        run: |
+          if [ ! -d android ]; then
+            npx cap add android
+          else
+            echo "Dossier android/ versionné : on l'utilise tel quel."
+          fi
+
+      - name: Icônes et écran de lancement Waypoint
+        run: |
+          RES=android/app/src/main/res
+          # Les splash.png de Capacitor entreraient en conflit avec notre splash.xml
+          find "$RES" -name 'splash.png' -delete
+          cp -R resources/android/res/. "$RES/"
+
+      - name: Synchroniser la maquette dans l'APK
+        run: npx cap sync android
+
+      - name: Numéro de version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          GRADLE=android/app/build.gradle
+          sed -i -E "s/versionCode [0-9]+/versionCode ${GITHUB_RUN_NUMBER}/" "$GRADLE"
+          sed -i -E "s/versionName \"[^\"]*\"/versionName \"${VERSION}-build.${GITHUB_RUN_NUMBER}\"/" "$GRADLE"
+          grep -q "versionCode ${GITHUB_RUN_NUMBER}" "$GRADLE" || { echo "::error::versionCode introuvable dans $GRADLE"; exit 1; }
+          echo "VERSION=${VERSION}" >> "$GITHUB_ENV"
+
+      - name: Clé de signature (toujours la même, pour pouvoir mettre à jour l'appli)
+        run: |
+          mkdir -p ~/.android
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > ~/.android/debug.keystore
+            echo "Clé du secret ANDROID_DEBUG_KEYSTORE utilisée."
+          else
+            echo "::warning::Secret ANDROID_DEBUG_KEYSTORE absent : clé temporaire. Pour installer cette version il faudra désinstaller la précédente."
+          fi
+
+      - name: Compiler l'APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon --stacktrace
+          cp app/build/outputs/apk/debug/app-debug.apk ../waypoint.apk
+          ls -lh ../waypoint.apk
+
+      - name: Publier la Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: build-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: Waypoint ${{ env.VERSION }} · build ${{ github.run_number }}
+          make_latest: true
+          files: waypoint.apk
+          body: |
+            Maquette Waypoint **${{ env.VERSION }}**, build ${{ github.run_number }} (commit ${{ github.sha }}).
+
+            **Installer sur Android** : télécharge `waypoint.apk` ci-dessous depuis le téléphone, ouvre-le et autorise l'installation.
+            Une nouvelle version s'installe par-dessus l'ancienne, les voyages enregistrés sont conservés.
+
+            Dernière modification : ${{ github.event.head_commit.message || 'lancement manuel' }}

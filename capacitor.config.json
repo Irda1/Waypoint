@@ -1,0 +1,14 @@
+{
+  "appId": "com.waypoint.maquette",
+  "appName": "Waypoint",
+  "webDir": "dist",
+  "android": {
+    "backgroundColor": "#080B0C"
+  },
+  "plugins": {
+    "SystemBars": {
+      "style": "DARK",
+      "insetsHandling": "css"
+    }
+  }
+}
