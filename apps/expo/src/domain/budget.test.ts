@@ -1,0 +1,99 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { computeBalances, settlements, paymentState, budgetSummary, posteForCategory, toCents } from './budget.ts';
+
+// Jeu d'essai de la maquette : 3 amis, 7 dépenses (Lisbonne / Porto)
+const exp = (amount: number, paid_by: string | null, extra: object = {}) => ({ amount, paid_by, ...extra });
+
+test('soldes : parts égales, somme des soldes nulle, centimes répartis', () => {
+  const expenses = [exp(390, 'a'), exp(105, 'l'), exp(75, 'l'), exp(138, 'm'), exp(74, 'a'), exp(60, 'm'), exp(30, 'l')];
+  const b = computeBalances(expenses, ['a', 'l', 'm']);
+  const total = expenses.reduce((s, e) => s + e.amount, 0);                      // 872
+  assert.equal(b.reduce((s, x) => s + x.share, 0), total, 'la somme des parts = le total');
+  assert.equal(Math.round(b.reduce((s, x) => s + x.balance, 0) * 100), 0, 'la somme des soldes est nulle');
+  const a = b.find((x) => x.userId === 'a')!;
+  assert.equal(a.paid, 464);
+  assert.ok(a.balance > 0, 'Adrien a avancé plus que sa part');
+});
+
+test('soldes : 10 € entre 3 personnes = 3,34 / 3,33 / 3,33, jamais 9,99', () => {
+  const b = computeBalances([exp(10, 'a')], ['a', 'b', 'c']);
+  assert.deepEqual(b.map((x) => x.share), [3.34, 3.33, 3.33]);
+  assert.equal(b.reduce((s, x) => s + toCents(x.share), 0), 1000);
+});
+
+test('soldes : une dépense d\'un ancien membre reste comptée à son nom', () => {
+  const b = computeBalances([exp(100, 'parti'), exp(50, 'a')], ['a', 'b']);
+  assert.equal(b.find((x) => x.userId === 'parti')!.balance, 100);
+  assert.equal(b.find((x) => x.userId === 'a')!.share, 75);
+  assert.equal(b.find((x) => x.userId === 'b')!.balance, -75);
+});
+
+test('soldes : sans dépense ni membre, aucun calcul absurde', () => {
+  assert.deepEqual(computeBalances([], ['a', 'b']).map((x) => x.balance), [0, 0]);
+  assert.deepEqual(computeBalances([], []), []);
+});
+
+test('virements : soldent exactement tous les comptes', () => {
+  const b = computeBalances([exp(300, 'a'), exp(30, 'b')], ['a', 'b', 'c']);
+  const t = settlements(b);
+  const net = new Map(b.map((x) => [x.userId, toCents(x.balance)]));
+  for (const tr of t) {
+    net.set(tr.from, net.get(tr.from)! + toCents(tr.amount));
+    net.set(tr.to, net.get(tr.to)! - toCents(tr.amount));
+  }
+  assert.ok([...net.values()].every((v) => v === 0), 'plus rien à régler après les virements');
+  assert.ok(t.length <= 2, 'au plus n-1 virements');
+  assert.ok(t.every((x) => x.amount > 0 && x.from !== x.to));
+});
+
+test('virements : comptes équilibrés = aucun virement', () => {
+  assert.deepEqual(settlements(computeBalances([exp(10, 'a'), exp(10, 'b')], ['a', 'b'])), []);
+});
+
+test('pastille de paiement : payé / acompte / pas payé / gratuit', () => {
+  const item = { id: 'i1', place_id: 1 };
+  const place = { price_amount: 35 };
+  assert.equal(paymentState(item, place, [], 3), 'unpaid');
+  assert.equal(paymentState(item, place, [{ amount: 74, item_id: 'i1' }], 3), 'partial');   // 74 < 105
+  assert.equal(paymentState(item, place, [{ amount: 105, item_id: 'i1' }], 3), 'paid');
+  assert.equal(paymentState(item, place, [{ amount: 60, item_id: 'i1' }, { amount: 45, item_id: 'i1' }], 3), 'paid', 'plusieurs paiements se cumulent');
+  assert.equal(paymentState(item, place, [{ amount: 105, item_id: 'autre' }], 3), 'unpaid', 'un paiement d\'une autre étape ne compte pas');
+  assert.equal(paymentState(item, { price_amount: 0 }, [], 3), null);
+  assert.equal(paymentState(item, { price_amount: null }, [], 3), null);
+  assert.equal(paymentState(item, undefined, [], 3), null);
+});
+
+test('catégories -> poste de dépense', () => {
+  assert.equal(posteForCategory('gastronomie'), 'repas');
+  assert.equal(posteForCategory('restaurant'), 'repas');
+  assert.equal(posteForCategory('nocturne'), 'repas');
+  assert.equal(posteForCategory('musee'), 'activites');
+  assert.equal(posteForCategory(null), 'activites');
+});
+
+test('bilan par poste : payé, prévisionnel sans double compte, plan A seulement', () => {
+  const places = new Map([
+    [1, { price_amount: 35, category_code: 'atelier' }],
+    [2, { price_amount: 20, category_code: 'restaurant' }],
+    [3, { price_amount: 10, category_code: 'musee' }],
+  ]);
+  const items = [
+    { id: 'i1', place_id: 1, category_code: null, plan: 'A' as const },   // 105 € prévus, 105 payés
+    { id: 'i2', place_id: 2, category_code: null, plan: 'A' as const },   // 60 € prévus, acompte 20
+    { id: 'i3', place_id: 3, category_code: null, plan: 'B' as const },   // plan B : ignoré
+  ];
+  const expenses = [
+    { amount: 105, poste: 'activites' as const, item_id: 'i1' },
+    { amount: 20, poste: 'repas' as const, item_id: 'i2' },
+    { amount: 390, poste: 'hebergement' as const, item_id: null },
+  ];
+  const s = budgetSummary({ expenses, items, places, envelopes: { repas: 450, hebergement: 530 }, travelers: 3 });
+  assert.equal(s.activites.paid, 105);
+  assert.equal(s.activites.forecast, 0, 'une étape payée n\'est pas comptée deux fois');
+  assert.equal(s.repas.paid, 20);
+  assert.equal(s.repas.forecast, 40, 'reste après acompte : 60 - 20');
+  assert.equal(s.hebergement.paid, 390);
+  assert.equal(s.hebergement.envelope, 530);
+  assert.equal(s.shopping.paid + s.shopping.forecast, 0);
+});

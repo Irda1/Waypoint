@@ -1,0 +1,36 @@
+{
+  "name": "waypoint-app",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Waypoint · application universelle (Android, iOS, web) avec Expo et Supabase.",
+  "main": "expo-router/entry",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "web": "expo start --web",
+    "export:web": "expo export --platform web",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@react-native-async-storage/async-storage": "*",
+    "@supabase/supabase-js": "^2.117.2",
+    "expo": "~57.0.25",
+    "expo-constants": "*",
+    "expo-linking": "*",
+    "expo-router": "~57.0.23",
+    "expo-status-bar": "*",
+    "expo-web-browser": "*",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "*",
+    "react-native-screens": "*",
+    "react-native-url-polyfill": "*",
+    "react-native-web": "*"
+  },
+  "devDependencies": {
+    "@types/react": "*",
+    "typescript": "*"
+  }
+}

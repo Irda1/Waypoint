@@ -1,0 +1,105 @@
+// Charge un voyage complet et le garde à jour en temps réel (Supabase Realtime, « Postgres Changes »).
+//
+// Stratégie volontairement simple : à chaque changement reçu, on recharge le voyage
+// (quelques requêtes légères pour un groupe d'amis). Deux raisons de ne pas filtrer par
+// trip_id côté abonnement : (1) la sécurité par ligne n'affiche que les voyages dont on est
+// membre pour les ajouts et modifications ; (2) les suppressions ne portent que la clé
+// primaire (identité de réplique par défaut), donc un filtre les ferait disparaître.
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { supabase } from '../lib/supabase';
+import type { Expense, Place, TripItem } from '../domain/types.ts';
+
+export interface Trip { id: string; title: string; starts_on: string | null; ends_on: string | null; currency: string; memo: string; deleted_at: string | null; version: number }
+export interface Member { user_id: string; color: string; left_at: string | null; profiles: { display_name: string; avatar_url: string | null } | null }
+export interface Day { id: string; day_date: string; city_id: number | null; depart_time: string | null; return_time: string | null }
+export interface BudgetLine { poste: string; amount: number }
+
+export interface TripData {
+  trip: Trip;
+  members: Member[];
+  days: Day[];
+  items: TripItem[];
+  places: Map<number, Place>;
+  expenses: (Expense & { label: string; currency: string })[];
+  budgetLines: BudgetLine[];
+}
+
+export type LiveStatus = 'connecting' | 'live' | 'offline';
+
+const TABLES = ['trips', 'trip_members', 'trip_days', 'trip_items', 'trip_stays', 'expenses', 'trip_budget_lines'] as const;
+
+export function useTrip(tripId: string) {
+  const [data, setData] = useState<TripData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<LiveStatus>('connecting');
+  const known = useRef<Set<string>>(new Set());
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const load = useCallback(async () => {
+    const [trip, members, days, items, expenses, budget] = await Promise.all([
+      supabase.from('trips').select('id,title,starts_on,ends_on,currency,memo,deleted_at,version').eq('id', tripId).maybeSingle(),
+      supabase.from('trip_members').select('user_id,color,left_at,profiles(display_name,avatar_url)').eq('trip_id', tripId),
+      supabase.from('trip_days').select('id,day_date,city_id,depart_time,return_time').eq('trip_id', tripId).order('day_date'),
+      supabase.from('trip_items').select('*').eq('trip_id', tripId),
+      supabase.from('expenses').select('id,poste,amount,paid_by,item_id,stay_id,label,currency').eq('trip_id', tripId).order('spent_on'),
+      supabase.from('trip_budget_lines').select('poste,amount').eq('trip_id', tripId),
+    ]);
+    const failure = [trip, members, days, items, expenses, budget].find((r) => r.error)?.error;
+    if (failure) { setError(failure.message); setLoading(false); return; }
+    if (!trip.data) { setError('Voyage introuvable, ou tu n\'en es plus membre.'); setData(null); setLoading(false); return; }
+
+    const placeIds = [...new Set((items.data ?? []).map((i) => i.place_id).filter((x): x is number => x != null))];
+    const places = new Map<number, Place>();
+    if (placeIds.length) {
+      const { data: rows } = await supabase.from('places')
+        .select('id,name,kind,category_code,lat,lng,price_amount,visit_duration_min,closed_days').in('id', placeIds);
+      for (const p of (rows ?? []) as Place[]) places.set(p.id, p);
+    }
+    const next: TripData = {
+      trip: trip.data as Trip,
+      members: (members.data ?? []) as unknown as Member[],
+      days: (days.data ?? []) as Day[],
+      items: (items.data ?? []) as TripItem[],
+      places,
+      expenses: (expenses.data ?? []) as TripData['expenses'],
+      budgetLines: (budget.data ?? []) as BudgetLine[],
+    };
+    known.current = new Set([next.trip.id, ...next.days.map((d) => d.id), ...next.items.map((i) => i.id), ...next.expenses.map((e) => e.id), ...next.members.map((m) => m.user_id)]);
+    setData(next);
+    setError(null);
+    setLoading(false);
+  }, [tripId]);
+
+  const reloadSoon = useCallback(() => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => { void load(); }, 150);
+  }, [load]);
+
+  useEffect(() => {
+    void load();
+    let channel = supabase.channel(`trip-${tripId}`);
+    for (const table of TABLES) {
+      channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
+        const row = (payload.eventType === 'DELETE' ? payload.old : payload.new) as Record<string, unknown>;
+        if (payload.eventType === 'DELETE') {
+          // Les suppressions ne sont pas filtrées par la sécurité par ligne : on ne réagit qu'à nos propres lignes.
+          const id = (row.id ?? row.user_id) as string | undefined;
+          if (id && known.current.has(id)) reloadSoon();
+        } else if (row.trip_id === tripId || row.id === tripId) {
+          reloadSoon();
+        }
+      });
+    }
+    channel.subscribe((s) => {
+      if (s === 'SUBSCRIBED') { setStatus('live'); void load(); }   // recharge après une reconnexion : rien de manqué
+      else if (s === 'CHANNEL_ERROR' || s === 'TIMED_OUT' || s === 'CLOSED') setStatus('offline');
+    });
+    return () => {
+      if (timer.current) clearTimeout(timer.current);
+      void supabase.removeChannel(channel);
+    };
+  }, [tripId, load, reloadSoon]);
+
+  return { data, error, loading, status, reload: load };
+}
