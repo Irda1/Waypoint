@@ -6,7 +6,7 @@ dist/
 
 # Projet Android généré par la CI (« npx cap add android »).
 # Retire cette ligne le jour où tu veux versionner et personnaliser le projet natif.
-android/
+/android/
 
 # Clés de signature : jamais dans le dépôt (elles vont dans les secrets GitHub)
 *.keystore
