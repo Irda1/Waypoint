@@ -1,0 +1,6 @@
+2267057	Lisbon	Lisbon	Lisboa,Lissabon	38.71667	-9.13333	P	PPLC	PT		14	1106			517802			Europe/Lisbon	2019-09-05
+2735943	Porto	Porto	Oporto	41.14961	-8.61099	P	PPLA	PT		17	1312			263131			Europe/Lisbon	2019-09-05
+1850147	Tokyo	Tokyo	Tokio	35.6895	139.69171	P	PPLC	JP		40				8336599		44	Asia/Tokyo	2022-07-26
+9999999	Tiny	Tiny		40.0	-8.0	P	PPL	PT						500			Europe/Lisbon	2020-01-01
+1111111	Mount	Mount		40.0	-8.0	T	MT	PT						20000			Europe/Lisbon	2020-01-01
+2222222	Ghosttown	Ghosttown		10.0	10.0	P	PPL	ZZ						20000			Africa/Nowhere	2020-01-01

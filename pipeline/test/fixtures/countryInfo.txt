@@ -1,0 +1,5 @@
+# ================================
+#ISO	ISO3	ISO-Numeric	fips	Country	Capital	Area(in sq km)	Population	Continent	tld	CurrencyCode	CurrencyName	Phone	Postal Code Format	Postal Code Regex	Languages	geonameid	neighbours	EquivalentFipsCode
+PT	PRT	620	PO	Portugal	Lisbon	92391	10676000	EU	.pt	EUR	Euro	351	####-###	^(\d{7}|\d{4}-\d{3})$	pt-PT,mwl	2264397	ES	
+JP	JPN	392	JA	Japan	Tokyo	377835	127288000	AS	.jp	JPY	Yen	81	###-####	^\d{3}-\d{4}$	ja	1861060		
+US	USA	840	US	United States	Washington	9629091	327167434	NA	.us	USD	Dollar	1	#####-####	^\d{5}(-\d{4})?$	en-US,es-US,haw,fr	6252001	CA,MX,CU	

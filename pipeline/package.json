@@ -1,0 +1,16 @@
+{
+  "name": "waypoint-pipeline",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Waypoint · pipeline de collecte (pays, villes, lieux, images) vers Supabase. Aucune dépendance : Node 22 suffit.",
+  "type": "module",
+  "engines": { "node": ">=22" },
+  "scripts": {
+    "countries": "node src/cli.mjs countries",
+    "cities": "node src/cli.mjs cities",
+    "places": "node src/cli.mjs places",
+    "images": "node src/cli.mjs images",
+    "queue": "node src/cli.mjs queue",
+    "test": "node --test test/*.test.mjs"
+  }
+}
