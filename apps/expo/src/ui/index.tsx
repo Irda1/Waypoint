@@ -1,9 +1,9 @@
 // Composants communs : mêmes écrans sur téléphone, tablette et web, mise en page adaptée à la largeur.
 import React from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, View } from 'react-native';
 import type { StyleProp, TextInputProps, TextStyle, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { radius, space } from '../theme/tokens';
+import { fonts, radius, space } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { useBreakpoint } from './useBreakpoint';
 
@@ -21,13 +21,14 @@ export function Screen({ children, scroll = true }: { children: React.ReactNode;
 type Variant = 'title' | 'heading' | 'body' | 'muted' | 'label' | 'mono';
 export function Text({ variant = 'body', style, children, ...rest }: { variant?: Variant; style?: StyleProp<TextStyle>; children?: React.ReactNode } & React.ComponentProps<typeof RNText>) {
   const { colors } = useTheme();
+  const mono = Platform.select({ ios: 'Menlo', android: 'monospace', default: 'ui-monospace, Menlo, Consolas, monospace' });
   const variants: Record<Variant, TextStyle> = {
-    title: { fontSize: 30, fontWeight: '700', color: colors.text, lineHeight: 36 },
-    heading: { fontSize: 19, fontWeight: '600', color: colors.text },
-    body: { fontSize: 16, color: colors.text, lineHeight: 22 },
-    muted: { fontSize: 14, color: colors.text2, lineHeight: 20 },
-    label: { fontSize: 12, fontWeight: '600', color: colors.text3, letterSpacing: 0.6, textTransform: 'uppercase' },
-    mono: { fontSize: 15, color: colors.text, fontVariant: ['tabular-nums'] },
+    title: { fontFamily: fonts.serif, fontSize: 32, color: colors.text, lineHeight: 38 },
+    heading: { fontFamily: fonts.serif, fontSize: 20, color: colors.text, lineHeight: 26 },
+    body: { fontFamily: fonts.sans, fontSize: 16, color: colors.text, lineHeight: 23 },
+    muted: { fontFamily: fonts.sans, fontSize: 14, color: colors.text2, lineHeight: 20 },
+    label: { fontFamily: fonts.sansSemi, fontSize: 11.5, color: colors.text3, letterSpacing: 1.6, textTransform: 'uppercase' },
+    mono: { fontFamily: mono, fontSize: 15, color: colors.text, fontVariant: ['tabular-nums'] },
   };
   return <RNText style={[variants[variant], style]} {...rest}>{children}</RNText>;
 }
@@ -49,7 +50,7 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading 
       })}
     >
       {loading ? <ActivityIndicator color={primary ? colors.onAccent : colors.text} /> : null}
-      <RNText style={{ fontSize: 16, fontWeight: '600', color: primary ? colors.onAccent : colors.text }}>{label}</RNText>
+      <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 16, color: primary ? colors.onAccent : colors.text }}>{label}</RNText>
     </Pressable>
   );
 }
@@ -64,7 +65,7 @@ export function Chip({ label, selected, onPress }: { label: string; selected?: b
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ selected: !!selected }} onPress={onPress}
       style={{ minHeight: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: selected ? colors.accent : colors.surface2 }}>
-      <RNText style={{ fontSize: 14, fontWeight: '600', color: selected ? colors.onAccent : colors.text }}>{label}</RNText>
+      <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: selected ? colors.onAccent : colors.text }}>{label}</RNText>
     </Pressable>
   );
 }
@@ -77,7 +78,7 @@ export function Field({ label, style, ...rest }: { label: string } & TextInputPr
       <TextInput
         accessibilityLabel={label}
         placeholderTextColor={colors.text3}
-        style={[{ minHeight: 48, borderRadius: radius.field, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface2, paddingHorizontal: space.lg, fontSize: 16, color: colors.text }, style]}
+        style={[{ minHeight: 48, borderRadius: radius.field, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface2, paddingHorizontal: space.lg, fontFamily: fonts.sans, fontSize: 16, color: colors.text }, style]}
         {...rest}
       />
     </View>
@@ -105,7 +106,7 @@ export function PayBadge({ state }: { state: 'paid' | 'partial' | 'unpaid' | nul
   return (
     <View accessible accessibilityRole="image" accessibilityLabel={label}
       style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: filled ? colors.paid : 'transparent', borderWidth: filled ? 0 : 1.5, borderColor: color }}>
-      <RNText style={{ fontSize: 13, fontWeight: '800', color: filled ? colors.onPaid : color }}>$</RNText>
+      <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: filled ? colors.onPaid : color }}>$</RNText>
     </View>
   );
 }

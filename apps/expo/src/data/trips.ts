@@ -2,7 +2,11 @@
 // lisible ou null. La sécurité est assurée par la base (RLS) : ces appels n'ont besoin
 // d'aucun contrôle de droits côté appli.
 import { supabase } from '../lib/supabase';
+import { POSTES } from '../domain/types.ts';
 import type { Poste } from '../domain/types.ts';
+import { addDays } from '../lib/dates.ts';
+import { autoTitle, budgetTotal, cityPerDay, dayCount, splitBudget } from '../domain/wizard.ts';
+import type { WizardState } from '../domain/wizard.ts';
 
 const msg = (e: { message: string; code?: string } | null): string | null => {
   if (!e) return null;
@@ -29,9 +33,26 @@ export async function listTrips(): Promise<{ trips: TripSummary[]; error: string
   return { trips: (data ?? []) as TripSummary[], error: msg(error) };
 }
 
-export async function createTrip(title: string, startsOn: string | null, endsOn: string | null): Promise<{ id: string | null; error: string | null }> {
+/** Crée le voyage puis ses destinations. Si seules les destinations échouent, l'id est rendu avec un message. */
+export async function createTrip(title: string, startsOn: string | null, endsOn: string | null, cityIds: number[] = []): Promise<{ id: string | null; error: string | null }> {
   const { data, error } = await supabase.from('trips').insert({ title: title.trim(), starts_on: startsOn, ends_on: endsOn }).select('id').single();
-  return { id: (data as { id: string } | null)?.id ?? null, error: msg(error) };
+  const id = (data as { id: string } | null)?.id ?? null;
+  if (!id) return { id: null, error: msg(error) };
+  if (cityIds.length) {
+    const res = await supabase.from('trip_destinations').insert(cityIds.map((city_id, position) => ({ trip_id: id, city_id, position })));
+    if (res.error) return { id, error: `Voyage créé, mais les destinations n'ont pas pu être ajoutées : ${res.error.message}` };
+  }
+  return { id, error: null };
+}
+
+export async function addDestination(tripId: string, cityId: number, position: number): Promise<string | null> {
+  const { error } = await supabase.from('trip_destinations').insert({ trip_id: tripId, city_id: cityId, position });
+  return error?.code === '23505' ? null : msg(error);
+}
+
+export async function removeDestination(tripId: string, cityId: number): Promise<string | null> {
+  const { error } = await supabase.from('trip_destinations').delete().eq('trip_id', tripId).eq('city_id', cityId);
+  return msg(error);
 }
 
 export async function addDay(tripId: string, date: string): Promise<string | null> {
@@ -50,6 +71,12 @@ export async function addExpense(args: { tripId: string; label: string; poste: P
   const { error } = await supabase.from('expenses').insert({
     trip_id: args.tripId, label: args.label.trim(), poste: args.poste, amount: args.amount, currency: args.currency, paid_by: args.paidBy, item_id: args.itemId ?? null,
   });
+  return msg(error);
+}
+
+/** Fixe (ou efface, avec null) l'heure de début d'une étape. */
+export async function setItemTime(itemId: string, time: string | null): Promise<string | null> {
+  const { error } = await supabase.from('trip_items').update({ start_time: time }).eq('id', itemId);
   return msg(error);
 }
 
@@ -86,4 +113,32 @@ export async function joinTrip(code: string): Promise<{ tripId: string | null; e
 export async function leaveTrip(tripId: string): Promise<string | null> {
   const { error } = await supabase.rpc('leave_trip', { p_trip: tripId });
   return msg(error);
+}
+
+/** Crée le voyage décrit par le parcours : voyage, destinations avec leurs nuits, jours (avec leur ville) et budget par poste. */
+export async function createTripFromWizard(s: WizardState): Promise<{ id: string | null; error: string | null }> {
+  const total = budgetTotal(s);
+  const days = dayCount(s);
+  if (!s.country || !s.start || !s.end || !days || !s.party || total === null) return { id: null, error: 'Il manque des informations pour créer le voyage.' };
+  const level = s.budget.level === 'montant' ? null : s.budget.level;
+  const title = (s.title.trim() || autoTitle(s)).slice(0, 120);
+  const { data, error } = await supabase.from('trips').insert({
+    title, starts_on: s.start, ends_on: s.end, currency: s.budget.currency, budget_level: level, budget_total: total,
+    styles: s.interests, travelers: s.travelers, party_type: s.party, dates_indicative: s.indicative, country_code: s.country,
+  }).select('id').single();
+  const id = (data as { id: string } | null)?.id ?? null;
+  if (!id) return { id: null, error: msg(error) };
+
+  const fail = (what: string, e: { message: string }) => ({ id, error: `Voyage créé, mais ${what} : ${e.message}` });
+  if (s.cities.length) {
+    const r = await supabase.from('trip_destinations').insert(s.cities.map((c, position) => ({ trip_id: id, city_id: c.id, position, nights: c.nights })));
+    if (r.error) return fail('les villes n\'ont pas pu être ajoutées', r.error);
+  }
+  const perDay = cityPerDay(s.cities, days);
+  const r2 = await supabase.from('trip_days').insert(perDay.map((city_id, i) => ({ trip_id: id, day_date: addDays(s.start!, i), city_id })));
+  if (r2.error) return fail('les jours n\'ont pas pu être créés', r2.error);
+  const split = splitBudget(total);
+  const r3 = await supabase.from('trip_budget_lines').insert(POSTES.map((poste) => ({ trip_id: id, poste, amount: split[poste] })));
+  if (r3.error) return fail('le budget n\'a pas pu être réparti', r3.error);
+  return { id, error: null };
 }

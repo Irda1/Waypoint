@@ -52,9 +52,17 @@ export const categoryColors: Record<Mode, Record<string, string>> = {
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 24, xxl: 32 } as const;
 export const radius = { card: 22, pill: 999, field: 14 } as const;
 
-// Polices : Fraunces (titres), Plus Jakarta Sans (texte), Geist Mono (chiffres).
-// Tant qu'elles ne sont pas chargées (voir docs/BACKEND.md), retomber sur le système.
-export const fonts = { serif: 'Fraunces', sans: 'PlusJakartaSans', mono: 'GeistMono' } as const;
+// Polices de la maquette : Fraunces (titres) et Plus Jakarta Sans (texte). Sur mobile chaque graisse est une
+// police à part : on nomme donc la variante voulue, jamais `fontWeight`. Les chiffres utilisent la police
+// à chasse fixe du système avec des chiffres de même largeur (Geist Mono n'est pas chargée pour l'instant).
+// Si le chargement échoue, le système prend le relais : l'appli reste lisible.
+export const fonts = {
+  serif: 'Fraunces_600SemiBold',
+  sans: 'PlusJakartaSans_400Regular',
+  sansMedium: 'PlusJakartaSans_500Medium',
+  sansSemi: 'PlusJakartaSans_600SemiBold',
+  sansBold: 'PlusJakartaSans_700Bold',
+} as const;
 
 // ---- Contraste (WCAG) : utilisé par les tests pour tenir la promesse d'accessibilité ----
 function luminance(hex: string): number {
