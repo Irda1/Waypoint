@@ -13,10 +13,13 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo-google-fonts/fraunces": "*",
+    "@expo-google-fonts/plus-jakarta-sans": "*",
     "@react-native-async-storage/async-storage": "*",
     "@supabase/supabase-js": "^2.117.2",
     "expo": "~57.0.25",
     "expo-constants": "*",
+    "expo-font": "*",
     "expo-linking": "*",
     "expo-router": "~57.0.23",
     "expo-status-bar": "*",
@@ -27,7 +30,8 @@
     "react-native-safe-area-context": "*",
     "react-native-screens": "*",
     "react-native-url-polyfill": "*",
-    "react-native-web": "*"
+    "react-native-web": "*",
+    "react-native-webview": "*"
   },
   "devDependencies": {
     "@types/react": "*",

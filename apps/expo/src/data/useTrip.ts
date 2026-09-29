@@ -9,9 +9,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { Expense, Place, TripItem } from '../domain/types.ts';
 
-export interface Trip { id: string; title: string; starts_on: string | null; ends_on: string | null; currency: string; memo: string; deleted_at: string | null; version: number }
+export interface Trip { id: string; title: string; starts_on: string | null; ends_on: string | null; currency: string; travelers: number; styles: string[]; budget_total: number | null; memo: string; deleted_at: string | null; version: number }
 export interface Member { user_id: string; color: string; left_at: string | null; profiles: { display_name: string; avatar_url: string | null } | null }
 export interface Day { id: string; day_date: string; city_id: number | null; depart_time: string | null; return_time: string | null }
+export interface Destination { city_id: number; position: number; nights: number; lat: number; lng: number; name: string; country_code: string; collection_status: 'empty' | 'queued' | 'collecting' | 'ready' | 'failed' }
 export interface BudgetLine { poste: string; amount: number }
 
 export interface TripData {
@@ -22,11 +23,20 @@ export interface TripData {
   places: Map<number, Place>;
   expenses: (Expense & { label: string; currency: string })[];
   budgetLines: BudgetLine[];
+  destinations: Destination[];
 }
 
 export type LiveStatus = 'connecting' | 'live' | 'offline';
 
-const TABLES = ['trips', 'trip_members', 'trip_days', 'trip_items', 'trip_stays', 'expenses', 'trip_budget_lines'] as const;
+type DestinationRow = { city_id: number; position: number; nights: number; cities: { lat: number; lng: number; name: string; name_fr: string | null; country_code: string; collection_status: Destination['collection_status'] } | null };
+
+function toDestinations(rows: unknown): Destination[] {
+  return ((rows ?? []) as DestinationRow[])
+    .filter((r) => r.cities)
+    .map((r) => ({ city_id: r.city_id, position: r.position, nights: r.nights, lat: r.cities!.lat, lng: r.cities!.lng, name: r.cities!.name_fr ?? r.cities!.name, country_code: r.cities!.country_code, collection_status: r.cities!.collection_status }));
+}
+
+const TABLES = ['trips', 'trip_members', 'trip_days', 'trip_items', 'trip_stays', 'expenses', 'trip_budget_lines', 'trip_destinations'] as const;
 
 export function useTrip(tripId: string) {
   const [data, setData] = useState<TripData | null>(null);
@@ -37,15 +47,16 @@ export function useTrip(tripId: string) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
-    const [trip, members, days, items, expenses, budget] = await Promise.all([
-      supabase.from('trips').select('id,title,starts_on,ends_on,currency,memo,deleted_at,version').eq('id', tripId).maybeSingle(),
+    const [trip, members, days, items, expenses, budget, dest] = await Promise.all([
+      supabase.from('trips').select('id,title,starts_on,ends_on,currency,travelers,styles,budget_total,memo,deleted_at,version').eq('id', tripId).maybeSingle(),
       supabase.from('trip_members').select('user_id,color,left_at,profiles(display_name,avatar_url)').eq('trip_id', tripId),
       supabase.from('trip_days').select('id,day_date,city_id,depart_time,return_time').eq('trip_id', tripId).order('day_date'),
       supabase.from('trip_items').select('*').eq('trip_id', tripId),
       supabase.from('expenses').select('id,poste,amount,paid_by,item_id,stay_id,label,currency').eq('trip_id', tripId).order('spent_on'),
       supabase.from('trip_budget_lines').select('poste,amount').eq('trip_id', tripId),
+      supabase.from('trip_destinations').select('city_id,position,nights,cities(name,name_fr,lat,lng,country_code,collection_status)').eq('trip_id', tripId).order('position'),
     ]);
-    const failure = [trip, members, days, items, expenses, budget].find((r) => r.error)?.error;
+    const failure = [trip, members, days, items, expenses, budget, dest].find((r) => r.error)?.error;
     if (failure) { setError(failure.message); setLoading(false); return; }
     if (!trip.data) { setError('Voyage introuvable, ou tu n\'en es plus membre.'); setData(null); setLoading(false); return; }
 
@@ -64,6 +75,7 @@ export function useTrip(tripId: string) {
       places,
       expenses: (expenses.data ?? []) as TripData['expenses'],
       budgetLines: (budget.data ?? []) as BudgetLine[],
+      destinations: toDestinations(dest.data),
     };
     known.current = new Set([next.trip.id, ...next.days.map((d) => d.id), ...next.items.map((i) => i.id), ...next.expenses.map((e) => e.id), ...next.members.map((m) => m.user_id)]);
     setData(next);
@@ -78,14 +90,16 @@ export function useTrip(tripId: string) {
 
   useEffect(() => {
     void load();
-    let channel = supabase.channel(`trip-${tripId}`);
+    // Nom unique par écran : la carte et le voyage sont ouverts en même temps et supabase réutilise un canal de même nom (déjà abonné).
+    let channel = supabase.channel(`trip-${tripId}-${Math.random().toString(36).slice(2, 10)}`);
     for (const table of TABLES) {
       channel = channel.on('postgres_changes', { event: '*', schema: 'public', table }, (payload) => {
         const row = (payload.eventType === 'DELETE' ? payload.old : payload.new) as Record<string, unknown>;
         if (payload.eventType === 'DELETE') {
           // Les suppressions ne sont pas filtrées par la sécurité par ligne : on ne réagit qu'à nos propres lignes.
           const id = (row.id ?? row.user_id) as string | undefined;
-          if (id && known.current.has(id)) reloadSoon();
+          // trip_destinations n'a pas d'id : sa clé primaire contient trip_id, présent dans l'ancienne ligne.
+          if ((id && known.current.has(id)) || row.trip_id === tripId) reloadSoon();
         } else if (row.trip_id === tripId || row.id === tripId) {
           reloadSoon();
         }

@@ -19,3 +19,8 @@ Thumbs.db
 .idea/
 .vscode/
 *.log
+
+# Variables d'environnement locales (clés) : jamais dans le dépôt
+.env
+.env.*
+!.env.example

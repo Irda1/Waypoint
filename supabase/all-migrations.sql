@@ -1128,3 +1128,67 @@ $$;
 
 grant execute on function public.places_nearby(double precision, double precision, integer, text, text[], integer)
   to anon, authenticated, service_role;
+
+-- ============================================================
+-- 20260929000800_trip_destinations.sql
+-- ============================================================
+-- Waypoint · migration 0800 : destinations d'un voyage
+--
+-- Un voyage peut avoir plusieurs destinations (villes de la base). Elles servent à proposer
+-- directement les bonnes villes dans le sélecteur de lieux, et à illustrer la couverture.
+-- Même règle que le reste du voyage : tout membre lit, ajoute et retire, sans rôle.
+
+create table public.trip_destinations (
+  trip_id     uuid not null references public.trips (id) on delete cascade,
+  city_id     bigint not null references public.cities (id) on delete cascade,
+  position    integer not null default 0,
+  created_by  uuid default auth.uid() references public.profiles (id) on delete set null,
+  created_at  timestamptz not null default now(),
+  primary key (trip_id, city_id)
+);
+create index trip_destinations_city_idx on public.trip_destinations (city_id);
+
+alter table public.trip_destinations enable row level security;
+
+create policy "membres : lecture" on public.trip_destinations for select to authenticated
+  using (public.is_trip_member(trip_id));
+create policy "membres : ajout" on public.trip_destinations for insert to authenticated
+  with check (public.is_trip_member(trip_id));
+create policy "membres : modification" on public.trip_destinations for update to authenticated
+  using (public.is_trip_member(trip_id)) with check (public.is_trip_member(trip_id));
+create policy "membres : suppression" on public.trip_destinations for delete to authenticated
+  using (public.is_trip_member(trip_id));
+revoke all on public.trip_destinations from anon;
+
+-- Temps réel (Supabase uniquement, comme la migration 0600)
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'trip_destinations') then
+    alter publication supabase_realtime add table public.trip_destinations;
+  end if;
+end $$;
+
+-- ============================================================
+-- 20260929000900_wizard_trip_fields.sql
+-- ============================================================
+-- Waypoint · migration 0900 : champs du parcours « Démarrer un voyage »
+--
+-- Le parcours de la maquette (pays, dates, villes avec nuits, voyageurs, envies, budget) enregistre :
+--  * le pays du voyage, le nombre de voyageurs et le type de groupe ;
+--  * l'indication « dates indicatives » quand seule une durée a été choisie ;
+--  * le nombre de nuits de chaque destination (répartition automatique, ajustable) ;
+--  * les villes phares, dans l'ordre d'affichage voulu (null = ville ordinaire).
+
+alter table public.cities
+  add column featured_rank smallint;
+create index cities_featured_idx on public.cities (country_code, featured_rank) where featured_rank is not null;
+
+alter table public.trips
+  add column country_code char(2) check (country_code ~ '^[A-Z]{2}$'),
+  add column travelers smallint not null default 1 check (travelers between 1 and 30),
+  add column party_type text check (party_type in ('seul', 'deux', 'amis', 'famille')),
+  add column dates_indicative boolean not null default false;
+
+alter table public.trip_destinations
+  add column nights smallint not null default 0 check (nights between 0 and 365);

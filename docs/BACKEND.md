@@ -86,7 +86,7 @@ npx expo start                    # « a » pour Android, « w » pour le web
 
 Un ami rejoint un voyage avec le lien d'invitation (bouton « Inviter un ami ») : il se connecte, devient membre à égalité avec les autres, et voit chaque modification en direct. Version web publiable : `npx expo export --platform web` (dossier `dist/`). Une build Android installable passe par EAS Build ou `npx expo run:android`.
 
-**Polices** : le thème prévoit Fraunces, Plus Jakarta Sans et Geist Mono ; elles ne sont pas encore chargées (l'appli utilise les polices du système en attendant). À ajouter avec `expo-font` à l'étape suivante.
+**Polices** : Fraunces (titres) et Plus Jakarta Sans (texte) sont chargées au démarrage (`src/theme/useAppFonts.ts`) ; en cas d'échec ou de réseau lent, le système prend le relais après 2,5 s. Geist Mono n'est pas chargée : les chiffres utilisent la police à chasse fixe du système.
 
 ## 7. Vérifications automatiques
 
@@ -119,9 +119,30 @@ Un seul flux au départ, et rien à construire : l'application n'ouvre **jamais*
 - Ni Bright Data ni les API de collecte n'étaient joignables ici : les passes sont testées contre de faux serveurs, jamais contre les vrais.
 - Les tarifs Supabase et Google Places, et les conditions d'usage de Pexels pour l'affichage des photos par lien, sont à relire avant l'ouverture au public.
 
+## Journal des versions de l'application
+
+- **v1.0** : socle (compte, voyages partagés en direct, budget, comptes entre amis) sur Supabase.
+- **v1.1** : thème Crépuscule, polices Fraunces et Plus Jakarta Sans, écran d'accueil de la maquette (photo d'horizon).
+- **v1.2** : écran d'un voyage repris de la maquette (couverture, jours en timeline, barres de budget).
+- **v1.3** : recherche de lieux réels dans un jour (ville, nom, catégorie), heure d'une étape modifiable, mention OpenStreetMap.
+- **v1.4** : le sélecteur propose d'abord les villes citées dans le titre du voyage, recherche d'une autre ville, ville mémorisée par jour.
+
+- **v1.5** : destinations d'un voyage (nouvelle table `trip_destinations`, migration 0800) : choix des villes à la création, modifiables depuis le voyage, proposées en premier dans la recherche de lieux.
+- **v1.6** : parcours « Démarrer un voyage » repris de la maquette Escale (pays, calendrier, villes avec nuits réparties, voyageurs, envies, budget, récapitulatif). Migration 0900, villes phares en français (`supabase/seed-villes-phares.sql`).
+- **v1.7** : programme automatique (`domain/itinerary.ts`, testé) : propose les jours vides selon envies, budget d'activités et proximité (arrivée 14 h, déjeuner 12 h 30, dîner 20 h, lieux fermés écartés, retrait avant validation), et « Ranger les horaires » pour les étapes sans heure. Aucune migration.
+- **v1.8** : météo (Open-Meteo, sans clé) : carte Météo (actuelle + prévisions du voyage, 16 jours max), météo et conseil pluie/plein air dans chaque jour. **Licence : l'offre gratuite est non commerciale ; une publication commerciale demande un abonnement Open-Meteo.** Attribution CC BY 4.0 affichée. Aucune migration.
+- **v1.9** : carte (`domain/map.ts`, testé) : écran `/map/[id]` avec le programme numéroté par jour, filtre par jour, lieux à découvrir filtrables par catégorie, ajout au jour d'une touche. Fond OpenFreeMap (usage commercial autorisé, sans clé), MapLibre GL JS dans un iframe (web) ou une WebView (Android/iOS, nouvelle dépendance `react-native-webview` : relancer `npm install`). Hors ligne : fond vide.
+- **v1.9.1** : correctif temps réel : chaque écran ouvre son propre canal (la carte et le voyage ouverts ensemble provoquaient « cannot add postgres_changes callbacks after subscribe »).
+- **v1.9.2** : carte : les repères n'attendent plus la fin du chargement des tuiles ; bandeau de diagnostic (erreur du fond de carte) en bas à gauche.
+- **v1.9.3** : carte : traits pointillés reliant les étapes de chaque jour (calque SVG, indépendant du fond) ; diagnostic réseau des tuiles ; repli automatique sur le style clair si le sombre ne charge pas en 8 s.
+- **v1.9.4** : bouton « ← Voyage » de la carte (retour direct au voyage, même après rechargement) ; carte : le style est téléchargé par la page en cas de blocage, diagnostic détaillé (style, tuiles, taille de la zone).
+- **v1.9.5** : carte web : la page de carte est servie comme fichier public (`apps/expo/public/map.html`, généré depuis `domain/map.ts`, test de cohérence) au lieu d'un iframe « srcdoc » ; réglages passés dans l'adresse.
+
+Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` remplit la ville, la recherche et l'ajout à un jour fonctionnent, les durées estimées sont marquées « ≈ ».
+
 ## Prochaines étapes
 
 1. Premier déploiement : projet Supabase, migrations, secrets, passes `countries`, `cities`, puis `places` pour Lisbonne et Porto.
-2. Recherche et ajout de lieux réels dans un jour (aujourd'hui l'appli ajoute des étapes libres), filtre « Pratique », carte.
+2. ~~Recherche et ajout de lieux réels dans un jour~~ (fait : bouton « Ajouter un lieu », recherche par ville, nom et catégorie ; heure modifiable). Reste : filtre « Pratique », carte, recherche sans accents (Belem / Belém).
 3. Portage des écrans de la maquette (accueil, itinéraire, budget) avec le thème Crépuscule et les polices.
 4. Météo, puis transports, seulement après lieux et carte réels.

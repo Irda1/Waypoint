@@ -15,7 +15,7 @@
   function appliquerBarres() {
     var jour = modeJour();
     var meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute("content", jour ? "#F2F1EC" : "#080B0C");
+    if (meta) meta.setAttribute("content", jour ? "#FFF6E9" : "#07090B");
     if (natif && cap.Plugins && cap.Plugins.SystemBars && cap.Plugins.SystemBars.setStyle) {
       // DARK = icônes claires pour fond sombre ; LIGHT = icônes sombres pour fond clair.
       cap.Plugins.SystemBars.setStyle({ style: jour ? "LIGHT" : "DARK" }).catch(function () {});

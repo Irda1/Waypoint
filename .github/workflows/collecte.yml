@@ -1,5 +1,10 @@
 name: Collecte de données
 
+# Remplit la base Supabase (pays, villes, lieux, images) depuis des sources
+# officielles ou ouvertes. Tourne sur GitHub : ton ordinateur n'a pas besoin
+# d'être allumé. Secrets à créer dans Settings > Secrets and variables > Actions :
+#   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, PEXELS_API_KEY (pour les images)
+
 on:
   workflow_dispatch:
     inputs:
@@ -23,17 +28,23 @@ on:
         type: boolean
         default: false
   schedule:
+    # Traite les villes demandées par l'app (file d'attente), toutes les 3 heures
     - cron: "17 */3 * * *"
 
 permissions:
   contents: read
 
+# Un seul flux à la fois : jamais deux collectes en parallèle (ni deux jobs
+# qui se disputent le quota Overpass ou Pexels).
 concurrency:
   group: collecte
   cancel-in-progress: false
 
 jobs:
   collecte:
+    # Les exécutions planifiées ne démarrent qu'une fois la variable de dépôt
+    # COLLECTE_ACTIVE = true créée (Settings > Secrets and variables > Actions > Variables) :
+    # pas d'échecs en boucle tant que les secrets ne sont pas configurés.
     if: ${{ github.event_name != 'schedule' || vars.COLLECTE_ACTIVE == 'true' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -52,6 +63,7 @@ jobs:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           PEXELS_API_KEY: ${{ secrets.PEXELS_API_KEY }}
+          # Saisies passées par variables d'environnement (jamais collées dans le script)
           PASS: ${{ inputs.pass || 'queue' }}
           COUNTRY: ${{ inputs.country }}
           CITY: ${{ inputs.city }}

@@ -109,6 +109,13 @@ select test.as_admin();
 select test.throws($$insert into public.places (city_id, kind, category_code, name, lat, lng, source, license)
                      select id, 'activity', 'pharmacie', 'x', 0, 0, 'x', 'x' from public.cities limit 1$$, '23503', 'une catégorie de service ne peut pas servir à une activité');
 
+-- Villes phares : le script s'exécute sans erreur et relancé, n'ajoute rien
+select test.as_admin();
+\ir ../seed-villes-phares.sql
+select count(*) as n_cities from public.cities \gset
+\ir ../seed-villes-phares.sql
+select test.ok((select count(*) from public.cities) = :n_cities, 'villes phares : relancer le script n''ajoute rien');
+
 -- ===========================================================================
 -- Voyage d'Alice
 -- ===========================================================================
@@ -142,6 +149,11 @@ insert into public.expenses (id, trip_id, label, poste, amount, paid_by, stay_id
   ('55555555-5555-5555-5555-555555555555', '11111111-1111-1111-1111-111111111111', 'Hôtel do Chiado, 3 nuits', 'hebergement', 390, 'aaaaaaaa-0000-0000-0000-000000000001', '22222222-2222-2222-2222-222222222222');
 insert into public.trip_budget_lines (trip_id, poste, amount) values ('11111111-1111-1111-1111-111111111111', 'repas', 450);
 insert into public.saved_places (trip_id, place_id, list) values ('11111111-1111-1111-1111-111111111111', 9001, 'favorite');
+insert into public.trip_destinations (trip_id, city_id, position) select '11111111-1111-1111-1111-111111111111', id, 1 from public.cities order by id limit 1;
+select test.ok((select count(*) from public.trip_destinations) = 1, 'une destination ajoutée au voyage');
+select test.throws($$update public.trips set travelers = 0 where id = '11111111-1111-1111-1111-111111111111'$$, '23514', 'nombre de voyageurs invalide refusé');
+select test.throws($$update public.trip_destinations set nights = -1$$, '23514', 'nuits négatives refusées');
+select test.throws($$insert into public.trip_destinations (trip_id, city_id) select '11111111-1111-1111-1111-111111111111', id from public.cities order by id limit 1$$, '23505', 'la même ville ne s''ajoute pas deux fois');
 
 select test.throws($$insert into public.trip_items (trip_id, day_id) values ('11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333')$$, '23514', 'une étape sans lieu ni titre est refusée');
 select test.throws($$insert into public.trip_days (trip_id, day_date) values ('11111111-1111-1111-1111-111111111111', '2026-10-13')$$, '23505', 'un seul enregistrement par jour et par voyage');
@@ -158,6 +170,8 @@ select test.ok((select count(*) from public.expenses) = 0, 'non-membre : dépens
 select test.ok((select count(*) from public.profiles where id = 'aaaaaaaa-0000-0000-0000-000000000001') = 0, 'non-membre : profil d''un inconnu invisible');
 select test.ok((select count(*) from public.profiles) = 1, 'chacun voit son propre profil');
 select test.throws($$insert into public.trip_items (trip_id, day_id, title) values ('11111111-1111-1111-1111-111111111111', '33333333-3333-3333-3333-333333333333', 'intrus')$$, '42501', 'non-membre : ajout d''étape refusé');
+select test.ok((select count(*) from public.trip_destinations) = 0, 'non-membre : destinations invisibles');
+select test.throws($$insert into public.trip_destinations (trip_id, city_id) select '11111111-1111-1111-1111-111111111111', id from public.cities order by id limit 1$$, '42501', 'non-membre : ajout de destination refusé');
 select test.throws($$insert into public.trip_members (trip_id, user_id) values ('11111111-1111-1111-1111-111111111111', 'bbbbbbbb-0000-0000-0000-000000000002')$$, '42501', 'impossible de s''ajouter soi-même à un voyage');
 select test.throws($$select public.join_trip('XXXXXXXXXXXX')$$, 'P0002', 'code d''invitation inconnu refusé');
 select test.ok((select count(*) from public.preview_invite('XXXXXXXXXXXX')) = 0, 'aperçu d''un code inconnu : rien');
@@ -182,6 +196,7 @@ select test.ok((select member_count from public.preview_invite(current_setting('
 select test.ok(public.join_trip(current_setting('test.code')) = '11111111-1111-1111-1111-111111111111', 'join_trip renvoie le voyage');
 select test.ok((select count(*) from public.trips) = 1, 'nouveau membre : voyage visible');
 select test.ok((select count(*) from public.trip_items) = 2, 'nouveau membre : étapes visibles');
+select test.ok((select count(*) from public.trip_destinations) = 1, 'nouveau membre : destinations visibles');
 select test.ok((select count(*) from public.profiles) = 2, 'membres : profils mutuellement visibles');
 select test.ok(public.join_trip(current_setting('test.code')) is not null, 'rejoindre deux fois est sans effet');
 select test.ok((select count(*) from public.trip_members where left_at is null) = 2, 'toujours deux membres actifs');
@@ -280,6 +295,7 @@ select test.ok((select status from public.ingestion_queue) = 'running' and (sele
 
 select test.as_anon();
 select test.throws($$select public.request_city_collection(1)$$, '42501', 'anonyme : demande de collecte refusée');
+select test.throws($$select * from public.trip_destinations$$, '42501', 'anonyme : destinations inaccessibles');
 
 -- ===========================================================================
 -- Corbeille visible dans l'aperçu ; suppression définitive côté serveur
@@ -294,6 +310,7 @@ select test.as_service();
 delete from public.trips where id = '11111111-1111-1111-1111-111111111111';
 select test.as_admin();
 select test.ok((select count(*) from public.trip_items where trip_id = '11111111-1111-1111-1111-111111111111') = 0, 'suppression serveur : tout le voyage disparaît en cascade');
+select test.ok((select count(*) from public.trip_destinations) = 0, 'suppression serveur : les destinations aussi');
 select test.ok((select count(*) from public.trip_activity_log where trip_id = '11111111-1111-1111-1111-111111111111') = 0, 'suppression serveur : le journal du voyage aussi');
 
 do $$ begin raise notice ''; raise notice 'TOUS LES TESTS PASSENT'; end $$;
