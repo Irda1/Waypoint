@@ -1,8 +1,9 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Text as RNText, View } from 'react-native';
-import { ErrorNote, Field, Text } from '../../ui';
-import { listCountryCities } from '../../data/places';
-import type { CityOption } from '../../data/places';
+import { Button, ErrorNote, Field, Text } from '../../ui';
+import { RegionMap } from '../regions/RegionMap';
+import { listCountryCities, listCountryCityPoints } from '../../data/places';
+import type { CityOption, CityPoint } from '../../data/places';
 import { COUNTRY_NAME } from '../../domain/countries.ts';
 import { changeNights, nightCount, toggleCity } from '../../domain/wizard.ts';
 import type { WizardState } from '../../domain/wizard.ts';
@@ -19,6 +20,8 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
   const [list, setList] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [warn, setWarn] = useState<string | null>(null);
+  const [showList, setShowList] = useState(false);
+  const [points, setPoints] = useState<CityPoint[]>([]);
   const nights = nightCount(state);
   const country = state.country ?? '';
 
@@ -29,6 +32,12 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
     }, query ? 250 : 0);
     return () => { alive = false; clearTimeout(id); };
   }, [country, query]);
+
+  useEffect(() => {
+    let alive = true;
+    void listCountryCityPoints(country).then((r) => { if (alive) setPoints(r.points); });
+    return () => { alive = false; };
+  }, [country]);
 
   // Ville venue d'une idée « Envie de… » : cochée d'office une seule fois.
   const [prefDone, setPrefDone] = useState(false);
@@ -48,10 +57,16 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
     if (!r.error) update({ ...state, cities: r.cities });
   }
 
+  const selected = useMemo(() => state.cities.map((c, i) => ({ id: c.id, order: i + 1 })), [state.cities]);
+  function toggleById(id: number) {
+    const p = points.find((x) => x.id === id);
+    if (p) toggle({ id: p.id, name: p.name } as Row);
+  }
+
   return (
     <View style={{ gap: space.md }}>
       <StepTitle title={`Quelles villes en ${COUNTRY_NAME[country] ?? 'ce pays'} ?`}
-        hint={`${nights} nuit${nights > 1 ? 's' : ''} à répartir. Les nuits se répartissent toutes seules, tu peux les ajuster.`} />
+        hint={`${nights} nuit${nights > 1 ? "s" : ""} à répartir. Touche une région sur la carte, puis les villes à visiter : les nuits se répartissent toutes seules.`} />
 
       {state.cities.length > 0 ? (
         <View style={{ gap: space.sm }}>
@@ -79,16 +94,26 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
       )}
       {warn ? <Text variant="muted" style={{ color: colors.warm }} accessibilityLiveRegion="polite">{warn}</Text> : null}
 
+      <View style={{ height: 440, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' }}>
+        <RegionMap country={country} cities={points} selected={selected} onToggle={toggleById} />
+      </View>
       <Field label="Rechercher une ville" value={query} onChangeText={setQuery} placeholder="Ex. Lisbonne, Porto…" autoCorrect={false} />
-      {list === null ? <Text variant="muted">Chargement des villes…</Text> : list.length === 0 ? (
-        <Text variant="muted">{query ? 'Aucune ville ne correspond.' : 'Aucune ville en base pour ce pays. Tu peux continuer sans, ou lancer la collecte des villes (voir le guide).'}</Text>
-      ) : list.map((c) => {
-        const index = chosen.get(c.id);
-        return (
-          <Choice key={c.id} title={c.name} detail={c.featured_rank != null ? 'Ville phare' : undefined} selected={index !== undefined} onPress={() => toggle(c)}
-            right={index !== undefined ? <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: colors.accent }}>{state.cities[index].nights} nuit{state.cities[index].nights > 1 ? 's' : ''}</RNText> : undefined} />
-        );
-      })}
+      {query || showList ? (
+        <>
+          {!query ? <Button label="Masquer la liste des villes" variant="ghost" onPress={() => setShowList(false)} /> : null}
+          {list === null ? <Text variant="muted">Chargement des villes…</Text> : list.length === 0 ? (
+            <Text variant="muted">{query ? 'Aucune ville ne correspond.' : 'Aucune ville en base pour ce pays. Tu peux continuer sans, ou lancer la collecte des villes (voir le guide).'}</Text>
+          ) : list.map((c) => {
+            const index = chosen.get(c.id);
+            return (
+              <Choice key={c.id} title={c.name} detail={c.featured_rank != null ? 'Ville phare' : undefined} selected={index !== undefined} onPress={() => toggle(c)}
+                right={index !== undefined ? <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: colors.accent }}>{state.cities[index].nights} nuit{state.cities[index].nights > 1 ? 's' : ''}</RNText> : undefined} />
+            );
+          })}
+        </>
+      ) : (
+        <Button label="Afficher la liste des villes" variant="ghost" onPress={() => setShowList(true)} />
+      )}
       <ErrorNote message={error} />
     </View>
   );
