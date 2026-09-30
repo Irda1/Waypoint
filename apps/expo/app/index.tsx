@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useRequireAuth } from '../src/auth/useRequireAuth';
 import { Button, Card, Columns, ErrorNote, Field, Text } from '../src/ui';
+import { savedLabel } from '../src/domain/offlineSnapshot.ts';
 import { listTrips } from '../src/data/trips';
 import type { TripSummary } from '../src/data/trips';
 import { formatDay, tripStatusLabel } from '../src/lib/format';
@@ -35,6 +36,7 @@ export default function Home() {
   const { colors } = useTheme();
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const [joinCode, setJoinCode] = useState('');
   const today = todayIso();
 
@@ -42,6 +44,7 @@ export default function Home() {
     const res = await listTrips();
     setTrips(res.trips);
     setError(res.error);
+    setSavedAt(res.savedAt ?? null);
   }, []);
   useEffect(() => { if (!guard) void refresh(); }, [guard, refresh]);
 
@@ -81,6 +84,7 @@ export default function Home() {
 
         <View style={styles.page}>
           <ErrorNote message={error} />
+          {savedAt ? <Text variant="muted">Hors connexion : voyages tels qu'ils étaient {savedLabel(savedAt)}.</Text> : null}
 
           <Text variant="label">Envie de…</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>

@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { capitalCovers, COVER_FIELDS, toCover } from './cityCover';
 import type { CityCover } from './cityCover';
 import { supabase } from '../lib/supabase';
+import { loadOffline, saveOffline } from './offline';
 import type { Expense, Place, TripItem } from '../domain/types.ts';
 
 export interface Trip { id: string; title: string; starts_on: string | null; ends_on: string | null; currency: string; country_code?: string | null; travelers: number; styles: string[]; budget_total: number | null; memo: string; deleted_at: string | null; version: number }
@@ -51,6 +52,8 @@ export function useTrip(tripId: string) {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [status, setStatus] = useState<LiveStatus>('connecting');
+  /** Non nul quand on affiche la copie gardée sur l'appareil (pas de réseau) : date de cette copie. */
+  const [savedAt, setSavedAt] = useState<number | null>(null);
   const known = useRef<Set<string>>(new Set());
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -66,7 +69,13 @@ export function useTrip(tripId: string) {
       supabase.from('trip_stays').select('id,name,address,lat,lng').eq('trip_id', tripId),
     ]);
     const failure = [trip, members, days, items, expenses, budget, dest, stays].find((r) => r.error)?.error;
-    if (failure) { setError(failure.message); setLoading(false); return; }
+    if (failure) {
+      // Sans réseau : on montre la dernière copie connue plutôt qu'une page d'erreur.
+      const copy = await loadOffline<TripData>(`trip.${tripId}`);
+      if (copy) { setData(copy.data); setSavedAt(copy.savedAt); setError(null); } else setError(failure.message);
+      setLoading(false);
+      return;
+    }
     if (!trip.data) { setError('Voyage introuvable, ou tu n\'en es plus membre.'); setData(null); setLoading(false); return; }
 
     const placeIds = [...new Set((items.data ?? []).map((i) => i.place_id).filter((x): x is number => x != null))];
@@ -95,8 +104,10 @@ export function useTrip(tripId: string) {
     };
     known.current = new Set([next.trip.id, ...next.days.map((d) => d.id), ...next.items.map((i) => i.id), ...next.expenses.map((e) => e.id), ...next.members.map((m) => m.user_id), ...next.stays.map((x) => x.id)]);
     setData(next);
+    setSavedAt(null);
     setError(null);
     setLoading(false);
+    void saveOffline(`trip.${tripId}`, next);
   }, [tripId]);
 
   const reloadSoon = useCallback(() => {
@@ -131,5 +142,5 @@ export function useTrip(tripId: string) {
     };
   }, [tripId, load, reloadSoon]);
 
-  return { data, error, loading, status, reload: load };
+  return { data, error, loading, status, savedAt, reload: load };
 }

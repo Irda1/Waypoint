@@ -15,6 +15,7 @@ import { DayCard } from '../../src/features/trip/DayCard';
 import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
 import { ProgramCard } from '../../src/features/trip/ProgramCard';
+import { savedLabel } from '../../src/domain/offlineSnapshot.ts';
 import { shareText } from '../../src/lib/share';
 import { ChecklistCard } from '../../src/features/trip/ChecklistCard';
 import { BookingsCard } from '../../src/features/trip/BookingsCard';
@@ -69,7 +70,7 @@ export default function TripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
   const { colors } = useTheme();
-  const { data, error, loading, status, reload } = useTrip(String(id));
+  const { data, error, loading, status, savedAt, reload } = useTrip(String(id));
   const [tab, setTab] = useState<'voyage' | 'jour' | 'budget' | 'amis'>('voyage');
   const [chosenDay, setChosenDay] = useState<number | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
@@ -172,7 +173,7 @@ export default function TripScreen() {
                   <RNText style={styles.glassLabel}>← Mes voyages</RNText>
                 </Pressable>
                 <View style={styles.glass} accessibilityLiveRegion="polite">
-                  <RNText style={styles.glassLabel}>{STATUS[status]}</RNText>
+                  <RNText style={styles.glassLabel}>{savedAt ? `Copie hors ligne · ${savedLabel(savedAt)}` : STATUS[status]}</RNText>
                 </View>
               </View>
               <View style={styles.coverText}>
