@@ -143,6 +143,29 @@ export function budgetSummary(args: {
   }])) as Record<Poste, PosteSummary>;
 }
 
+export interface PosteLine { kind: 'paid' | 'forecast'; label: string; amount: number }
+
+/** Détail d'un poste : dépenses saisies, puis reste estimé des étapes du programme (plan A) pas encore payées. */
+export function posteDetail(poste: Poste, args: {
+  expenses: (Pick<Expense, 'amount' | 'poste' | 'item_id'> & { label?: string | null })[];
+  items: Pick<TripItem, 'id' | 'place_id' | 'category_code' | 'plan' | 'title'>[];
+  places: Map<number, Pick<Place, 'price_amount' | 'category_code'> & { name?: string }>;
+  travelers: number;
+}): PosteLine[] {
+  const lines: PosteLine[] = args.expenses.filter((e) => e.poste === poste)
+    .map((e) => ({ kind: 'paid' as const, label: e.label || 'Dépense', amount: e.amount }));
+  for (const it of args.items) {
+    if (it.plan !== 'A' || it.place_id == null) continue;
+    const place = args.places.get(it.place_id);
+    if (posteForCategory(it.category_code ?? place?.category_code) !== poste) continue;
+    const price = toCents((place?.price_amount ?? 0) * Math.max(1, args.travelers));
+    const paid = args.expenses.filter((e) => e.item_id === it.id).reduce((sum, e) => sum + toCents(e.amount), 0);
+    const remaining = Math.max(0, price - paid);
+    if (remaining > 0) lines.push({ kind: 'forecast', label: place?.name ?? it.title ?? 'Étape', amount: fromCents(remaining) });
+  }
+  return lines;
+}
+
 export interface SavingItem { itemId: string; name: string; cost: number }
 export interface Saving {
   poste: Poste;

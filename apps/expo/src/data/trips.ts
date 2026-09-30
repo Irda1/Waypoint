@@ -182,3 +182,9 @@ export async function setTripMemo(tripId: string, memo: string): Promise<string 
   const { error } = await supabase.from('trips').update({ memo: memo.trim() }).eq('id', tripId);
   return msg(error);
 }
+
+/** Fixe le budget prévu d'un poste (crée la ligne si elle n'existe pas). */
+export async function setBudgetLine(tripId: string, poste: Poste, amount: number): Promise<string | null> {
+  const { error } = await supabase.from('trip_budget_lines').upsert({ trip_id: tripId, poste, amount }, { onConflict: 'trip_id,poste' });
+  return msg(error);
+}

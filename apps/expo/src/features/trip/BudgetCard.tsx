@@ -1,20 +1,25 @@
-import React from 'react';
-import { View } from 'react-native';
-import { Card, Text } from '../../ui';
+import React, { useState } from 'react';
+import { Pressable, View } from 'react-native';
+import { Button, Card, ErrorNote, Field, Text } from '../../ui';
+import { setBudgetLine } from '../../data/trips';
 import { radius, space } from '../../theme/tokens';
 import { useTheme } from '../../theme/useTheme';
 import { formatMoney } from '../../lib/format';
 import { useLocalMoney } from '../../data/rates';
 import { convert, formatApprox } from '../../domain/currency.ts';
-import { budgetSummary, costByDay, savingSuggestions } from '../../domain/budget.ts';
+import { budgetSummary, costByDay, posteDetail, savingSuggestions } from '../../domain/budget.ts';
 import { POSTES } from '../../domain/types.ts';
 import type { Poste } from '../../domain/types.ts';
 import type { TripData } from '../../data/useTrip';
 
 const NOMS: Record<Poste, string> = { hebergement: 'Hébergement', transports: 'Transports', repas: 'Repas', activites: 'Activités', shopping: 'Shopping' };
 
-export function BudgetCard({ data }: { data: TripData }) {
+export function BudgetCard({ data, onChanged }: { data: TripData; onChanged?: () => void }) {
   const { colors } = useTheme();
+  const [open, setOpen] = useState<Poste | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [error, setError] = useState<string | null>(null);
   const { trip, members, expenses, items, places, budgetLines } = data;
   const active = members.filter((m) => !m.left_at);
 
@@ -27,6 +32,13 @@ export function BudgetCard({ data }: { data: TripData }) {
   const maxDay = Math.max(0, ...dayCosts);
   const { rates, local } = useLocalMoney(data.destinations[0]?.country_code ?? null);
   const localTotal = local && local !== trip.currency ? convert(total, trip.currency, local, rates) : null;
+
+  async function saveEnvelope(poste: Poste, value: number) {
+    if (!Number.isFinite(value) || value < 0) { setError('Indique un montant positif.'); return; }
+    const err = await setBudgetLine(trip.id, poste, Math.round(value * 100) / 100);
+    setError(err);
+    if (!err) { setEditing(false); onChanged?.(); }
+  }
 
   return (
     <Card>
@@ -44,14 +56,15 @@ export function BudgetCard({ data }: { data: TripData }) {
         const totalShare = s.envelope ? Math.min(100, (spent / s.envelope) * 100) : 0;
         return (
           <View key={p} style={{ gap: space.xs }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: open === p }} accessibilityLabel={`Détail du poste ${NOMS[p]}`} onPress={() => { setOpen(open === p ? null : p); setEditing(false); setError(null); }}
+              style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>
               <Text variant="body">{NOMS[p]}</Text>
               <Text variant="mono" style={{ flexShrink: 1, textAlign: 'right' }}>
                 {formatMoney(s.paid, trip.currency)}
                 {s.forecast ? ` + ≈ ${formatMoney(s.forecast, trip.currency)} prévus` : ''}
                 {s.envelope ? ` / ${formatMoney(s.envelope, trip.currency)}` : ''}
               </Text>
-            </View>
+            </Pressable>
             {s.envelope ? (
               <View accessible accessibilityRole="progressbar" accessibilityLabel={`${NOMS[p]} : ${Math.round((spent / s.envelope) * 100)} % du budget prévu`}
                 style={{ height: 6, borderRadius: radius.pill, backgroundColor: colors.surface2, overflow: 'hidden' }}>
@@ -60,6 +73,30 @@ export function BudgetCard({ data }: { data: TripData }) {
               </View>
             ) : null}
             {over ? <Text variant="muted" style={{ color: colors.warm }}>Dépasse le budget prévu de {formatMoney(spent - (s.envelope ?? 0), trip.currency)}</Text> : null}
+            {open === p ? (
+              <View style={{ gap: space.sm, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }}>
+                {posteDetail(p, { expenses, items, places, travelers }).map((l, i) => (
+                  <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>
+                    <Text variant="body" style={{ flex: 1 }}>{l.label}{l.kind === 'forecast' ? ' (prévu)' : ''}</Text>
+                    <Text variant="mono">{l.kind === 'forecast' ? '≈ ' : ''}{formatMoney(l.amount, trip.currency)}</Text>
+                  </View>
+                ))}
+                {!posteDetail(p, { expenses, items, places, travelers }).length ? <Text variant="muted">Aucune dépense ni étape prévue pour ce poste.</Text> : null}
+                {editing ? (
+                  <View style={{ gap: space.sm }}>
+                    <Field label={`Budget prévu pour ${NOMS[p].toLowerCase()} (${trip.currency})`} value={amount} onChangeText={setAmount} keyboardType="decimal-pad" placeholder="Ex. 400" />
+                    <Button label="Enregistrer le budget" onPress={() => saveEnvelope(p, Number(amount.replace(',', '.')))} />
+                    <Button label="Annuler" variant="ghost" onPress={() => { setEditing(false); setError(null); }} />
+                  </View>
+                ) : (
+                  <View style={{ gap: space.sm }}>
+                    {over ? <Button label={`Augmenter à ${formatMoney(Math.ceil(spent), trip.currency)}`} onPress={() => saveEnvelope(p, Math.ceil(spent))} /> : null}
+                    <Button label="Modifier le budget de ce poste" variant="ghost" onPress={() => { setAmount(s.envelope ? String(s.envelope) : ''); setEditing(true); }} />
+                  </View>
+                )}
+                <ErrorNote message={error} />
+              </View>
+            ) : null}
           </View>
         );
       })}
@@ -78,7 +115,7 @@ export function BudgetCard({ data }: { data: TripData }) {
               ) : <Text variant="muted">Aucune étape à retirer : les dépenses déjà saisies dépassent le budget.</Text>}
             </View>
           ))}
-          <Text variant="muted">Ou garde le programme et augmente le budget de ce poste à la création du voyage.</Text>
+          <Text variant="muted">Ou garde le programme : touche le poste ci-dessus pour augmenter son budget.</Text>
         </View>
       ) : null}
 
