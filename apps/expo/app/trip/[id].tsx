@@ -20,7 +20,7 @@ import { BudgetCard } from '../../src/features/trip/BudgetCard';
 import { AddExpenseCard } from '../../src/features/trip/AddExpenseCard';
 import { formatDay, isIsoDate } from '../../src/lib/format';
 import { photoKeyFor } from '../../src/lib/photoKey';
-import { checkNewDay, suggestNewDay } from '../../src/lib/dates.ts';
+import { checkNewDay, suggestNewDay, todayIso } from '../../src/lib/dates.ts';
 import { photos } from '../../src/theme/photos';
 import { FloatingNav } from '../../src/features/nav/FloatingNav';
 import type { NavTab } from '../../src/features/nav/FloatingNav';
@@ -60,7 +60,7 @@ export default function TripScreen() {
   const { colors } = useTheme();
   const { data, error, loading, status, reload } = useTrip(String(id));
   const [tab, setTab] = useState<'voyage' | 'jour' | 'budget' | 'amis'>('voyage');
-  const [dayIndex, setDayIndex] = useState(0);
+  const [chosenDay, setChosenDay] = useState<number | null>(null);
   const [newDay, setNewDay] = useState('');
   const [addingDay, setAddingDay] = useState(false);
   const [dayError, setDayError] = useState<string | null>(null);
@@ -112,6 +112,10 @@ export default function TripScreen() {
     if (!err) { setNewDay(''); setAddingDay(false); void reload(); }
   }
 
+  // Sans choix, on ouvre le jour d'aujourd'hui s'il fait partie du voyage, sinon le premier.
+  const todayIdx = data.days.findIndex((d) => d.day_date === todayIso());
+  const dayIndex = chosenDay ?? Math.max(0, todayIdx);
+
   function onNav(key: string) {
     if (key === 'accueil') router.replace('/');
     else if (key === 'carte') router.push({ pathname: '/map/[id]', params: { id: trip.id } });
@@ -160,7 +164,7 @@ export default function TripScreen() {
                 {data.days.map((d, i) => {
                   const city = data.destinations.find((x) => x.city_id === d.city_id)?.name ?? destinationOptions[0]?.name ?? '';
                   return (
-                    <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={`Ouvrir le jour ${i + 1}`} onPress={() => { setDayIndex(i); setTab('jour'); }}>
+                    <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={`Ouvrir le jour ${i + 1}`} onPress={() => { setChosenDay(i); setTab('jour'); }}>
                       <ImageBackground source={photos[photoKeyFor(`${city} ${trip.title}`)]} resizeMode="cover" style={styles.dayTile} imageStyle={{ borderRadius: radius.card }}>
                         <View style={styles.tileVeil} pointerEvents="none" />
                         <RNText style={styles.tileNumber}>{d.day_date.slice(8, 10).replace(/^0/, '')}</RNText>
@@ -208,7 +212,7 @@ export default function TripScreen() {
                 {data.days.map((d, i) => {
                   const on = i === Math.min(dayIndex, data.days.length - 1);
                   return (
-                    <Pressable key={d.id} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={`Jour ${i + 1}, ${formatDay(d.day_date)}`} onPress={() => setDayIndex(i)}
+                    <Pressable key={d.id} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={`Jour ${i + 1}, ${formatDay(d.day_date)}`} onPress={() => setChosenDay(i)}
                       style={[styles.bubble, { backgroundColor: on ? colors.accent : colors.surface2 }]}>
                       <RNText style={[styles.bubbleNum, { color: on ? colors.onAccent : colors.text }]}>{i + 1}</RNText>
                       <RNText style={[styles.bubbleDay, { color: on ? colors.onAccent : colors.text3 }]}>{weekdayShort(d.day_date)}</RNText>

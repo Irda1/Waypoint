@@ -9,7 +9,9 @@ import { organizeTimes } from '../../domain/itinerary.ts';
 import { applyTimes } from '../../data/itinerary';
 import { paymentState } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
-import { addItem, deleteItem, setItemTime } from '../../data/trips';
+import { addItem, deleteItem, setDayHours, setItemTime } from '../../data/trips';
+import { DEFAULT_DEPART, DEFAULT_RETURN, dayHours, hoursIssues, liveStatus } from '../../domain/dayhours.ts';
+import { todayIso } from '../../lib/dates.ts';
 import { useCategories } from '../../data/categories';
 import { LegRow } from './LegRow';
 import { dayTips } from '../../domain/advice.ts';
@@ -55,6 +57,9 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
   const [editing, setEditing] = useState<string | null>(null);
   const [editTime, setEditTime] = useState('');
   const [sheetId, setSheetId] = useState<string | null>(null);
+  const [editHours, setEditHours] = useState(false);
+  const [departInput, setDepartInput] = useState('');
+  const [returnInput, setReturnInput] = useState('');
 
   const schedule = scheduleDay({ date: day.day_date, plan, items: items.filter((i) => i.day_id === day.id), places });
   const lastPosition = schedule.reduce((max, s) => Math.max(max, s.item.position), 0);
@@ -81,6 +86,20 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
     dailyActivityBudget,
     formatMoney: (n) => formatMoney(n, currency),
   });
+  const hours = dayHours(day.depart_time, day.return_time);
+  const hIssues = hoursIssues(schedule, hours, lodging ?? null);
+  const isToday = day.day_date === todayIso();
+  const now = new Date();
+  const live = isToday && schedule.some((s) => s.startMin != null) ? liveStatus(schedule, now.getHours() * 60 + now.getMinutes()) : null;
+  function openHours() { setDepartInput(hours.depart); setReturnInput(hours.return); setEditHours(true); setError(null); }
+  async function saveHours(reset: boolean) {
+    const d = reset ? DEFAULT_DEPART : departInput;
+    const r = reset ? DEFAULT_RETURN : returnInput;
+    if (!isTime(d) || !isTime(r)) { setError('Heures au format 09:30.'); return; }
+    const err = await setDayHours(day.id, d === DEFAULT_DEPART ? null : d, r === DEFAULT_RETURN ? null : r);
+    setError(err);
+    if (!err) { setEditHours(false); onChanged(); }
+  }
   const untimed = schedule.filter((s) => s.startMin == null).length;
   async function tidy() {
     const changes = organizeTimes(schedule.map((s) => ({
@@ -124,6 +143,33 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
           </Pressable>
         </View>
       ))}
+      {live && schedule.length > 0 ? (
+        <View style={{ gap: 2, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }} accessibilityLabel="En ce moment">
+          <Text variant="label" style={{ color: colors.accent }}>En ce moment</Text>
+          {live.current ? (
+            <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>
+              {schedule[live.current.index].place?.name ?? schedule[live.current.index].item.title ?? 'Étape'} · il reste {formatDuration(live.current.remainingMin)}
+            </Text>
+          ) : <Text variant="body">{live.next ? 'Pas d\'étape en cours.' : 'Journée terminée.'}</Text>}
+          {live.next ? (
+            <Text variant="muted">
+              Ensuite : {schedule[live.next.index].place?.name ?? schedule[live.next.index].item.title ?? 'Étape'} à {formatTime(live.next.startMin)}
+              {live.next.travelMin ? ` · ${live.next.travelMin} min de trajet` : ''}
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+      {hIssues.map((h) => (
+        <View key={h.kind} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 48, paddingHorizontal: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.warm }} />
+          <Text variant="body" style={{ flex: 1, fontFamily: fonts.sansSemi }}>
+            {h.kind === 'late_return' ? `Retour vers ${h.at}, après ${hours.return}` : `Première étape à ${h.at}, avant ${hours.depart}`}
+          </Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Changer l'heure" onPress={openHours} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <RNText style={{ fontFamily: fonts.sansBold, fontSize: 15, color: colors.accent }}>Changer</RNText>
+          </Pressable>
+        </View>
+      ))}
       {tips.length ? (
         <View style={{ gap: space.xs, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }} accessibilityLabel="Conseils pour cette journée">
           <Text variant="label">Conseils</Text>
@@ -161,6 +207,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                   <Pressable accessibilityRole="button" accessibilityLabel={`Ouvrir la fiche de ${name}`} onPress={() => setSheetId(s.item.id)}>
                     <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{name}</Text>
                   </Pressable>
+                  {live ? <Text variant="muted" style={{ color: live.states[index] === 'current' ? colors.accent : colors.text3, fontFamily: fonts.sansSemi }}>{live.states[index] === 'past' ? 'Passé' : live.states[index] === 'current' ? 'En cours' : 'À venir'}</Text> : null}
                   {(() => {
                     const dur = s.startMin != null && s.endMin != null ? s.endMin - s.startMin : s.item.duration_min ?? s.place?.visit_duration_min ?? null;
                     const price = s.place?.price_amount;
@@ -198,6 +245,22 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
         })}
         {lodging && schedule.length > 0 && schedule[schedule.length - 1].place ? <LegRow from={schedule[schedule.length - 1].place!} to={lodging} fromName={schedule[schedule.length - 1].place!.name} toName={lodging.name} /> : null}
       </View>
+
+      {editHours ? (
+        <View style={{ gap: space.sm, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }}>
+          <Text variant="label">Horaires du jour</Text>
+          <Field label="Départ du logement" value={departInput} onChangeText={setDepartInput} placeholder="09:30" keyboardType="numbers-and-punctuation" />
+          <Field label="Retour souhaité" value={returnInput} onChangeText={setReturnInput} placeholder="23:30" keyboardType="numbers-and-punctuation" />
+          <ErrorNote message={error} />
+          <Button label="Enregistrer" onPress={() => saveHours(false)} />
+          <Button label="Remettre par défaut" variant="ghost" onPress={() => saveHours(true)} />
+          <Button label="Annuler" variant="ghost" onPress={() => { setEditHours(false); setError(null); }} />
+        </View>
+      ) : (
+        <Pressable accessibilityRole="button" accessibilityLabel="Modifier les horaires du jour" onPress={openHours} style={{ minHeight: 44, justifyContent: 'center' }}>
+          <Text variant="muted">Horaires · départ {hours.depart} · retour {hours.return}{hours.isDefault ? ' (par défaut)' : ''}  ·  <Text variant="muted" style={{ color: colors.accent, fontFamily: fonts.sansSemi }}>Modifier</Text></Text>
+        </Pressable>
+      )}
 
       {adding === 'place' ? (
         <PlacePicker

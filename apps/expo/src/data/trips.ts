@@ -80,6 +80,12 @@ export async function setItemTime(itemId: string, time: string | null): Promise<
   return msg(error);
 }
 
+/** Heures de départ et de retour du logement pour un jour ; `null` = valeur par défaut. */
+export async function setDayHours(dayId: string, depart: string | null, ret: string | null): Promise<string | null> {
+  const { error } = await supabase.from('trip_days').update({ depart_time: depart, return_time: ret }).eq('id', dayId);
+  return error?.message ?? null;
+}
+
 export async function deleteItem(itemId: string): Promise<string | null> {
   const { error } = await supabase.from('trip_items').delete().eq('id', itemId);
   return msg(error);
