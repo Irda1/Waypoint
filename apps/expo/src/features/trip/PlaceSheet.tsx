@@ -7,9 +7,12 @@ import { fonts, space } from '../../theme/tokens';
 import { formatMoney } from '../../lib/format';
 import { formatDuration } from '../../lib/search';
 import { googlePlaceUrl } from '../../domain/routes.ts';
+import { useFavorites } from '../../data/favorites';
 
 interface Props {
   visible: boolean;
+  tripId: string;
+  placeId: number | null;
   name: string;
   category: string;
   dot: string;
@@ -23,8 +26,10 @@ interface Props {
 }
 
 // Feuille du bas (maquette V5 « fiche lieu ») : l'essentiel d'un lieu sans quitter la journée.
-export function PlaceSheet({ visible, name, category, dot, place, currency, travelers, closedToday, onRemove, onClose }: Props) {
+export function PlaceSheet({ visible, tripId, placeId, name, category, dot, place, currency, travelers, closedToday, onRemove, onClose }: Props) {
   const { colors } = useTheme();
+  const fav = useFavorites(tripId, visible && placeId != null);
+  const isFav = placeId != null && fav.ids.has(placeId);
   const duration = place?.visit_duration_min ? formatDuration(place.visit_duration_min) : null;
   const price = place?.price_amount != null ? place.price_amount : null;
   return (
@@ -44,6 +49,7 @@ export function PlaceSheet({ visible, name, category, dot, place, currency, trav
               {price != null ? <Row k={travelers > 1 ? `Prix (× ${travelers})` : 'Prix'} v={price === 0 ? 'Gratuit' : formatMoney(price * travelers, currency)} /> : null}
             </View>
             <Text variant="muted" style={{ fontSize: 12.5 }}>Durées et prix : valeurs indicatives, à vérifier avant d'y aller.</Text>
+            {placeId != null ? <Button label={isFav ? '♥ Dans mes favoris' : '♡ Ajouter aux favoris'} variant="ghost" onPress={() => { void fav.toggle(placeId); }} /> : null}
             {place ? <Button label="Ouvrir dans Maps" onPress={() => { void Linking.openURL(googlePlaceUrl(name, place)); }} /> : null}
             <Button label="Retirer du jour" variant="ghost" onPress={() => { onRemove(); onClose(); }} />
             <Button label="Fermer" variant="ghost" onPress={onClose} />

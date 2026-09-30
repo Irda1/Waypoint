@@ -295,7 +295,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
         if (!s) return null;
         const category = s.place?.category_code ?? s.item.category_code ?? '';
         return (
-          <PlaceSheet visible name={s.place?.name ?? s.item.title ?? 'Étape'} category={categories.byCode.get(category)?.name_fr ?? 'Étape'}
+          <PlaceSheet visible tripId={tripId} placeId={s.place?.id ?? null} name={s.place?.name ?? s.item.title ?? 'Étape'} category={categories.byCode.get(category)?.name_fr ?? 'Étape'}
             dot={categoryColors[mode][categories.rootOf(category)] ?? colors.text3} place={s.place ?? null} currency={currency} travelers={travelers}
             closedToday={s.issues.some((i) => i.type === 'closed_day')}
             onRemove={async () => { setError(await deleteItem(s.item.id)); onChanged(); }} onClose={() => setSheetId(null)} />
