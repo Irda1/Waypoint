@@ -4,7 +4,8 @@ import { Button, Card, Chip, ErrorNote, Field, PayBadge, Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
 import { categoryColors, fonts, radius, space } from '../../theme/tokens';
 import { formatDay, isTime } from '../../lib/format';
-import { formatTime, scheduleDay } from '../../domain/planning.ts';
+import { formatTime, scheduleDay, weekdayOf } from '../../domain/planning.ts';
+import { checkOpening } from '../../domain/openingHours.ts';
 import { organizeTimes } from '../../domain/itinerary.ts';
 import { applyTimes } from '../../data/itinerary';
 import { amountDue, paymentState, posteForCategory } from '../../domain/budget.ts';
@@ -68,6 +69,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
   const [editTime, setEditTime] = useState('');
   const [sheetId, setSheetId] = useState<string | null>(null);
   const [editHours, setEditHours] = useState(false);
+  const [checkHours, setCheckHours] = useState(false);
   const [departInput, setDepartInput] = useState('');
   const [returnInput, setReturnInput] = useState('');
 
@@ -301,6 +303,29 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
         })}
         {lodging && schedule.length > 0 && schedule[schedule.length - 1].place ? <LegRow from={schedule[schedule.length - 1].place!} to={lodging} fromName={schedule[schedule.length - 1].place!.name} toName={lodging.name} /> : null}
       </View>
+
+      {schedule.some((s) => s.place) ? (
+        <View style={{ gap: space.xs }}>
+          <Pressable accessibilityRole="button" accessibilityState={{ expanded: checkHours }} accessibilityLabel="Vérifier les horaires d'ouverture" onPress={() => setCheckHours((v) => !v)} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.accent }}>{checkHours ? 'Masquer la vérification des horaires' : 'Vérifier les horaires d\'ouverture'}</RNText>
+          </Pressable>
+          {checkHours ? (
+            <View style={{ gap: space.sm, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }}>
+              {schedule.map((s) => {
+                const name = s.place?.name ?? s.item.title ?? 'Étape';
+                if (!s.place) return <Text key={s.item.id} variant="muted">{name} : lieu libre, horaires non vérifiables.</Text>;
+                const res = checkOpening(s.place.opening_hours, s.place.closed_days, weekdayOf(day.day_date), s.startMin, s.endMin);
+                const slot = (a: number, b: number) => `${formatTime(a)}–${formatTime(b)}`;
+                const text = res.status === 'ok' ? `✓ ${name} : ouvert sur ton créneau${s.startMin != null ? ` (${formatTime(s.startMin)})` : ''}.`
+                  : res.status === 'closed' ? `⚠ ${name} : fermé le ${res.day}.`
+                  : res.status === 'outside' ? `⚠ ${name} : ouvert ${res.slots.map(([a, b]) => slot(a, b)).join(', ')}, ton créneau est en dehors.`
+                  : `? ${name} : horaires inconnus, à vérifier avant d'y aller.`;
+                return <Text key={s.item.id} variant="muted" style={res.status === 'closed' || res.status === 'outside' ? { color: colors.warm } : undefined}>{text}</Text>;
+              })}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       {editHours ? (
         <View style={{ gap: space.sm, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }}>

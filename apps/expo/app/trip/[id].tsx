@@ -9,6 +9,7 @@ import { Button, Card, Columns, ErrorNote, Field, Screen, Text } from '../../src
 import { useTrip } from '../../src/data/useTrip';
 import { addDay, addDestination, createInvite, removeDestination } from '../../src/data/trips';
 import type { CityOption } from '../../src/data/places';
+import { MiniCalendar } from '../../src/features/trip/MiniCalendar';
 import { DestinationsCard } from '../../src/features/trip/DestinationsCard';
 import { DayCard } from '../../src/features/trip/DayCard';
 import { WeatherCard } from '../../src/features/trip/WeatherCard';
@@ -271,7 +272,8 @@ export default function TripScreen() {
           {addingDay ? (
             <Card>
               <Text variant="heading">Ajouter un jour</Text>
-              <Field label="Date" value={newDay} onChangeText={setNewDay} placeholder="2026-10-13" />
+              <MiniCalendar value={newDay} taken={new Set(data.days.map((d) => d.day_date))} onPick={(iso) => { setNewDay(iso); setDayError(null); }} />
+              <Text variant="muted">{newDay ? `Jour choisi : ${formatDay(newDay)}` : 'Touche une date.'}</Text>
               <ErrorNote message={dayError} />
               <Button label="Ajouter le jour" onPress={submitDay} />
               <Button label="Annuler" variant="ghost" onPress={() => { setAddingDay(false); setDayError(null); }} />
