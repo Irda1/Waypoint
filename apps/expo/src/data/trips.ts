@@ -2,6 +2,7 @@
 // lisible ou null. La sécurité est assurée par la base (RLS) : ces appels n'ont besoin
 // d'aucun contrôle de droits côté appli.
 import { supabase } from '../lib/supabase';
+import { dayCities } from '../domain/destinations.ts';
 import { capitalCovers, COVER_FIELDS, toCover } from './cityCover';
 import type { CityCover } from './cityCover';
 import { POSTES } from '../domain/types.ts';
@@ -61,6 +62,30 @@ export async function createTrip(title: string, startsOn: string | null, endsOn:
     if (res.error) return { id, error: `Voyage créé, mais les destinations n'ont pas pu être ajoutées : ${res.error.message}` };
   }
   return { id, error: null };
+}
+
+/**
+ * Enregistre les villes du voyage (ordre et nuits) puis rattache chaque jour à sa ville d'après ces nuits.
+ * `dayIds` : les jours du voyage, dans l'ordre des dates.
+ */
+export async function saveDestinations(tripId: string, dests: { id: number; nights: number }[], dayIds: string[]): Promise<string | null> {
+  const keep = dests.map((d) => d.id);
+  const old = await supabase.from('trip_destinations').select('city_id').eq('trip_id', tripId);
+  if (old.error) return old.error.message;
+  const gone = ((old.data ?? []) as { city_id: number }[]).map((r) => r.city_id).filter((id) => !keep.includes(id));
+  if (gone.length) {
+    const del = await supabase.from('trip_destinations').delete().eq('trip_id', tripId).in('city_id', gone);
+    if (del.error) return del.error.message;
+  }
+  if (dests.length) {
+    const up = await supabase.from('trip_destinations').upsert(dests.map((d, position) => ({ trip_id: tripId, city_id: d.id, position, nights: d.nights })), { onConflict: 'trip_id,city_id' });
+    if (up.error) return up.error.message;
+  }
+  for (const [cityId, ids] of dayCities(dests.map((d) => ({ ...d, name: '' })), dayIds)) {
+    const r = await supabase.from('trip_days').update({ city_id: cityId }).in('id', ids);
+    if (r.error) return r.error.message;
+  }
+  return null;
 }
 
 export async function addDestination(tripId: string, cityId: number, position: number): Promise<string | null> {
