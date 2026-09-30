@@ -3,11 +3,12 @@ import { Pressable, ScrollView, Text as RNText, View } from 'react-native';
 import { Button, Card, Chip, ErrorNote, Field, Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
-import { daysForStay, nightsByStay } from '../../domain/stays.ts';
-import { addStay, removeStay } from '../../data/stays';
+import { daysForStay, nightsByStay, nightsChange, toggleNight } from '../../domain/stays.ts';
+import { addStay, removeStay, setStayNights } from '../../data/stays';
 import { searchPlaces } from '../../data/places';
 import type { PlaceHit } from '../../data/places';
 import type { TripData } from '../../data/useTrip';
+import { shortDate } from '../../lib/dates.ts';
 
 /** Hébergements du voyage : on choisit un lieu de la base (hôtels, auberges…) et il est rattaché aux jours de sa ville. */
 export function StayCard({ data, onChanged }: { data: TripData; onChanged: () => void }) {
@@ -16,6 +17,7 @@ export function StayCard({ data, onChanged }: { data: TripData; onChanged: () =>
   const [cityId, setCityId] = useState<number | null>(null);
   const [text, setText] = useState('');
   const [hits, setHits] = useState<PlaceHit[] | null>(null);
+  const [editing, setEditing] = useState<string | null>(null);
   const [busy, setBusy] = useState<number | string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +46,13 @@ export function StayCard({ data, onChanged }: { data: TripData; onChanged: () =>
     if (!err) { setChoosing(false); setText(''); onChanged(); }
   }
 
+  async function toggle(stayId: string, dayId: string) {
+    setBusy(dayId);
+    setError(await setStayNights(stayId, nightsChange(data.days, stayId, toggleNight(data.days, stayId, dayId))));
+    setBusy(null);
+    onChanged();
+  }
+
   async function remove(id: string) {
     setBusy(id);
     setError(await removeStay(id));
@@ -58,14 +67,30 @@ export function StayCard({ data, onChanged }: { data: TripData; onChanged: () =>
         <Text variant="muted">Aucun hébergement : ajoute-en un pour voir les trajets depuis et vers l'hébergement dans chaque journée.</Text>
       ) : null}
       {data.stays.map((s) => (
-        <View key={s.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}>
-          <View style={{ flex: 1, gap: 2 }}>
-            <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{s.name}</Text>
-            <Text variant="muted">{[s.address, nights.get(s.id) ? `${nights.get(s.id)} nuit${nights.get(s.id)! > 1 ? 's' : ''}` : 'aucune nuit rattachée'].filter(Boolean).join(' · ')}</Text>
+        <View key={s.id} style={{ gap: space.sm }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}>
+            <View style={{ flex: 1, gap: 2 }}>
+              <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{s.name}</Text>
+              <Text variant="muted">{[s.address, nights.get(s.id) ? `${nights.get(s.id)} nuit${nights.get(s.id)! > 1 ? 's' : ''}` : 'aucune nuit rattachée'].filter(Boolean).join(' · ')}</Text>
+            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Modifier les nuits de ${s.name}`} onPress={() => setEditing(editing === s.id ? null : s.id)} style={{ minHeight: 44, justifyContent: 'center' }}>
+              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.accent }}>{editing === s.id ? 'Fermer' : 'Nuits'}</RNText>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${s.name}`} disabled={busy === s.id} onPress={() => remove(s.id)} style={{ minHeight: 44, justifyContent: 'center' }}>
+              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text2 }}>Retirer</RNText>
+            </Pressable>
           </View>
-          <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${s.name}`} disabled={busy === s.id} onPress={() => remove(s.id)} style={{ minHeight: 44, justifyContent: 'center' }}>
-            <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text2 }}>Retirer</RNText>
-          </Pressable>
+          {editing === s.id ? (
+            <>
+              <Text variant="muted">Touche les nuits passées ici. Une nuit déjà prise par un autre hébergement lui est retirée.</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                {data.days.map((d) => {
+                  const other = d.stay_id && d.stay_id !== s.id ? data.stays.find((x) => x.id === d.stay_id) : null;
+                  return <Chip key={d.id} label={`${shortDate(d.day_date)}${other ? ` · ${other.name}` : ''}`} selected={d.stay_id === s.id} onPress={() => toggle(s.id, d.id)} />;
+                })}
+              </View>
+            </>
+          ) : null}
         </View>
       ))}
       {choosing ? (
