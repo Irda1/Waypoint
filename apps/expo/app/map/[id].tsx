@@ -9,6 +9,7 @@ import { useCategories } from '../../src/data/categories';
 import { loadCandidates } from '../../src/data/itinerary';
 import { addPlaceItem } from '../../src/data/places';
 import { useFavorites } from '../../src/data/favorites';
+import { PlaceSheet } from '../../src/features/trip/PlaceSheet';
 import { discoverPoints, legendDays, planPoints, searchPoints, visiblePoints } from '../../src/domain/map.ts';
 import type { MapPoint } from '../../src/domain/map.ts';
 import { MapCanvas } from '../../src/features/map/MapCanvas';
@@ -40,6 +41,7 @@ export default function TripMap() {
   const [legendOpen, setLegendOpen] = useState(false);
   const [panel, setPanel] = useState<PanelPos>('bas');
   const [areaH, setAreaH] = useState(0);
+  const [details, setDetails] = useState(false);
 
   const cityIds = useMemo(() => [...new Set((data?.days ?? []).map((d) => d.city_id).filter((c): c is number => c != null).concat((data?.destinations ?? []).map((d) => d.city_id)))], [data?.days, data?.destinations]);
 
@@ -86,7 +88,7 @@ export default function TripMap() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ flex: 1 }} onLayout={(e) => setAreaH(e.nativeEvent.layout.height)}>
-        <MapCanvas points={points} selectedId={selected} dark={mode === 'nuit'} start={start} fitKey={`${day}|${discover}`} focusId={focus} onSelect={(pid) => { setSelected(pid); setNotice(null); }} />
+        <MapCanvas points={points} selectedId={selected} dark={false} start={start} fitKey={`${day}|${discover}`} focusId={focus} onSelect={(pid) => { setSelected(pid); setNotice(null); }} />
         <SafeAreaView edges={['top']} pointerEvents="box-none" style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
           <View style={{ padding: space.sm, gap: space.sm }} pointerEvents="box-none">
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
@@ -190,6 +192,7 @@ export default function TripMap() {
                   place?.visit_duration_min ? `≈ ${formatDuration(place.visit_duration_min)}` : null,
                   place?.price_amount != null ? `≈ ${formatMoney(place.price_amount, data.trip.currency)}` : null].filter(Boolean).join(' · ')}
               </Text>
+              {point.placeId != null ? <Button label="Voir les détails" variant="ghost" onPress={() => setDetails(true)} /> : null}
               {point.placeId != null ? <Button label={favorites.ids.has(point.placeId) ? '♥ Dans mes favoris' : '♡ Ajouter aux favoris'} variant="ghost" onPress={() => { void favorites.toggle(point.placeId!); }} /> : null}
               {point.kind === 'disc' ? (dayId ? <Button label={`Ajouter au jour ${day}`} onPress={add} loading={busy} /> : <Text variant="muted">Choisis un jour en haut pour l'ajouter à ton programme.</Text>) : null}
             </>
@@ -202,6 +205,11 @@ export default function TripMap() {
           <Text variant="muted" style={{ fontSize: 12 }}>Fond de carte : OpenFreeMap · © contributeurs d'OpenStreetMap. Nécessite une connexion.</Text>
         </View>
       </SafeAreaView>
+      {details && point?.placeId != null ? (
+        <PlaceSheet visible tripId={data.trip.id} placeId={point.placeId} name={point.label} category={category}
+          dot={categoryColors[mode][point.root] ?? colors.text3} place={place ?? null} currency={data.trip.currency}
+          travelers={Math.max(1, data.members.filter((m) => !m.left_at).length)} closedToday={false} onClose={() => setDetails(false)} />
+      ) : null}
     </View>
   );
 }

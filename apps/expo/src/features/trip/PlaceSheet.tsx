@@ -9,6 +9,7 @@ import { formatDuration } from '../../lib/search';
 import { fastest, googleDirectionsUrl, googlePlaceUrl, travelOptions } from '../../domain/routes.ts';
 import type { Point } from '../../domain/routes.ts';
 import { useFavorites } from '../../data/favorites';
+import { usePlaceInfo } from '../../data/placeInfo';
 
 interface Props {
   visible: boolean;
@@ -27,7 +28,8 @@ interface Props {
   onPay?: () => Promise<string | null>;
   /** Étape précédente (ou hébergement pour la première) : sert au bouton « Y aller ». */
   from?: (Point & { name: string }) | null;
-  onRemove: () => void;
+  /** Absent quand la fiche n'est pas une étape d'un jour (ex. depuis la carte) : pas de bouton « Retirer du jour ». */
+  onRemove?: () => void;
   onClose: () => void;
 }
 
@@ -38,6 +40,7 @@ export function PlaceSheet({ visible, tripId, placeId, name, category, dot, plac
   const { colors } = useTheme();
   const fav = useFavorites(tripId, visible && placeId != null);
   const isFav = placeId != null && fav.ids.has(placeId);
+  const info = usePlaceInfo(placeId, visible);
   const duration = place?.visit_duration_min ? formatDuration(place.visit_duration_min) : null;
   const price = place?.price_amount != null ? place.price_amount : null;
   const trip = from && place ? fastest(travelOptions(from, place)) : null;
@@ -53,9 +56,15 @@ export function PlaceSheet({ visible, tripId, placeId, name, category, dot, plac
             </View>
             <Text variant="title" accessibilityRole="header">{name}</Text>
             {closedToday ? <Text variant="body" style={{ color: colors.warm, fontFamily: fonts.sansSemi }}>Fermé ce jour-là : choisis un autre jour ou une autre étape.</Text> : null}
+            {info.text ? (
+              <View style={{ gap: 2 }}>
+                <Text variant="body">{info.text}</Text>
+                {info.source === 'wikipedia' ? <Text variant="muted" style={{ fontSize: 12 }}>Source : Wikipédia (CC BY-SA)</Text> : null}
+              </View>
+            ) : null}
             <View style={{ gap: space.xs }}>
               {duration ? <Row k="Durée de visite" v={duration} /> : null}
-              {price != null ? <Row k={travelers > 1 ? `Prix (× ${travelers})` : 'Prix'} v={price === 0 ? 'Gratuit' : formatMoney(price * travelers, currency)} /> : null}
+              {price != null ? <Row k={travelers > 1 ? `Entrée estimée (× ${travelers})` : 'Entrée estimée'} v={price === 0 ? 'Gratuit' : `≈ ${formatMoney(price * travelers, currency)}`} /> : null}
             </View>
             {price != null && price > 0 ? (
               due > 0 && onPay ? (
@@ -77,7 +86,7 @@ export function PlaceSheet({ visible, tripId, placeId, name, category, dot, plac
               </View>
             ) : null}
             {place ? <Button label="Ouvrir dans Maps" onPress={() => { void Linking.openURL(googlePlaceUrl(name, place)); }} /> : null}
-            <Button label="Retirer du jour" variant="ghost" onPress={() => { onRemove(); onClose(); }} />
+            {onRemove ? <Button label="Retirer du jour" variant="ghost" onPress={() => { onRemove(); onClose(); }} /> : null}
             <Button label="Fermer" variant="ghost" onPress={onClose} />
           </ScrollView>
         </Pressable>

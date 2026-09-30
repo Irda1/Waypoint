@@ -14,7 +14,7 @@ import { DragRow } from './DragRow';
 
 const PAGE = 5;
 
-/** Villes du voyage : ordre (glisser ou flèches), nuits (+/−), détail des nuits, ajout depuis une liste de villes du pays. */
+/** Villes du voyage : ordre (glisser-déposer), nuits (+/−), détail des nuits, ajout depuis une liste de villes du pays. */
 export function DestinationsCard({ data, onChanged }: { data: TripData; onChanged: () => void }) {
   const { colors } = useTheme();
   const [editing, setEditing] = useState(false);
@@ -64,11 +64,13 @@ export function DestinationsCard({ data, onChanged }: { data: TripData; onChange
   return (
     <Card>
       <Text variant="label">Destinations · {nights} nuit{nights > 1 ? 's' : ''}</Text>
+      {editing && dests.length > 1 ? <Text variant="muted">Glisse une ville sur une autre pour changer l'ordre.</Text> : null}
       {dests.length === 0 ? <Text variant="muted">Aucune destination choisie : ajoutes-en pour retrouver directement les bonnes villes dans la recherche de lieux.</Text> : null}
       {dests.map((d, index) => (
         <DragRow key={d.id} index={index} onMove={(from, to) => { if (editing) void apply(moveCity(dests, from, to)); }}>
           <View style={{ gap: space.xs, paddingVertical: space.xs }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}>
+              {editing && dests.length > 1 ? <RNText accessibilityLabel={`Glisser ${d.name} pour changer l'ordre`} style={{ fontSize: 20, color: colors.text3, width: 22, textAlign: 'center' }}>⠿</RNText> : null}
               <Pressable accessibilityRole="button" accessibilityState={{ expanded: open === d.id }} accessibilityLabel={`Détail des nuits à ${d.name}`} onPress={() => setOpen(open === d.id ? null : d.id)} style={{ flex: 1, minHeight: 44, justifyContent: 'center' }}>
                 <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{index + 1}. {d.name}</Text>
                 <Text variant="muted">{d.nights} nuit{d.nights > 1 ? 's' : ''} {open === d.id ? '▴' : '▾'}</Text>
@@ -81,16 +83,6 @@ export function DestinationsCard({ data, onChanged }: { data: TripData; onChange
                   <Pressable accessibilityRole="button" accessibilityLabel={`Une nuit de plus à ${d.name}`} disabled={busy || dests.length < 2} onPress={() => void apply(shiftNights(dests, index, 1))} style={{ minWidth: 40, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}>
                     <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 20, color: colors.accent }}>＋</RNText>
                   </Pressable>
-                  {index > 0 ? (
-                    <Pressable accessibilityRole="button" accessibilityLabel={`Monter ${d.name}`} disabled={busy} onPress={() => void apply(moveCity(dests, index, index - 1))} style={{ minWidth: 36, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}>
-                      <RNText style={{ fontSize: 16, color: colors.text2 }}>↑</RNText>
-                    </Pressable>
-                  ) : null}
-                  {index < dests.length - 1 ? (
-                    <Pressable accessibilityRole="button" accessibilityLabel={`Descendre ${d.name}`} disabled={busy} onPress={() => void apply(moveCity(dests, index, index + 1))} style={{ minWidth: 36, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}>
-                      <RNText style={{ fontSize: 16, color: colors.text2 }}>↓</RNText>
-                    </Pressable>
-                  ) : null}
                   <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${d.name}`} disabled={busy} onPress={() => void apply(removeCity(dests, d.id, nights))} style={{ minWidth: 36, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}>
                     <RNText style={{ fontSize: 16, color: colors.text3 }}>✕</RNText>
                   </Pressable>
