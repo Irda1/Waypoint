@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { TextInput, View } from 'react-native';
 import { Button, Card, ErrorNote, Text } from '../../ui';
 import { setTripMemo } from '../../data/trips';
@@ -8,12 +8,14 @@ import { fonts, radius, space } from '../../theme/tokens';
 export const MEMO_MAX = 4000;
 
 /** Notes libres du voyage (codes, adresses, idées) : visibles et modifiables par tous les voyageurs. */
-export function MemoCard({ tripId, memo, onChanged }: { tripId: string; memo: string; onChanged: () => void }) {
+export function MemoCard({ tripId, memo, onChanged, startEditing = false, onStarted }: { tripId: string; memo: string; onChanged: () => void; startEditing?: boolean; onStarted?: () => void }) {
   const { colors } = useTheme();
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(memo);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => { if (startEditing) { setDraft(memo); setEditing(true); onStarted?.(); } }, [startEditing]); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
     setBusy(true);

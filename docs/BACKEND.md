@@ -179,3 +179,4 @@ Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` rempli
 - **v1.10.15** : mémo du voyage (carte « Mémo du voyage » de l'onglet Voyage : notes partagées, 4 000 caractères, colonne `trips.memo` déjà en base). Aucune migration.
 - **v1.10.16** : budget : toucher un poste ouvre son détail (dépenses saisies, puis étapes prévues pas encore payées, `posteDetail` testé) ; « Modifier le budget de ce poste » et « Augmenter à … » quand il dépasse (écrit `trip_budget_lines`). Aucune migration.
 - **v1.10.17** : jour : « ↑ Monter » / « ↓ Descendre » sur chaque étape (échange heure de début et rang avec la voisine, `swapWithNeighbor` testé). Aucune migration.
+- **v1.10.18** : bouton « ＋ » flottant sur l'écran voyage : menu « Ajouter… » (une activité, une dépense, une note) qui ouvre la bonne carte. Aucune migration.
