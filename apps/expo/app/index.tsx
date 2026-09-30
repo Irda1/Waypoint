@@ -22,6 +22,13 @@ const ON_PHOTO_SOFT = 'rgba(245, 245, 242, 0.82)';
 // Sable clair pour les petits titres posés sur photo (l'accent du thème clair est trop sombre ici).
 const ON_PHOTO_ACCENT = '#FFD08A';
 
+// Idées de destinations (photos d'ambiance déjà dans l'appli) ; d'autres villes suivront avec leurs photos.
+const IDEAS: { key: 'lisbonne' | 'porto' | 'alfama'; name: string; hint: string }[] = [
+  { key: 'lisbonne', name: 'Lisbonne', hint: 'Tramways et collines' },
+  { key: 'porto', name: 'Porto', hint: 'Fleuve et azulejos' },
+  { key: 'alfama', name: 'Alfama', hint: 'Ruelles et fado' },
+];
+
 export default function Home() {
   const guard = useRequireAuth();
   const { colors } = useTheme();
@@ -69,6 +76,20 @@ export default function Home() {
         <View style={styles.page}>
           <ErrorNote message={error} />
 
+          <Text variant="label">Envie de…</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+            {IDEAS.map((c) => (
+              <Pressable key={c.key} accessibilityRole="button" accessibilityLabel={`Partir à ${c.name}`} onPress={() => router.push('/new-trip')}
+                style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}>
+                <ImageBackground source={photos[c.key]} resizeMode="cover" style={styles.idea} imageStyle={{ borderRadius: radius.card }}>
+                  <View style={styles.tripVeil} pointerEvents="none" />
+                  <RNText style={styles.ideaName}>{c.name}</RNText>
+                  <RNText style={styles.tripDates}>{c.hint}</RNText>
+                </ImageBackground>
+              </Pressable>
+            ))}
+          </ScrollView>
+
           <Text variant="label">{trips && trips.length > 0 ? `Mes voyages · ${trips.length}` : 'Mes voyages'}</Text>
           {trips === null ? <Text variant="muted">Chargement…</Text> : trips.length === 0 ? (
             <Card><Text variant="body">Aucun voyage pour l'instant. Démarre le premier avec le bouton ci-dessus, ou rejoins celui d'un ami avec son lien d'invitation.</Text></Card>
@@ -109,6 +130,8 @@ const styles = StyleSheet.create({
   eyebrow: { fontFamily: fonts.sansSemi, fontSize: 11.5, letterSpacing: 1.6, textTransform: 'uppercase' },
   poster: { fontFamily: fonts.serif, fontSize: 56, lineHeight: 60, color: ON_PHOTO },
   lead: { fontFamily: fonts.sans, fontSize: 16, lineHeight: 23, color: ON_PHOTO_SOFT, maxWidth: 440 },
+  idea: { width: 148, height: 200, borderRadius: radius.card, overflow: 'hidden', padding: space.md, justifyContent: 'flex-end', backgroundColor: '#101315' },
+  ideaName: { fontFamily: fonts.serif, fontSize: 22, lineHeight: 26, color: ON_PHOTO },
   tripCard: { minHeight: 168, borderRadius: radius.card, overflow: 'hidden', padding: space.lg, justifyContent: 'space-between', backgroundColor: '#101315' },
   tripVeil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.card, backgroundColor: 'rgba(7, 9, 11, 0.5)' },
   statusPill: { alignSelf: 'flex-start', minHeight: 28, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center' },
