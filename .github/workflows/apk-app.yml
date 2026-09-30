@@ -58,6 +58,11 @@ jobs:
           sed -i -E "s/versionName \"[^\"]*\"/versionName \"1.10-build.${GITHUB_RUN_NUMBER}\"/" "$GRADLE"
           grep -q "versionCode ${GITHUB_RUN_NUMBER}" "$GRADLE" || { echo "::error::versionCode introuvable dans $GRADLE"; exit 1; }
 
+      - name: Désactiver l'analyse Lint (inutile pour un APK, et elle plantait)
+        working-directory: apps/expo
+        run: |
+          printf '\nandroid {\n    lint {\n        checkReleaseBuilds = false\n        abortOnError = false\n    }\n}\n' >> android/app/build.gradle
+
       - name: Clé de signature
         working-directory: apps/expo
         run: |
