@@ -21,6 +21,7 @@ import { AddExpenseCard } from '../../src/features/trip/AddExpenseCard';
 import { formatDay, isIsoDate } from '../../src/lib/format';
 import { photoKeyFor } from '../../src/lib/photoKey';
 import { checkNewDay, suggestNewDay, todayIso } from '../../src/lib/dates.ts';
+import { coverSource } from '../../src/data/cityCover';
 import { photos } from '../../src/theme/photos';
 import { FloatingNav } from '../../src/features/nav/FloatingNav';
 import type { NavTab } from '../../src/features/nav/FloatingNav';
@@ -128,7 +129,7 @@ export default function TripScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
         {tab === 'voyage' ? (
-          <ImageBackground source={photos[photoKeyFor(`${trip.title} ${destNames}`)]} resizeMode="cover" style={styles.cover}>
+          <ImageBackground source={coverSource(photoKeyFor(`${trip.title} ${destNames}`), photos[photoKeyFor(`${trip.title} ${destNames}`)], data.destinations[0]?.cover ?? null)} resizeMode="cover" style={styles.cover}>
             <View style={styles.veil} pointerEvents="none" />
             <SafeAreaView edges={['top']} style={styles.coverInner}>
               <View style={styles.coverBar}>
@@ -145,6 +146,9 @@ export default function TripScreen() {
                 </RNText>
                 <RNText style={styles.poster} accessibilityRole="header">{trip.title}</RNText>
                 <RNText style={styles.lead}>{dates}</RNText>
+                {photoKeyFor(`${trip.title} ${destNames}`) === 'horizon' && data.destinations[0]?.cover?.credit ? (
+                  <RNText style={{ fontFamily: fonts.sans, fontSize: 10, color: ON_PHOTO_SOFT }}>{data.destinations[0].cover.credit}</RNText>
+                ) : null}
               </View>
             </SafeAreaView>
           </ImageBackground>
