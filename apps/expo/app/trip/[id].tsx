@@ -16,6 +16,7 @@ import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
 import { ProgramCard } from '../../src/features/trip/ProgramCard';
 import { shareText } from '../../src/lib/share';
+import { ChecklistCard } from '../../src/features/trip/ChecklistCard';
 import { BookingsCard } from '../../src/features/trip/BookingsCard';
 import { ExportCard } from '../../src/features/trip/ExportCard';
 import { UnplannedCard } from '../../src/features/trip/UnplannedCard';
@@ -237,6 +238,7 @@ export default function TripScreen() {
           <ProgramCard data={data} onApplied={reload} />
           <UnplannedCard data={data} onChanged={reload} />
           <BookingsCard tripId={trip.id} />
+          <ChecklistCard tripId={trip.id} />
           <ExportCard data={data} />
         </View>
         ) : null}
