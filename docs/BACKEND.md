@@ -140,7 +140,7 @@ Un seul flux au départ, et rien à construire : l'application n'ouvre **jamais*
 
 - **v1.9.6** : accueil en cartes photo avec statut, correctifs de lisibilité (PR n°2) ; recherche de lieux sans accents (`accentTolerantTerm` : les lettres accentuables deviennent des jokers, sans migration ; cherche aussi un peu plus large) ; filtre « Pratique » (pharmacies, banques, laveries… : lieux de type `service`). Aucune migration.
 
-- **v1.9.7** : taux de change. Migration 1000 (`exchange_rates`, lecture publique), passe `rates` du pipeline (Frankfurter / BCE, sans clé, ajoutée au workflow), `domain/currency.ts` (conversion via l'euro, jamais de taux inventé, « ≈ ») et `data/rates.ts`. Pas encore branché dans les écrans. **Migration à exécuter seule dans le SQL Editor** (`supabase/migrations/20260929001000_exchange_rates.sql`), puis lancer la passe `rates`.
+- **v1.9.7** : taux de change. Migration 1000 (`exchange_rates`, lecture publique), passe `rates` du pipeline (Frankfurter / BCE, sans clé, ajoutée au workflow), `domain/currency.ts` (conversion via l'euro, jamais de taux inventé, « ≈ ») et `data/rates.ts`. La carte Budget affiche le total dépensé en monnaie locale du premier pays du voyage (« ≈ », taux BCE daté) quand elle diffère de la monnaie du voyage (v1.9.8). **Migration à exécuter seule dans le SQL Editor** (`supabase/migrations/20260929001000_exchange_rates.sql`), puis lancer la passe `rates`.
 
 Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` remplit la ville, la recherche et l'ajout à un jour fonctionnent, les durées estimées sont marquées « ≈ ».
 
