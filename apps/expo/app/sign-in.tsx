@@ -13,7 +13,7 @@ const safeNext = (next: string | string[] | undefined): string => {
 };
 
 export default function SignIn() {
-  const { session, signIn, signUp, signInWithGoogle } = useAuth();
+  const { session, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
   const { next } = useLocalSearchParams<{ next?: string }>();
   const [mode, setMode] = useState<'in' | 'up'>('in');
   const [name, setName] = useState('');
@@ -40,6 +40,16 @@ export default function SignIn() {
     setBusy(false);
   }
 
+  async function forgot() {
+    setError(null); setInfo(null);
+    if (!email.includes('@')) { setError('Entre ton adresse email ci-dessus, puis touche « Mot de passe oublié ».'); return; }
+    setBusy(true);
+    const err = await resetPassword(email);
+    setBusy(false);
+    if (err) setError(err);
+    else setInfo('Si un compte existe avec cet email, un lien pour choisir un nouveau mot de passe vient d\'être envoyé.');
+  }
+
   return (
     <Screen>
       <View style={{ gap: space.sm, marginTop: space.xl }}>
@@ -62,6 +72,7 @@ export default function SignIn() {
         <ErrorNote message={error} />
         {info ? <Text variant="muted">{info}</Text> : null}
         <Button label={mode === 'in' ? 'Se connecter' : 'Créer mon compte'} onPress={submit} loading={busy} />
+        {mode === 'in' ? <Button label="Mot de passe oublié ?" variant="ghost" onPress={forgot} disabled={busy} /> : null}
         <Button label="Continuer avec Google" variant="ghost" onPress={async () => { setError(await signInWithGoogle()); }} />
         <Button label={mode === 'in' ? 'Pas encore de compte ? Créer un compte' : 'J\'ai déjà un compte'} variant="ghost" onPress={() => { setMode(mode === 'in' ? 'up' : 'in'); setError(null); setInfo(null); }} />
       </Card>

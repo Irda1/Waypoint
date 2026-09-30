@@ -21,3 +21,14 @@ export async function copyText(text: string): Promise<boolean> {
   const nav = (globalThis as { navigator?: { clipboard?: { writeText: (t: string) => Promise<void> } } }).navigator;
   try { await nav?.clipboard?.writeText(text); return !!nav?.clipboard; } catch { return false; }
 }
+
+/** Télécharge un fichier texte (web uniquement ; sur téléphone il faudrait un module de fichiers, pas installé). */
+export function downloadTextFile(filename: string, content: string, mime = 'text/plain'): boolean {
+  const g = globalThis as { document?: { createElement: (t: string) => { href: string; download: string; click: () => void } }; URL?: { createObjectURL: (b: unknown) => string; revokeObjectURL: (u: string) => void }; Blob?: new (p: string[], o: { type: string }) => unknown };
+  if (Platform.OS !== 'web' || !g.document || !g.URL || !g.Blob) return false;
+  const url = g.URL.createObjectURL(new g.Blob([content], { type: `${mime};charset=utf-8` }));
+  const a = g.document.createElement('a');
+  a.href = url; a.download = filename; a.click();
+  setTimeout(() => g.URL?.revokeObjectURL(url), 1000);
+  return true;
+}
