@@ -20,3 +20,16 @@ export async function removeStay(stayId: string): Promise<string | null> {
   const { error } = await supabase.from('trip_stays').delete().eq('id', stayId);
   return error?.message ?? null;
 }
+
+/** Rattache et libère des nuits (jours) d'un hébergement. */
+export async function setStayNights(stayId: string, change: { assign: string[]; release: string[] }): Promise<string | null> {
+  if (change.release.length) {
+    const { error } = await supabase.from('trip_days').update({ stay_id: null }).in('id', change.release).eq('stay_id', stayId);
+    if (error) return error.message;
+  }
+  if (change.assign.length) {
+    const { error } = await supabase.from('trip_days').update({ stay_id: stayId }).in('id', change.assign);
+    if (error) return error.message;
+  }
+  return null;
+}
