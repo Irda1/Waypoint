@@ -379,6 +379,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
           <PlaceSheet visible tripId={tripId} placeId={s.place?.id ?? null} name={s.place?.name ?? s.item.title ?? 'Étape'} category={categories.byCode.get(category)?.name_fr ?? 'Étape'}
             dot={categoryColors[mode][categories.rootOf(category)] ?? colors.text3} place={s.place ?? null} currency={currency} travelers={travelers}
             closedToday={s.issues.some((i) => i.type === 'closed_day')}
+            from={(() => { const i = schedule.findIndex((x) => x.item.id === sheetId); const prev = i > 0 ? schedule[i - 1].place : null; return prev ? { ...prev, name: prev.name } : i === 0 ? lodging ?? null : null; })()}
             due={amountDue(s.item, s.place, expenses, travelers)}
             onPay={session ? async () => {
               const err = await addExpense({ tripId, label: s.place?.name ?? s.item.title ?? 'Étape', poste: posteForCategory(categories.rootOf(category)), amount: amountDue(s.item, s.place, expenses, travelers), currency, paidBy: session.user.id, itemId: s.item.id });

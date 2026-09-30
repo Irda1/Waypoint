@@ -6,7 +6,8 @@ import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
 import { formatMoney } from '../../lib/format';
 import { formatDuration } from '../../lib/search';
-import { googlePlaceUrl } from '../../domain/routes.ts';
+import { fastest, googleDirectionsUrl, googlePlaceUrl, travelOptions } from '../../domain/routes.ts';
+import type { Point } from '../../domain/routes.ts';
 import { useFavorites } from '../../data/favorites';
 
 interface Props {
@@ -24,12 +25,14 @@ interface Props {
   /** Reste à payer pour cette étape (0 = rien à payer ou déjà payé) et action « Marquer payé ». */
   due?: number;
   onPay?: () => Promise<string | null>;
+  /** Étape précédente (ou hébergement pour la première) : sert au bouton « Y aller ». */
+  from?: (Point & { name: string }) | null;
   onRemove: () => void;
   onClose: () => void;
 }
 
 // Feuille du bas (maquette V5 « fiche lieu ») : l'essentiel d'un lieu sans quitter la journée.
-export function PlaceSheet({ visible, tripId, placeId, name, category, dot, place, currency, travelers, closedToday, due = 0, onPay, onRemove, onClose }: Props) {
+export function PlaceSheet({ visible, tripId, placeId, name, category, dot, place, currency, travelers, closedToday, due = 0, onPay, from = null, onRemove, onClose }: Props) {
   const [payError, setPayError] = React.useState<string | null>(null);
   const [paying, setPaying] = React.useState(false);
   const { colors } = useTheme();
@@ -37,6 +40,7 @@ export function PlaceSheet({ visible, tripId, placeId, name, category, dot, plac
   const isFav = placeId != null && fav.ids.has(placeId);
   const duration = place?.visit_duration_min ? formatDuration(place.visit_duration_min) : null;
   const price = place?.price_amount != null ? place.price_amount : null;
+  const trip = from && place ? fastest(travelOptions(from, place)) : null;
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <Pressable accessibilityLabel="Fermer la fiche" onPress={onClose} style={{ flex: 1, backgroundColor: 'rgba(3, 5, 6, 0.6)', justifyContent: 'flex-end' }}>
@@ -65,6 +69,13 @@ export function PlaceSheet({ visible, tripId, placeId, name, category, dot, plac
             ) : null}
             <Text variant="muted" style={{ fontSize: 12.5 }}>Durées et prix : valeurs indicatives, à vérifier avant d'y aller.</Text>
             {placeId != null ? <Button label={isFav ? '♥ Dans mes favoris' : '♡ Ajouter aux favoris'} variant="ghost" onPress={() => { void fav.toggle(placeId); }} /> : null}
+            {trip && from && place ? (
+              <View style={{ gap: 2 }}>
+                <Button label={`Y aller · ≈ ${formatDuration(trip.minutes)} ${trip.mode === 'walk' ? 'à pied' : trip.mode === 'bike' ? 'à vélo' : trip.mode === 'transit' ? 'en transports' : 'en voiture'}`}
+                  onPress={() => { void Linking.openURL(googleDirectionsUrl(from, place, trip.mode)); }} />
+                <Text variant="muted" style={{ fontSize: 12.5 }}>Depuis {from.name}</Text>
+              </View>
+            ) : null}
             {place ? <Button label="Ouvrir dans Maps" onPress={() => { void Linking.openURL(googlePlaceUrl(name, place)); }} /> : null}
             <Button label="Retirer du jour" variant="ghost" onPress={() => { onRemove(); onClose(); }} />
             <Button label="Fermer" variant="ghost" onPress={onClose} />
