@@ -1,7 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DAY_COLORS, boundsOf, dayColor, discoverPoints, mapHtml, planPoints, safeJson, visiblePoints } from './map.ts';
+import { DAY_COLORS, boundsOf, dayColor, discoverPoints, legendDays, mapHtml, planPoints, searchPoints, safeJson, visiblePoints } from './map.ts';
+import type { MapPoint } from './map.ts';
 import type { Place, TripItem } from './types.ts';
 
 const pl = (id: number, over: Partial<Place> = {}): Place => ({ id, name: `Lieu ${id}`, kind: 'activity', category_code: 'musee', lat: 38.7 + id / 100, lng: -9.1, price_amount: null, visit_duration_min: 60, closed_days: [], ...over });
@@ -74,4 +75,13 @@ test('page de carte : style clair ou sombre, messages, attribution automatique d
 test('public/map.html (web) est à jour : identique à la page générée', () => {
   const file = readFileSync(new URL('../../public/map.html', import.meta.url), 'utf8');
   assert.equal(file, mapHtml({ dark: false, start: { lat: 20, lng: 0, zoom: 2 }, fromUrl: true }));
+});
+
+test('recherche : insensible aux accents, étapes du programme d\'abord, deux lettres minimum', () => {
+  const mk = (id: string, label: string, kind: 'plan' | 'disc', day: number | null = null): MapPoint => ({ id, lat: 0, lng: 0, label, root: 'culture', kind, day, order: day ? 1 : null, color: '#000', placeId: 1 });
+  const pts = [mk('a', 'Café Ferreira', 'disc'), mk('b', 'Musée du Fado', 'plan', 2), mk('c', 'Cafe Beira', 'plan', 1)];
+  assert.deepEqual(searchPoints(pts, 'cafe').map((p) => p.id), ['c', 'a']);
+  assert.deepEqual(searchPoints(pts, 'MUSEE').map((p) => p.id), ['b']);
+  assert.deepEqual(searchPoints(pts, 'c'), []);
+  assert.deepEqual(legendDays(pts).map((l) => l.day), [1, 2]);
 });

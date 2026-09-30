@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MapCanvasProps } from './types';
 
 /** Carte sur le web : page MapLibre dans un cadre (iframe), pilotée par messages. */
-export function MapCanvas({ points, selectedId, dark, start, fitKey, onSelect }: MapCanvasProps) {
+export function MapCanvas({ points, selectedId, dark, start, fitKey, focusId, onSelect }: MapCanvasProps) {
   const frame = useRef<HTMLIFrameElement | null>(null);
   const [ready, setReady] = useState(false);
   const lastFit = useRef<string | null>(null);
@@ -29,8 +29,8 @@ export function MapCanvas({ points, selectedId, dark, start, fitKey, onSelect }:
     if (!ready) return;
     const fit = lastFit.current !== fitKey;
     lastFit.current = fitKey;
-    frame.current?.contentWindow?.postMessage({ type: 'points', points, fit, selected: selectedId }, '*');
-  }, [ready, points, fitKey, selectedId]);
+    frame.current?.contentWindow?.postMessage({ type: 'points', points, fit, selected: selectedId, focus: focusId ?? null }, '*');
+  }, [ready, points, fitKey, selectedId, focusId]);
 
   return React.createElement('iframe', { ref: frame, src, title: 'Carte du voyage', style: { border: 0, width: '100%', height: '100%' } });
 }

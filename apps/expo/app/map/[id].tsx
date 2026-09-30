@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { Pressable, ScrollView, Text as RNText, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRequireAuth } from '../../src/auth/useRequireAuth';
@@ -9,7 +9,7 @@ import { useCategories } from '../../src/data/categories';
 import { loadCandidates } from '../../src/data/itinerary';
 import { addPlaceItem } from '../../src/data/places';
 import { useFavorites } from '../../src/data/favorites';
-import { discoverPoints, planPoints, visiblePoints } from '../../src/domain/map.ts';
+import { discoverPoints, legendDays, planPoints, searchPoints, visiblePoints } from '../../src/domain/map.ts';
 import type { MapPoint } from '../../src/domain/map.ts';
 import { MapCanvas } from '../../src/features/map/MapCanvas';
 import { formatMoney } from '../../src/lib/format';
@@ -33,14 +33,17 @@ export default function TripMap() {
   const [busy, setBusy] = useState(false);
   const [onlyFav, setOnlyFav] = useState(false);
   const favorites = useFavorites(String(id));
+  const [term, setTerm] = useState('');
+  const [focus, setFocus] = useState<string | null>(null);
+  const [legendOpen, setLegendOpen] = useState(false);
 
   const cityIds = useMemo(() => [...new Set((data?.days ?? []).map((d) => d.city_id).filter((c): c is number => c != null).concat((data?.destinations ?? []).map((d) => d.city_id)))], [data?.days, data?.destinations]);
 
   // Les lieux à découvrir se chargent la première fois qu'on les demande.
   useEffect(() => {
-    if (!(discover || onlyFav) || loaded !== null || !cityIds.length) return;
+    if (!(discover || onlyFav || term.trim().length >= 2) || loaded !== null || !cityIds.length) return;
     void loadCandidates(cityIds, categories.rootOf).then((r) => { setLoaded(r.candidates); if (r.error) setProblem(r.error); });
-  }, [discover, onlyFav, loaded, cityIds, categories]);
+  }, [discover, onlyFav, term, loaded, cityIds, categories]);
 
   const plan = useMemo(() => (data ? planPoints({ days: data.days, items: data.items, places: data.places, rootOf: categories.rootOf }) : []), [data, categories]);
   const disc = useMemo(() => {
@@ -50,6 +53,8 @@ export default function TripMap() {
   }, [data, loaded, mode, colors.text3]);
   const shown = useMemo(() => visiblePoints([...plan, ...disc], { day, discover: discover || onlyFav, roots }), [plan, disc, day, discover, onlyFav, roots]);
   const points = useMemo(() => (onlyFav ? shown.filter((p) => p.placeId != null && favorites.ids.has(p.placeId)) : shown), [shown, onlyFav, favorites.ids]);
+  const found = useMemo(() => searchPoints([...plan, ...disc], term), [plan, disc, term]);
+  const legend = useMemo(() => legendDays(points), [points]);
   const point: MapPoint | undefined = points.find((p) => p.id === selected);
 
   if (guard) return guard;
@@ -77,7 +82,7 @@ export default function TripMap() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ flex: 1 }}>
-        <MapCanvas points={points} selectedId={selected} dark={mode === 'nuit'} start={start} fitKey={`${day}|${discover}`} onSelect={(pid) => { setSelected(pid); setNotice(null); }} />
+        <MapCanvas points={points} selectedId={selected} dark={mode === 'nuit'} start={start} fitKey={`${day}|${discover}`} focusId={focus} onSelect={(pid) => { setSelected(pid); setNotice(null); }} />
         <SafeAreaView edges={['top']} pointerEvents="box-none" style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
           <View style={{ padding: space.sm, gap: space.sm }} pointerEvents="box-none">
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
@@ -89,6 +94,33 @@ export default function TripMap() {
                 {data.days.map((d, i) => <Chip key={d.id} label={`Jour ${i + 1}`} selected={day === i + 1} onPress={() => setDay(i + 1)} />)}
               </ScrollView>
             </View>
+            <View style={{ backgroundColor: colors.surface, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.md, minHeight: 44 }}>
+              <RNText accessibilityElementsHidden importantForAccessibility="no" style={{ fontSize: 16 }}>🔍</RNText>
+              <TextInput accessibilityLabel="Chercher un lieu" value={term} onChangeText={setTerm} placeholder="Chercher un lieu" placeholderTextColor={colors.text3}
+                style={{ flex: 1, minHeight: 44, paddingHorizontal: space.sm, fontFamily: fonts.sans, fontSize: 15, color: colors.text }} />
+              {term ? (
+                <Pressable accessibilityRole="button" accessibilityLabel="Effacer la recherche" onPress={() => setTerm('')} style={{ minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}>
+                  <RNText style={{ color: colors.text3, fontSize: 16 }}>✕</RNText>
+                </Pressable>
+              ) : null}
+            </View>
+            {term.trim().length >= 2 ? (
+              <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' }}>
+                {found.length === 0 ? (
+                  <Text variant="muted" style={{ padding: space.md }}>{loaded === null ? 'Recherche…' : 'Aucun lieu trouvé.'}</Text>
+                ) : found.map((p) => (
+                  <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`Voir ${p.label} sur la carte`}
+                    onPress={() => { if (p.kind === 'disc') setDiscover(true); setDay(null); setSelected(p.id); setFocus(p.id); setNotice(null); setTerm(''); }}
+                    style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, borderTopWidth: 1, borderTopColor: colors.line }}>
+                    <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: p.color }} />
+                    <View style={{ flex: 1 }}>
+                      <RNText numberOfLines={1} style={{ fontFamily: fonts.sansSemi, fontSize: 15, color: colors.text }}>{p.label}</RNText>
+                      <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: colors.text3 }}>{p.kind === 'plan' ? `Jour ${p.day} · étape ${p.order}` : 'À découvrir'}</RNText>
+                    </View>
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
             <View style={{ flexDirection: 'row', gap: space.sm }}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
                 <Chip label="♥ Favoris" selected={onlyFav} onPress={() => setOnlyFav((v) => !v)} />
@@ -100,6 +132,30 @@ export default function TripMap() {
             </View>
           </View>
         </SafeAreaView>
+        <View pointerEvents="box-none" style={{ position: 'absolute', left: space.sm, bottom: space.sm, gap: space.xs, alignItems: 'flex-start' }}>
+          {legendOpen ? (
+            <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, padding: space.md, gap: space.xs }}>
+              {legend.map((l) => (
+                <View key={l.day} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                  <View style={{ width: 16, height: 16, borderRadius: 8, backgroundColor: l.color }} />
+                  <RNText style={{ fontFamily: fonts.sans, fontSize: 13, color: colors.text }}>Jour {l.day}</RNText>
+                </View>
+              ))}
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                <View style={{ width: 16, borderTopWidth: 3, borderStyle: 'dashed', borderColor: colors.text2 }} />
+                <RNText style={{ fontFamily: fonts.sans, fontSize: 13, color: colors.text }}>Trajet entre les étapes du jour</RNText>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.text3, marginHorizontal: 3 }} />
+                <RNText style={{ fontFamily: fonts.sans, fontSize: 13, color: colors.text }}>Lieu à découvrir</RNText>
+              </View>
+            </View>
+          ) : null}
+          <Pressable accessibilityRole="button" accessibilityLabel={legendOpen ? 'Masquer la légende' : 'Afficher la légende'} onPress={() => setLegendOpen((v) => !v)}
+            style={{ minHeight: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
+            <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text }}>Légende</RNText>
+          </Pressable>
+        </View>
       </View>
 
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line }}>

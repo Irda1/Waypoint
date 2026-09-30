@@ -147,7 +147,7 @@ export function mapHtml(opts: { dark: boolean; start: { lat: number; lng: number
   }
   map.on('move', drawRoutes); map.on('resize', drawRoutes);
   function mark(id) { selected = id; markers.forEach(function (m) { m.el.classList.toggle('sel', m.id === id); }); }
-  window.__setPoints = function (points, fit, sel) {
+  window.__setPoints = function (points, fit, sel, focus) {
     markers.forEach(function (m) { m.marker.remove(); }); markers = [];
     points.forEach(function (p) {
       var el = document.createElement('div');
@@ -167,10 +167,13 @@ export function mapHtml(opts: { dark: boolean; start: { lat: number; lng: number
       points.forEach(function (p) { b.extend([p.lng, p.lat]); });
       map.fitBounds(b, { padding: 60, maxZoom: 15, duration: 400 });
     }
+    // Recherche : on centre la carte sur le lieu choisi.
+    var f = focus ? points.filter(function (p) { return p.id === focus; })[0] : null;
+    if (f) map.flyTo({ center: [f.lng, f.lat], zoom: Math.max(map.getZoom(), 14), duration: 500 });
   };
   function onMessage(e) {
     try { var m = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-      if (m && m.type === 'points') window.__setPoints(m.points, m.fit, m.selected);
+      if (m && m.type === 'points') window.__setPoints(m.points, m.fit, m.selected, m.focus);
       if (m && m.type === 'selected') mark(m.id);
     } catch (err) {}
   }
@@ -211,4 +214,22 @@ export function mapHtml(opts: { dark: boolean; start: { lat: number; lng: number
   map.on('click', function () { send({type:'select', id: null}); });
 })();
 </script></body></html>`;
+}
+
+/** Repli des accents et de la casse pour comparer des noms de lieux. */
+export const foldText = (t: string): string => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+
+/** Recherche d'un lieu par son nom parmi les repères ; les étapes du programme passent avant les lieux à découvrir. */
+export function searchPoints(points: MapPoint[], term: string, limit = 6): MapPoint[] {
+  const q = foldText(term);
+  if (q.length < 2) return [];
+  return points
+    .filter((p) => foldText(p.label).includes(q))
+    .sort((a, b) => Number(a.kind === 'disc') - Number(b.kind === 'disc') || Number(!foldText(a.label).startsWith(q)) - Number(!foldText(b.label).startsWith(q)) || a.label.localeCompare(b.label))
+    .slice(0, limit);
+}
+
+/** Légende : une ligne par jour présent sur la carte, avec sa couleur. */
+export function legendDays(points: MapPoint[]): { day: number; color: string }[] {
+  return [...new Set(points.filter((p) => p.kind === 'plan' && p.day != null).map((p) => p.day as number))].sort((a, b) => a - b).map((day) => ({ day, color: dayColor(day) }));
 }

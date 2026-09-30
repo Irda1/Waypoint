@@ -8,7 +8,7 @@ import type { MapCanvasProps } from './types';
 const WebViewView = WebView as unknown as React.ComponentType<Record<string, unknown>>;
 
 /** Carte sur Android et iOS : la même page MapLibre dans une WebView. */
-export function MapCanvas({ points, selectedId, dark, start, fitKey, onSelect }: MapCanvasProps) {
+export function MapCanvas({ points, selectedId, dark, start, fitKey, focusId, onSelect }: MapCanvasProps) {
   const view = useRef<{ injectJavaScript: (script: string) => void } | null>(null);
   const [ready, setReady] = useState(false);
   const lastFit = useRef<string | null>(null);
@@ -18,8 +18,8 @@ export function MapCanvas({ points, selectedId, dark, start, fitKey, onSelect }:
     if (!ready) return;
     const fit = lastFit.current !== fitKey;
     lastFit.current = fitKey;
-    view.current?.injectJavaScript(`window.__setPoints(${safeJson(points)}, ${fit}, ${safeJson(selectedId)}); true;`);
-  }, [ready, points, fitKey, selectedId]);
+    view.current?.injectJavaScript(`window.__setPoints(${safeJson(points)}, ${fit}, ${safeJson(selectedId)}, ${safeJson(focusId ?? null)}); true;`);
+  }, [ready, points, fitKey, selectedId, focusId]);
 
   function onMessage(e: WebViewMessageEvent) {
     try {
