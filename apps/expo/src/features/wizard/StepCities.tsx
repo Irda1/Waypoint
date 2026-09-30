@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Text as RNText, View } from 'react-native';
+import { Text as RNText, View, useWindowDimensions } from 'react-native';
 import { Button, ErrorNote, Field, Text } from '../../ui';
 import { RegionMap } from '../regions/RegionMap';
 import { listCountryCities, listCountryCityPoints } from '../../data/places';
@@ -63,11 +63,16 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
     if (p) toggle({ id: p.id, name: p.name } as Row);
   }
 
-  return (
-    <View style={{ gap: space.md }}>
-      <StepTitle title={`Quelles villes en ${COUNTRY_NAME[country] ?? 'ce pays'} ?`}
-        hint={`${nights} nuit${nights > 1 ? "s" : ""} à répartir. Touche une région sur la carte, puis les villes à visiter : les nuits se répartissent toutes seules.`} />
-
+  const { width, height } = useWindowDimensions();
+  const wide = width >= 900;
+  const mapHeight = wide ? Math.max(520, Math.min(760, height - 260)) : 440;
+  const map = (
+    <View style={{ height: mapHeight, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' }}>
+      <RegionMap country={country} cities={points} selected={selected} onToggle={toggleById} />
+    </View>
+  );
+  const route = (
+    <>
       {state.cities.length > 0 ? (
         <View style={{ gap: space.sm }}>
           <Text variant="label">Ton parcours</Text>
@@ -94,9 +99,10 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
       )}
       {warn ? <Text variant="muted" style={{ color: colors.warm }} accessibilityLiveRegion="polite">{warn}</Text> : null}
 
-      <View style={{ height: 440, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' }}>
-        <RegionMap country={country} cities={points} selected={selected} onToggle={toggleById} />
-      </View>
+    </>
+  );
+  const search = (
+    <>
       <Field label="Rechercher une ville" value={query} onChangeText={setQuery} placeholder="Ex. Lisbonne, Porto…" autoCorrect={false} />
       {query || showList ? (
         <>
@@ -113,6 +119,21 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
         </>
       ) : (
         <Button label="Afficher la liste des villes" variant="ghost" onPress={() => setShowList(true)} />
+      )}
+    </>
+  );
+
+  return (
+    <View style={{ gap: space.md }}>
+      <StepTitle title={`Quelles villes en ${COUNTRY_NAME[country] ?? 'ce pays'} ?`}
+        hint={`${nights} nuit${nights > 1 ? "s" : ""} à répartir. Touche une région sur la carte, puis les villes à visiter : les nuits se répartissent toutes seules.`} />
+      {wide ? (
+        <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'flex-start' }}>
+          <View style={{ flex: 7, minWidth: 0 }}>{map}</View>
+          <View style={{ flex: 3, minWidth: 260, gap: space.md }}>{route}{search}</View>
+        </View>
+      ) : (
+        <>{route}{map}{search}</>
       )}
       <ErrorNote message={error} />
     </View>

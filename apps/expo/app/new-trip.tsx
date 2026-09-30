@@ -104,7 +104,7 @@ export default function NewTrip() {
         </View>
       </SafeAreaView>
 
-      <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl * 2, width: '100%', maxWidth: 880, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl * 2, width: '100%', maxWidth: step === 'villes' ? 1320 : 880, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
         {step === 'pays' ? <StepCountry {...props} /> : null}
         {step === 'dates' ? <StepDates {...props} /> : null}
         {step === 'villes' ? <StepCities {...props} preferCity={preCity} /> : null}
