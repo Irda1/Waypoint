@@ -154,3 +154,9 @@ test('détail d\'un poste : dépenses saisies puis reste estimé des étapes non
   ]);
   assert.deepEqual(posteDetail('activites', { expenses, items, places, travelers: 1 }), [{ kind: 'forecast', label: 'Musée', amount: 10 }]);
 });
+
+test('part par personne : montant du groupe divisé par le nombre de voyageurs', async () => {
+  const { share } = await import('./budget.ts');
+  assert.equal(share(300, 3), 100);
+  assert.equal(share(300, 0), 300);
+});
