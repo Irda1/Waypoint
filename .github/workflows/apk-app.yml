@@ -1,5 +1,6 @@
 # APK Android de la vraie appli Expo (apps/expo), à chaque push qui la modifie sur main.
 # Release GitHub « app-N » avec waypoint-app.apk. S'installe à côté de l'ancienne maquette (autre identifiant : com.waypoint.app).
+# Lien fixe vers le dernier APK : releases/download/app-latest/waypoint-app.apk
 # Secrets requis : SUPABASE_URL (déjà présent pour la collecte) et SUPABASE_ANON_KEY (clé « anon » publique du projet Supabase).
 name: APK de l'appli
 
@@ -92,3 +93,15 @@ jobs:
           body: |
             Vraie appli Waypoint (Expo), build ${{ github.run_number }}, commit ${{ github.sha }}.
             Installer : télécharge `waypoint-app.apk` depuis le téléphone, ouvre-le et autorise l'installation. Elle s'installe à côté de l'ancienne maquette.
+
+      - name: Lien fixe vers le dernier APK de l'appli
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: app-latest
+          target_commitish: ${{ github.sha }}
+          name: Waypoint (appli) · dernière version
+          make_latest: false
+          files: waypoint-app.apk
+          body: |
+            Dernier APK de la vraie appli Waypoint (Expo) : build ${{ github.run_number }}, commit ${{ github.sha }}.
+            Lien direct : https://github.com/${{ github.repository }}/releases/download/app-latest/waypoint-app.apk
