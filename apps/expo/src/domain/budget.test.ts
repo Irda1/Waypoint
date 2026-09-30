@@ -169,3 +169,20 @@ test('reste à payer d\'une étape : prix × voyageurs moins les paiements déj�
   assert.equal(amountDue(item, { price_amount: 20 }, [{ amount: 80, item_id: 'i1' }], 3), 0);
   assert.equal(amountDue(item, undefined, [], 3), 0);
 });
+
+test('activités : coût total, déjà payé et reste à payer', async () => {
+  const { activityLines } = await import('./budget.ts');
+  const lines = activityLines({
+    days: [{ id: 'd1' }, { id: 'd2' }],
+    items: [
+      { id: 'i1', day_id: 'd2', place_id: 1, plan: 'A' as const, title: null },
+      { id: 'i2', day_id: 'd1', place_id: 2, plan: 'A' as const, title: null },
+      { id: 'i3', day_id: 'd1', place_id: 1, plan: 'B' as const, title: null },
+      { id: 'i4', day_id: 'd1', place_id: 3, plan: 'A' as const, title: null },
+    ],
+    places: new Map([[1, { price_amount: 20, name: 'Tour' }], [2, { price_amount: 10, name: 'Musée' }], [3, { price_amount: 0, name: 'Parc' }]]),
+    expenses: [{ amount: 40, item_id: 'i1' }],
+    travelers: 2,
+  });
+  assert.deepEqual(lines.map((l) => [l.name, l.day, l.total, l.paid, l.due]), [['Musée', 1, 20, 0, 20], ['Tour', 2, 40, 40, 0]]);
+});
