@@ -9,7 +9,8 @@ import { organizeTimes } from '../../domain/itinerary.ts';
 import { applyTimes } from '../../data/itinerary';
 import { paymentState } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
-import { addItem, deleteItem, setDayHours, setItemTime } from '../../data/trips';
+import { addItem, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
+import { deriveAltPlan } from '../../domain/altplan.ts';
 import { DEFAULT_DEPART, DEFAULT_RETURN, dayHours, hoursIssues, liveStatus } from '../../domain/dayhours.ts';
 import { todayIso } from '../../lib/dates.ts';
 import { useCategories } from '../../data/categories';
@@ -62,6 +63,18 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
   const [returnInput, setReturnInput] = useState('');
 
   const schedule = scheduleDay({ date: day.day_date, plan, items: items.filter((i) => i.day_id === day.id), places });
+  const planA = plan === 'A' ? schedule : scheduleDay({ date: day.day_date, plan: 'A', items: items.filter((i) => i.day_id === day.id), places });
+  async function createAlt(kind: 'light' | 'shelter') {
+    const keep = new Set(deriveAltPlan(kind, planA.map((s) => ({
+      itemId: s.item.id,
+      root: categories.rootOf(s.place?.category_code ?? s.item.category_code ?? ''),
+      durationMin: s.startMin != null && s.endMin != null ? s.endMin - s.startMin : s.item.duration_min ?? s.place?.visit_duration_min ?? 60,
+      travelMin: s.travelFromPrevious?.minutes ?? 0,
+    }))));
+    const err = await copyItemsToPlan({ tripId, dayId: day.id, plan: plan === 'C' ? 'C' : 'B', items: planA.filter((s) => keep.has(s.item.id)).map((s) => s.item) });
+    setError(err);
+    if (!err) onChanged();
+  }
   const lastPosition = schedule.reduce((max, s) => Math.max(max, s.item.position), 0);
 
   async function add() {
@@ -134,6 +147,12 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
       </View>
 
       {schedule.length === 0 ? <Text variant="muted">Rien de prévu dans ce plan.</Text> : null}
+      {schedule.length === 0 && plan !== 'A' && planA.length > 0 ? (
+        <Button label={plan === 'B' ? 'Créer une journée allégée depuis le plan A' : 'Créer un plan à l\'abri depuis le plan A'} variant="ghost" onPress={() => createAlt(plan === 'B' ? 'light' : 'shelter')} />
+      ) : null}
+      {schedule.length === 0 && plan !== 'A' && planA.length > 0 ? (
+        <Text variant="muted">{plan === 'B' ? 'Garde les repas et retire les visites les plus longues.' : 'Retire les activités de plein air (nature, sport).'}</Text>
+      ) : null}
       {schedule.filter((s) => s.issues.some((i) => i.type === 'closed_day')).map((s) => (
         <View key={`closed-${s.item.id}`} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 48, paddingHorizontal: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.warm }} />
