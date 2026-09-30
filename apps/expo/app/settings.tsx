@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Pressable, Text as RNText, View } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../src/auth/AuthProvider';
 import { useRequireAuth } from '../src/auth/useRequireAuth';
-import { Button, Card, Chip, Screen, Text } from '../src/ui';
+import { Button, Card, Chip, ErrorNote, Field, Screen, Text } from '../src/ui';
 import { Icon } from '../src/ui/Icon';
 import { ACCENTS, ICON_STYLES } from '../src/theme/settings';
 import type { IconStyle, ModePref } from '../src/theme/settings';
@@ -19,10 +19,31 @@ const ACCENT_LABELS: Record<AccentName, string> = { soleil: 'Soleil', turquoise:
 
 export default function Settings() {
   const guard = useRequireAuth();
-  const { session, signOut } = useAuth();
+  const { session, signOut, changePassword, deleteAccount } = useAuth();
+  const [newPwd, setNewPwd] = useState('');
+  const [pwdNote, setPwdNote] = useState<{ ok: boolean; text: string } | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [typed, setTyped] = useState('');
+  const [delError, setDelError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const { colors, mode } = useTheme();
   const pref = useAppearance();
   if (guard) return guard;
+
+  async function savePassword() {
+    if (newPwd.length < 6) { setPwdNote({ ok: false, text: 'Mot de passe : 6 caractères minimum.' }); return; }
+    setBusy(true);
+    const err = await changePassword(newPwd);
+    setBusy(false);
+    setPwdNote(err ? { ok: false, text: err } : { ok: true, text: 'Mot de passe changé.' });
+    if (!err) setNewPwd('');
+  }
+  async function removeAccount() {
+    setBusy(true); setDelError(null);
+    const err = await deleteAccount();
+    setBusy(false);
+    if (err) setDelError(err);
+  }
 
   return (
     <Screen>
@@ -72,6 +93,28 @@ export default function Settings() {
         <Text variant="label">Compte</Text>
         <Text variant="body">{session?.user.email ?? ''}</Text>
         <Button label="Se déconnecter" variant="ghost" onPress={signOut} />
+      </Card>
+
+      <Card>
+        <Text variant="label">Mot de passe</Text>
+        <Field label="Nouveau mot de passe" value={newPwd} onChangeText={setNewPwd} secureTextEntry autoComplete="new-password" />
+        {pwdNote ? (pwdNote.ok ? <Text variant="muted" accessibilityLiveRegion="polite">{pwdNote.text}</Text> : <ErrorNote message={pwdNote.text} />) : null}
+        <Button label="Changer le mot de passe" variant="ghost" onPress={savePassword} loading={busy} disabled={!newPwd} />
+      </Card>
+
+      <Card>
+        <Text variant="label">Supprimer mon compte</Text>
+        <Text variant="muted">Efface ton compte et les voyages où tu voyages seul·e. Dans un voyage partagé, tes dépenses restent mais sans ton nom. Impossible à annuler.</Text>
+        {confirmDelete ? (
+          <>
+            <Field label="Pour confirmer, écris SUPPRIMER" value={typed} onChangeText={setTyped} autoCapitalize="characters" autoCorrect={false} />
+            <ErrorNote message={delError} />
+            <Button label="Supprimer définitivement" onPress={removeAccount} loading={busy} disabled={typed.trim().toUpperCase() !== 'SUPPRIMER'} />
+            <Button label="Annuler" variant="ghost" onPress={() => { setConfirmDelete(false); setTyped(''); setDelError(null); }} />
+          </>
+        ) : (
+          <Button label="Supprimer mon compte…" variant="ghost" onPress={() => setConfirmDelete(true)} />
+        )}
       </Card>
     </Screen>
   );

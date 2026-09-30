@@ -17,6 +17,12 @@ interface AuthValue {
   signUp: (email: string, password: string, displayName: string) => Promise<{ error?: string; needsConfirmation?: boolean }>;
   signInWithGoogle: () => Promise<string | null>;
   signOut: () => Promise<void>;
+  /** Envoie un lien de réinitialisation du mot de passe. */
+  resetPassword: (email: string) => Promise<string | null>;
+  /** Change le mot de passe de la personne connectée. */
+  changePassword: (password: string) => Promise<string | null>;
+  /** Supprime le compte et ses données (migration 1200). */
+  deleteAccount: () => Promise<string | null>;
 }
 
 const AuthContext = createContext<AuthValue | null>(null);
@@ -85,7 +91,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signOut = useCallback(async () => { await supabase.auth.signOut(); }, []);
 
-  const value = useMemo(() => ({ session, loading, signIn, signUp, signInWithGoogle, signOut }), [session, loading, signIn, signUp, signInWithGoogle, signOut]);
+  const resetPassword = useCallback(async (email: string) => {
+    const redirectTo = Platform.OS === 'web' ? window.location.origin : undefined;
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), redirectTo ? { redirectTo } : undefined);
+    return error ? friendly(error.message) : null;
+  }, []);
+
+  const changePassword = useCallback(async (password: string) => {
+    const { error } = await supabase.auth.updateUser({ password });
+    return error ? friendly(error.message) : null;
+  }, []);
+
+  const deleteAccount = useCallback(async () => {
+    const { error } = await supabase.rpc('delete_my_account');
+    if (error) {
+      return /delete_my_account|schema cache|does not exist/i.test(error.message)
+        ? 'La suppression n\'est pas encore activée sur le serveur (migration 1200 à installer).'
+        : friendly(error.message);
+    }
+    await supabase.auth.signOut();
+    return null;
+  }, []);
+
+  const value = useMemo(() => ({ session, loading, signIn, signUp, signInWithGoogle, signOut, resetPassword, changePassword, deleteAccount }), [session, loading, signIn, signUp, signInWithGoogle, signOut, resetPassword, changePassword, deleteAccount]);
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
