@@ -20,6 +20,8 @@ const horizon = require('../assets/photos/horizon.jpg');
 // Textes posés sur la photo : toujours clairs, quel que soit le mode du téléphone.
 const ON_PHOTO = '#F4EFE6';
 const ON_PHOTO_SOFT = 'rgba(245, 245, 242, 0.82)';
+// Sable clair pour les petits titres posés sur photo (l'accent du thème clair est trop sombre ici).
+const ON_PHOTO_ACCENT = '#FFD08A';
 
 export default function Home() {
   const guard = useRequireAuth();
@@ -51,7 +53,7 @@ export default function Home() {
               </Pressable>
             </View>
             <View style={styles.heroText}>
-              <RNText style={[styles.eyebrow, { color: colors.accent2 }]}>Nouveau voyage</RNText>
+              <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>Nouveau voyage</RNText>
               <RNText style={styles.poster} accessibilityRole="header">Où part-on ?</RNText>
               <RNText style={styles.lead}>Un pays, tes dates, tes envies. Waypoint te propose un programme jour par jour, avec la carte.</RNText>
               <Button label="Démarrer un voyage" onPress={() => router.push('/new-trip')} />
