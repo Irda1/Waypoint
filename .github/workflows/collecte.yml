@@ -14,7 +14,7 @@ on:
         options: [queue, countries, cities, places, images, rates]
         default: queue
       country:
-        description: "Villes : code pays ISO à charger (ex. PT). Vide = tous les pays"
+        description: "Villes / images : code pays ISO (ex. PT). Vide = tous les pays"
         required: false
       city:
         description: "Lieux : identifiant de la ville en base (ex. 12)"
@@ -80,7 +80,8 @@ jobs:
             cities)  [ -n "$COUNTRY" ] && args+=(--country "$COUNTRY") ;;
             places)  [ -n "$CITY" ] || { echo "::error::La passe places demande l'identifiant de la ville (champ city)."; exit 1; }
                      args+=(--city "$CITY") ;;
-            images|queue) args+=(--max "$MAX") ;;
+            images)  args+=(--max "$MAX"); [ -n "$COUNTRY" ] && args+=(--country "$COUNTRY") ;;
+            queue)   args+=(--max "$MAX") ;;
           esac
           [ "$DRY_RUN" = "true" ] && args+=(--dry-run)
           node pipeline/src/cli.mjs "${args[@]}"

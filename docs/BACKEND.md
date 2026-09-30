@@ -172,3 +172,4 @@ Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` rempli
 - **v1.10.8** : accueil : carrousel « Envie de… » (Lisbonne, Porto, Alfama, photos déjà dans l'appli) qui ouvre l'assistant de création. Aucune migration.
 - **v1.10.9** : identité : icône de l'appli, icône adaptative Android, favicon et logo dans l'en-tête de l'accueil (générés par `scripts/generate-icons.mjs`, dessin du logo v0.9). Aucune migration.
 - **v1.10.10** : accueil : toucher une idée « Envie de… » ouvre l'assistant avec le pays (Portugal) déjà choisi, la ville cochée et l'étape « Dates » directement. Aucune migration.
+- **v1.10.11** : passe `images` : option pays (`--country PT`, champ « country » du workflow) pour photographier les villes d'un pays précis au lieu des plus peuplées du monde. Aucune migration.
