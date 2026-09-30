@@ -142,7 +142,7 @@ Un seul flux au départ, et rien à construire : l'application n'ouvre **jamais*
 
 - **v1.9.7** : taux de change. Migration 1000 (`exchange_rates`, lecture publique), passe `rates` du pipeline (Frankfurter / BCE, sans clé, ajoutée au workflow), `domain/currency.ts` (conversion via l'euro, jamais de taux inventé, « ≈ ») et `data/rates.ts`. La carte Budget affiche le total dépensé en monnaie locale du premier pays du voyage (« ≈ », taux BCE daté) quand elle diffère de la monnaie du voyage (v1.9.8). **Migration à exécuter seule dans le SQL Editor** (`supabase/migrations/20260929001000_exchange_rates.sql`), puis lancer la passe `rates`.
 
-- **v1.9.9** : météo : heure de mise à jour affichée sous les prévisions. Transports : trajets **à pied** réels (itinéraire piéton OSRM, `domain/routes.ts`, `data/routes.ts`) à la place de l'estimation, avec repli automatique sur « ≈ … · estimé » si le service ne répond pas. Serveur public `routing.openstreetmap.de` (sans clé, usage léger : une requête par seconde) ; changer `EXPO_PUBLIC_ROUTING_URL` avant une ouverture au public. La durée réelle est affichée mais ne modifie pas encore la détection de chevauchements. **Pas de transports en commun ni de trafic en temps réel** : aucune source gratuite fiable n'a été vérifiée (voir « Transports et trafic »). Aucune migration.
+- **v1.9.9** : météo : heure de mise à jour affichée. Transports : volet « Itinéraire » entre deux étapes (et entre l'hébergement et la première/dernière étape quand le jour a un hébergement avec coordonnées) : replié, il montre le mode le plus rapide ; ouvert, à pied / à vélo / transports en commun / voiture avec la durée, chaque ligne ouvrant Google Maps (format « Maps URLs », sans clé) avec le bon mode de déplacement. À pied, vélo et voiture : itinéraire calculé sans circulation (serveur OSRM public FOSSGIS, une requête par seconde, demandé seulement à l'ouverture du volet, repli sur l'estimation ≈ de la maquette) ; transports : toujours estimation. `EXPO_PUBLIC_ROUTING_URL` remplace le serveur avant une ouverture au public. La durée réelle ne modifie pas encore la détection de chevauchements. Aucune migration. L'appli n'a pas encore d'écran pour créer un hébergement : les liens hébergement ne s'affichent qu'avec une ligne de `trip_stays` rattachée au jour.
 
 Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` remplit la ville, la recherche et l'ajout à un jour fonctionnent, les durées estimées sont marquées « ≈ ».
 
@@ -155,7 +155,6 @@ Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` rempli
 
 ## Transports et trafic : où on en est
 
-- **À pied** : fait (v1.9.9), itinéraire réel, service public à usage léger.
-- **Voiture** : le même serveur OSRM public existe en profil « driving » (testé : Lisbonne → Porto, 314 km, 3 h 26 hors circulation), mais il ne connaît **pas le trafic** ; à afficher comme « hors circulation ».
+- **À pied, vélo, voiture** : faits (v1.9.9), itinéraire calculé sans circulation, service public à usage léger, plus lien Google Maps pour les horaires et le trafic réels.
 - **Transports en commun** : toujours estimés (« ≈ … · estimé »). Une vraie source demande des horaires GTFS par ville ou un service à clé (Navitia, Transitland, Google, HERE…) : couverture, prix et licence de stockage sont à vérifier un par un avant de choisir. Non faits ici : aucun de ces services n'a été testé.
 - **Trafic en temps réel** : uniquement chez des services payants ou à clé ; ne jamais présenter comme temps réel une estimation.

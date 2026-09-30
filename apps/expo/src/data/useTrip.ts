@@ -11,7 +11,8 @@ import type { Expense, Place, TripItem } from '../domain/types.ts';
 
 export interface Trip { id: string; title: string; starts_on: string | null; ends_on: string | null; currency: string; travelers: number; styles: string[]; budget_total: number | null; memo: string; deleted_at: string | null; version: number }
 export interface Member { user_id: string; color: string; left_at: string | null; profiles: { display_name: string; avatar_url: string | null } | null }
-export interface Day { id: string; day_date: string; city_id: number | null; depart_time: string | null; return_time: string | null }
+export interface Day { id: string; day_date: string; city_id: number | null; stay_id: string | null; depart_time: string | null; return_time: string | null }
+export interface Stay { id: string; name: string; address: string | null; lat: number | null; lng: number | null }
 export interface Destination { city_id: number; position: number; nights: number; lat: number; lng: number; name: string; country_code: string; collection_status: 'empty' | 'queued' | 'collecting' | 'ready' | 'failed' }
 export interface BudgetLine { poste: string; amount: number }
 
@@ -24,6 +25,7 @@ export interface TripData {
   expenses: (Expense & { label: string; currency: string })[];
   budgetLines: BudgetLine[];
   destinations: Destination[];
+  stays: Stay[];
 }
 
 export type LiveStatus = 'connecting' | 'live' | 'offline';
@@ -47,16 +49,17 @@ export function useTrip(tripId: string) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const load = useCallback(async () => {
-    const [trip, members, days, items, expenses, budget, dest] = await Promise.all([
+    const [trip, members, days, items, expenses, budget, dest, stays] = await Promise.all([
       supabase.from('trips').select('id,title,starts_on,ends_on,currency,travelers,styles,budget_total,memo,deleted_at,version').eq('id', tripId).maybeSingle(),
       supabase.from('trip_members').select('user_id,color,left_at,profiles(display_name,avatar_url)').eq('trip_id', tripId),
-      supabase.from('trip_days').select('id,day_date,city_id,depart_time,return_time').eq('trip_id', tripId).order('day_date'),
+      supabase.from('trip_days').select('id,day_date,city_id,stay_id,depart_time,return_time').eq('trip_id', tripId).order('day_date'),
       supabase.from('trip_items').select('*').eq('trip_id', tripId),
       supabase.from('expenses').select('id,poste,amount,paid_by,item_id,stay_id,label,currency').eq('trip_id', tripId).order('spent_on'),
       supabase.from('trip_budget_lines').select('poste,amount').eq('trip_id', tripId),
       supabase.from('trip_destinations').select('city_id,position,nights,cities(name,name_fr,lat,lng,country_code,collection_status)').eq('trip_id', tripId).order('position'),
+      supabase.from('trip_stays').select('id,name,address,lat,lng').eq('trip_id', tripId),
     ]);
-    const failure = [trip, members, days, items, expenses, budget, dest].find((r) => r.error)?.error;
+    const failure = [trip, members, days, items, expenses, budget, dest, stays].find((r) => r.error)?.error;
     if (failure) { setError(failure.message); setLoading(false); return; }
     if (!trip.data) { setError('Voyage introuvable, ou tu n\'en es plus membre.'); setData(null); setLoading(false); return; }
 
@@ -76,6 +79,7 @@ export function useTrip(tripId: string) {
       expenses: (expenses.data ?? []) as TripData['expenses'],
       budgetLines: (budget.data ?? []) as BudgetLine[],
       destinations: toDestinations(dest.data),
+      stays: (stays.data ?? []) as Stay[],
     };
     known.current = new Set([next.trip.id, ...next.days.map((d) => d.id), ...next.items.map((i) => i.id), ...next.expenses.map((e) => e.id), ...next.members.map((m) => m.user_id)]);
     setData(next);

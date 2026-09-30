@@ -11,7 +11,8 @@ import { paymentState } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
 import { addItem, deleteItem, setItemTime } from '../../data/trips';
 import { useCategories } from '../../data/categories';
-import { useWalkRoutes } from '../../data/routes';
+import { LegRow } from './LegRow';
+import type { Point } from '../../domain/routes.ts';
 import { PlacePicker } from './PlacePicker';
 import type { CityOption } from '../../data/places';
 import type { Day } from '../../data/useTrip';
@@ -31,10 +32,12 @@ interface Props {
   travelers: number;
   /** Prévisions de la ville de ce jour, si connues. */
   forecast?: Forecast | null;
+  /** Hébergement de la nuit (avec coordonnées) : trajets vers la première étape et depuis la dernière. */
+  lodging?: (Point & { name: string }) | null;
   onChanged: () => void;
 }
 
-export function DayCard({ tripId, tripTitle, destinations, day, number, items, places, expenses, travelers, forecast, onChanged }: Props) {
+export function DayCard({ tripId, tripTitle, destinations, day, number, items, places, expenses, travelers, forecast, lodging, onChanged }: Props) {
   const { colors, mode } = useTheme();
   const categories = useCategories();
   const [plan, setPlan] = useState<'A' | 'B' | 'C'>('A');
@@ -46,10 +49,6 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
   const [editTime, setEditTime] = useState('');
 
   const schedule = scheduleDay({ date: day.day_date, plan, items: items.filter((i) => i.day_id === day.id), places });
-  // Trajets à pied : durée réelle (itinéraire piéton) quand le service répond, estimation sinon.
-  const walkLegs = schedule.flatMap((s, i) => (s.travelFromPrevious?.mode === 'walk' && schedule[i - 1]?.place && s.place
-    ? [{ key: s.item.id, from: schedule[i - 1].place!, to: s.place }] : []));
-  const walks = useWalkRoutes(walkLegs);
   const lastPosition = schedule.reduce((max, s) => Math.max(max, s.item.position), 0);
 
   async function add() {
@@ -104,13 +103,8 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
           const name = s.place?.name ?? s.item.title ?? 'Étape';
           return (
             <View key={s.item.id}>
-              {s.travelFromPrevious ? (
-                <Text variant="muted" style={{ paddingLeft: 52 + space.md + 16, paddingBottom: space.xs }}>
-                  {walks.get(s.item.id)
-                    ? `${walks.get(s.item.id)!.minutes} min à pied · ${walks.get(s.item.id)!.km.toString().replace('.', ',')} km (itinéraire piéton)`
-                    : `≈ ${s.travelFromPrevious.minutes} min ${s.travelFromPrevious.mode === 'walk' ? 'à pied' : 'en transports'} · estimé`}
-                </Text>
-              ) : null}
+              {index === 0 && lodging && s.place ? <LegRow from={lodging} to={s.place} fromName={lodging.name} toName={s.place.name} /> : null}
+              {index > 0 && schedule[index - 1].place && s.place ? <LegRow from={schedule[index - 1].place!} to={s.place} fromName={schedule[index - 1].place!.name} toName={s.place.name} /> : null}
               <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: space.md, minHeight: 56 }}>
                 <Pressable
                   accessibilityRole="button"
@@ -157,6 +151,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
             </View>
           );
         })}
+        {lodging && schedule.length > 0 && schedule[schedule.length - 1].place ? <LegRow from={schedule[schedule.length - 1].place!} to={lodging} fromName={schedule[schedule.length - 1].place!.name} toName={lodging.name} /> : null}
       </View>
 
       {adding === 'place' ? (
