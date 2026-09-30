@@ -4,7 +4,7 @@ import { Button, Card, Chip, ErrorNote, Field, Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
 import { daysForStay, nightsByStay, nightsChange, toggleNight } from '../../domain/stays.ts';
-import { addStay, removeStay, setStayNights } from '../../data/stays';
+import { addManualStay, addStay, removeStay, setStayNights, updateStay } from '../../data/stays';
 import { searchPlaces } from '../../data/places';
 import type { PlaceHit } from '../../data/places';
 import type { TripData } from '../../data/useTrip';
@@ -21,6 +21,10 @@ export function StayCard({ data, userId, onChanged }: { data: TripData; userId: 
   const [hits, setHits] = useState<PlaceHit[] | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [paying, setPaying] = useState<string | null>(null);
+  const [manual, setManual] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [nameInput, setNameInput] = useState('');
+  const [addressInput, setAddressInput] = useState('');
   const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState<number | string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -71,6 +75,24 @@ export function StayCard({ data, userId, onChanged }: { data: TripData; userId: 
     if (!err) { setPaying(null); setAmount(''); onChanged(); }
   }
 
+  async function saveManual() {
+    if (!nameInput.trim()) { setError('Indique le nom de l\'hébergement.'); return; }
+    setBusy('manual');
+    const err = await addManualStay({ tripId: data.trip.id, cityId: city?.city_id ?? null, name: nameInput, address: addressInput, dayIds: daysForStay(data.days, city?.city_id ?? -1, cities.length) });
+    setBusy(null);
+    setError(err);
+    if (!err) { setManual(false); setNameInput(''); setAddressInput(''); onChanged(); }
+  }
+
+  async function saveRename(id: string) {
+    if (!nameInput.trim()) { setError('Indique le nom de l\'hébergement.'); return; }
+    setBusy(id);
+    const err = await updateStay(id, { name: nameInput, address: addressInput });
+    setBusy(null);
+    setError(err);
+    if (!err) { setRenaming(null); onChanged(); }
+  }
+
   async function remove(id: string) {
     setBusy(id);
     setError(await removeStay(id));
@@ -91,6 +113,9 @@ export function StayCard({ data, userId, onChanged }: { data: TripData; userId: 
               <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{s.name}</Text>
               <Text variant="muted">{[s.address, paid(s.id), nights.get(s.id) ? `${nights.get(s.id)} nuit${nights.get(s.id)! > 1 ? 's' : ''}` : 'aucune nuit rattachée'].filter(Boolean).join(' · ')}</Text>
             </View>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Modifier ${s.name}`} onPress={() => { setRenaming(renaming === s.id ? null : s.id); setNameInput(s.name); setAddressInput(s.address ?? ''); setError(null); }} style={{ minHeight: 44, justifyContent: 'center' }}>
+              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.accent }}>{renaming === s.id ? 'Annuler' : 'Modifier'}</RNText>
+            </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={`Payer ${s.name}`} onPress={() => { setPaying(paying === s.id ? null : s.id); setError(null); }} style={{ minHeight: 44, justifyContent: 'center' }}>
               <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.accent }}>{paying === s.id ? 'Annuler' : 'Payer'}</RNText>
             </Pressable>
@@ -101,6 +126,13 @@ export function StayCard({ data, userId, onChanged }: { data: TripData; userId: 
               <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text2 }}>Retirer</RNText>
             </Pressable>
           </View>
+          {renaming === s.id ? (
+            <>
+              <Field label="Nom de l'hébergement" value={nameInput} onChangeText={setNameInput} placeholder="Ex. Hôtel do Chiado, Airbnb à Alfama" />
+              <Field label="Adresse (facultatif)" value={addressInput} onChangeText={setAddressInput} placeholder="Ex. Rua Garrett 12, Lisboa" />
+              <Button label="Enregistrer" onPress={() => saveRename(s.id)} loading={busy === s.id} />
+            </>
+          ) : null}
           {paying === s.id ? (
             <>
               <Field label={`Montant payé (${data.trip.currency})`} value={amount} onChangeText={setAmount} placeholder="240" keyboardType="decimal-pad" />
@@ -120,6 +152,18 @@ export function StayCard({ data, userId, onChanged }: { data: TripData; userId: 
           ) : null}
         </View>
       ))}
+      {manual ? (
+        <>
+          {cities.length > 1 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+              {cities.map((c) => <Chip key={c.city_id} label={c.name} selected={c.city_id === city?.city_id} onPress={() => setCityId(c.city_id)} />)}
+            </ScrollView>
+          ) : null}
+          <Field label="Nom de l'hébergement" value={nameInput} onChangeText={setNameInput} placeholder="Ex. Hôtel do Chiado, Airbnb à Alfama" />
+          <Field label="Adresse (facultatif, sert à l'itinéraire)" value={addressInput} onChangeText={setAddressInput} placeholder="Ex. Rua Garrett 12, Lisboa" />
+          <Button label="Enregistrer l'hébergement" onPress={saveManual} loading={busy === 'manual'} />
+        </>
+      ) : null}
       {choosing ? (
         cities.length === 0 ? <Text variant="muted">Choisis d'abord une destination.</Text> : (
           <>
@@ -152,7 +196,8 @@ export function StayCard({ data, userId, onChanged }: { data: TripData; userId: 
         )
       ) : null}
       <ErrorNote message={error} />
-      <Button label={choosing ? 'Fermer' : 'Ajouter un hébergement'} variant="ghost" onPress={() => { setChoosing((v) => !v); setError(null); }} />
+      <Button label={choosing ? 'Fermer' : 'Ajouter un hébergement'} variant="ghost" onPress={() => { setChoosing((v) => !v); setManual(false); setError(null); }} />
+      <Button label={manual ? 'Fermer la saisie' : 'Saisir un hébergement moi-même'} variant="ghost" onPress={() => { setManual((v) => !v); setChoosing(false); setError(null); }} />
     </Card>
   );
 }

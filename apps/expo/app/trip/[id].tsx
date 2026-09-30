@@ -302,7 +302,7 @@ export default function TripScreen() {
         {tab === 'budget' ? (
         <View style={styles.page}>
           <BudgetCard data={data} onChanged={reload} />
-          {session ? <AddExpenseCard tripId={trip.id} currency={trip.currency} userId={session.user.id} onChanged={reload} /> : null}
+          {session ? <AddExpenseCard data={data} userId={session.user.id} onChanged={reload} /> : null}
         </View>
         ) : null}
 
