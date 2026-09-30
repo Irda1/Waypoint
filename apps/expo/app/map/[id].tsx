@@ -12,6 +12,8 @@ import { useFavorites } from '../../src/data/favorites';
 import { discoverPoints, legendDays, planPoints, searchPoints, visiblePoints } from '../../src/domain/map.ts';
 import type { MapPoint } from '../../src/domain/map.ts';
 import { MapCanvas } from '../../src/features/map/MapCanvas';
+import { SlidingPanel } from '../../src/features/map/SlidingPanel';
+import type { PanelPos } from '../../src/features/map/SlidingPanel';
 import { formatMoney } from '../../src/lib/format';
 import { formatDuration } from '../../src/lib/search';
 import { categoryColors, fonts, radius, space } from '../../src/theme/tokens';
@@ -36,7 +38,8 @@ export default function TripMap() {
   const [term, setTerm] = useState('');
   const [focus, setFocus] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
-  const [listOpen, setListOpen] = useState(false);
+  const [panel, setPanel] = useState<PanelPos>('bas');
+  const [areaH, setAreaH] = useState(0);
 
   const cityIds = useMemo(() => [...new Set((data?.days ?? []).map((d) => d.city_id).filter((c): c is number => c != null).concat((data?.destinations ?? []).map((d) => d.city_id)))], [data?.days, data?.destinations]);
 
@@ -82,7 +85,7 @@ export default function TripMap() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }} onLayout={(e) => setAreaH(e.nativeEvent.layout.height)}>
         <MapCanvas points={points} selectedId={selected} dark={mode === 'nuit'} start={start} fitKey={`${day}|${discover}`} focusId={focus} onSelect={(pid) => { setSelected(pid); setNotice(null); }} />
         <SafeAreaView edges={['top']} pointerEvents="box-none" style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
           <View style={{ padding: space.sm, gap: space.sm }} pointerEvents="box-none">
@@ -133,24 +136,23 @@ export default function TripMap() {
             </View>
           </View>
         </SafeAreaView>
-        {listOpen ? (
-          <View style={{ position: 'absolute', left: space.sm, right: space.sm, bottom: 64, maxHeight: 280, backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' }}>
-            <ScrollView>
-              {points.length === 0 ? <Text variant="muted" style={{ padding: space.md }}>Aucun repère à lister.</Text> : points.map((p, i) => (
-                <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`Voir ${p.label} sur la carte`}
-                  onPress={() => { setSelected(p.id); setFocus(p.id); setNotice(null); setListOpen(false); }}
-                  style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, borderTopWidth: i ? 1 : 0, borderTopColor: colors.line }}>
-                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: p.color }} />
-                  <View style={{ flex: 1 }}>
-                    <RNText numberOfLines={1} style={{ fontFamily: fonts.sansSemi, fontSize: 15, color: colors.text }}>{p.label}</RNText>
-                    <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: colors.text3 }}>{p.kind === 'plan' ? `Jour ${p.day} · étape ${p.order}` : 'À découvrir'}</RNText>
-                  </View>
-                </Pressable>
-              ))}
-            </ScrollView>
-          </View>
-        ) : null}
-        <View pointerEvents="box-none" style={{ position: 'absolute', left: space.sm, bottom: space.sm, gap: space.xs, alignItems: 'flex-start' }}>
+        <SlidingPanel containerHeight={areaH} position={panel} onPosition={setPanel} title={`${points.length} lieu${points.length > 1 ? 'x' : ''} sur la carte`}>
+          <ScrollView scrollEnabled={panel !== 'bas'}>
+            {points.length === 0 ? <Text variant="muted" style={{ padding: space.md }}>Aucun repère à lister.</Text> : points.map((p, i) => (
+              <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`Voir ${p.label} sur la carte`}
+                onHoverIn={() => setSelected(p.id)}
+                onPress={() => { setSelected(p.id); setFocus(p.id); setNotice(null); setPanel('bas'); }}
+                style={{ minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, borderTopWidth: i ? 1 : 0, borderTopColor: colors.line, backgroundColor: selected === p.id ? colors.surface2 : 'transparent' }}>
+                <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: p.color }} />
+                <View style={{ flex: 1 }}>
+                  <RNText numberOfLines={1} style={{ fontFamily: fonts.sansSemi, fontSize: 15, color: colors.text }}>{p.label}</RNText>
+                  <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: colors.text3 }}>{p.kind === 'plan' ? `Jour ${p.day} · étape ${p.order}` : 'À découvrir'}</RNText>
+                </View>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </SlidingPanel>
+        <View pointerEvents="box-none" style={{ position: 'absolute', left: space.sm, bottom: 72 + space.sm, gap: space.xs, alignItems: 'flex-start' }}>
           {legendOpen ? (
             <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, padding: space.md, gap: space.xs }}>
               {legend.map((l) => (
@@ -173,10 +175,6 @@ export default function TripMap() {
             <Pressable accessibilityRole="button" accessibilityLabel={legendOpen ? 'Masquer la légende' : 'Afficher la légende'} onPress={() => setLegendOpen((v) => !v)}
               style={{ minHeight: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
               <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text }}>Légende</RNText>
-            </Pressable>
-            <Pressable accessibilityRole="button" accessibilityLabel={listOpen ? 'Masquer la liste des lieux' : 'Afficher la liste des lieux'} onPress={() => setListOpen((v) => !v)}
-              style={{ minHeight: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: listOpen ? colors.accent : colors.surface, borderWidth: 1, borderColor: colors.line }}>
-              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: listOpen ? colors.onAccent : colors.text }}>{`Liste (${points.length})`}</RNText>
             </Pressable>
           </View>
         </View>
