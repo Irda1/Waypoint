@@ -1,0 +1,89 @@
+# APK Android de la vraie appli Expo (apps/expo), à chaque push qui la modifie sur main.
+# Release GitHub « app-N » avec waypoint-app.apk. S'installe à côté de l'ancienne maquette (autre identifiant : com.waypoint.app).
+# Secrets requis : SUPABASE_URL (déjà présent pour la collecte) et SUPABASE_ANON_KEY (clé « anon » publique du projet Supabase).
+name: APK de l'appli
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps/expo/**', '.github/workflows/apk-app.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-app
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: APK Android (Expo)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      KEYSTORE_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE }}
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Vérifier les secrets
+        run: |
+          [ -n "$EXPO_PUBLIC_SUPABASE_URL" ] || { echo "::error::Secret SUPABASE_URL absent."; exit 1; }
+          [ -n "$EXPO_PUBLIC_SUPABASE_ANON_KEY" ] || { echo "::error::Secret SUPABASE_ANON_KEY absent : ajoute la clé « anon » du projet Supabase dans Settings > Secrets and variables > Actions."; exit 1; }
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - name: Installer les dépendances
+        working-directory: apps/expo
+        run: npm install --no-audit --no-fund
+
+      - name: Créer le projet Android
+        working-directory: apps/expo
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Numéro de version
+        working-directory: apps/expo
+        run: |
+          GRADLE=android/app/build.gradle
+          sed -i -E "s/versionCode [0-9]+/versionCode ${GITHUB_RUN_NUMBER}/" "$GRADLE"
+          sed -i -E "s/versionName \"[^\"]*\"/versionName \"1.10-build.${GITHUB_RUN_NUMBER}\"/" "$GRADLE"
+          grep -q "versionCode ${GITHUB_RUN_NUMBER}" "$GRADLE" || { echo "::error::versionCode introuvable dans $GRADLE"; exit 1; }
+
+      - name: Clé de signature
+        working-directory: apps/expo
+        run: |
+          if [ -n "$KEYSTORE_B64" ]; then
+            echo "$KEYSTORE_B64" | base64 -d > android/app/debug.keystore
+            echo "Clé du secret ANDROID_DEBUG_KEYSTORE utilisée."
+          else
+            echo "::warning::Secret ANDROID_DEBUG_KEYSTORE absent : clé de test."
+          fi
+
+      - name: Compiler l'APK (le code de l'appli est embarqué)
+        working-directory: apps/expo/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+          cp app/build/outputs/apk/release/app-release.apk ../../../waypoint-app.apk
+          ls -lh ../../../waypoint-app.apk
+
+      - name: Publier la Release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: app-${{ github.run_number }}
+          target_commitish: ${{ github.sha }}
+          name: Waypoint (appli) · build ${{ github.run_number }}
+          make_latest: false
+          files: waypoint-app.apk
+          body: |
+            Vraie appli Waypoint (Expo), build ${{ github.run_number }}, commit ${{ github.sha }}.
+            Installer : télécharge `waypoint-app.apk` depuis le téléphone, ouvre-le et autorise l'installation. Elle s'installe à côté de l'ancienne maquette.
