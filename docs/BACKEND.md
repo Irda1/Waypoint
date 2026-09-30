@@ -138,6 +138,8 @@ Un seul flux au départ, et rien à construire : l'application n'ouvre **jamais*
 - **v1.9.4** : bouton « ← Voyage » de la carte (retour direct au voyage, même après rechargement) ; carte : le style est téléchargé par la page en cas de blocage, diagnostic détaillé (style, tuiles, taille de la zone).
 - **v1.9.5** : carte web : la page de carte est servie comme fichier public (`apps/expo/public/map.html`, généré depuis `domain/map.ts`, test de cohérence) au lieu d'un iframe « srcdoc » ; réglages passés dans l'adresse.
 
+- **v1.9.6** : accueil en cartes photo avec statut, correctifs de lisibilité (PR n°2) ; recherche de lieux sans accents (`accentTolerantTerm` : les lettres accentuables deviennent des jokers, sans migration ; cherche aussi un peu plus large) ; filtre « Pratique » (pharmacies, banques, laveries… : lieux de type `service`). Aucune migration.
+
 Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` remplit la ville, la recherche et l'ajout à un jour fonctionnent, les durées estimées sont marquées « ≈ ».
 
 ## Prochaines étapes

@@ -1,6 +1,6 @@
 // Recherche de lieux dans la base collectée (lecture publique, voir la migration 0500) et ajout à un jour.
 import { supabase } from '../lib/supabase';
-import { likeTerm } from '../lib/search';
+import { accentTolerantTerm, likeTerm } from '../lib/search';
 import type { Place } from '../domain/types.ts';
 
 export interface CityOption {
@@ -65,14 +65,14 @@ export async function setDayCity(dayId: string, cityId: number): Promise<string 
   return error?.message ?? null;
 }
 
-export async function searchPlaces(args: { cityId: number; text: string; categories: string[] | null; limit?: number }): Promise<{ places: PlaceHit[]; error: string | null }> {
+export async function searchPlaces(args: { cityId: number; text: string; categories: string[] | null; kind?: 'activity' | 'service'; limit?: number }): Promise<{ places: PlaceHit[]; error: string | null }> {
   let q = supabase
     .from('places')
     .select('id,name,kind,category_code,lat,lng,price_amount,price_currency,price_is_estimate,visit_duration_min,duration_is_estimate,closed_days,address')
     .eq('city_id', args.cityId)
-    .eq('kind', 'activity')
+    .eq('kind', args.kind ?? 'activity')
     .eq('status', 'active');
-  const term = likeTerm(args.text);
+  const term = accentTolerantTerm(args.text);
   if (term) q = q.ilike('name', `%${term}%`);
   if (args.categories && args.categories.length) q = q.in('category_code', args.categories);
   const { data, error } = await q.order('popularity', { ascending: false }).limit(args.limit ?? 20);

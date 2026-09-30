@@ -20,3 +20,12 @@ export function formatDuration(minutes: number): string {
   if (h === 0) return `${m} min`;
   return m === 0 ? `${h} h` : `${h} h ${String(m).padStart(2, '0')}`;
 }
+
+/**
+ * Terme de recherche insensible aux accents pour `ilike` (Belem trouve Belém) : la base ne propose pas
+ * `unaccent`, donc chaque lettre pouvant porter un accent devient un joker « _ » (un seul caractère).
+ */
+export function accentTolerantTerm(input: string): string {
+  const plain = input.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+  return likeTerm(plain).replace(/[aeiouycn]/gi, '_');
+}
