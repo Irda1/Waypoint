@@ -211,9 +211,10 @@ test('images Pexels : crédit du photographe, lien, cover de la ville, arrêt su
       sent.push({ url, auth: init.headers.Authorization });
       return new Response(JSON.stringify({ photos: [photo] }), { status: 200, headers: { 'x-ratelimit-remaining': '3' } });
     };
-    const stats = await imagesPass({ sb, cfg, max: 5, fetchImpl, throttle: noWait(), log: silent });
+    const stats = await imagesPass({ sb, cfg, max: 5, country: 'pt', fetchImpl, throttle: noWait(), log: silent });
     assert.equal(sent.length, 1, 'quota presque atteint : arrêt propre après la première ville');
     assert.equal(sent[0].auth, 'PX');
+    assert.match(fake.calls.find((c) => c.method === 'GET' && c.path.endsWith('/cities')).query.country_code, /eq\.PT/);
     assert.match(sent[0].url, /query=Lisboa%20Portugal%20city/);
     assert.equal(stats.kept, 1);
     const media = fake.calls.find((c) => c.path.endsWith('/media'));

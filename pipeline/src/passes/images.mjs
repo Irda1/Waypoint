@@ -22,14 +22,14 @@ export function photoToMedia(photo) {
   };
 }
 
-export async function imagesPass({ sb, cfg, max = 20, fetchImpl = fetch, throttle = new Throttle(cfg.pexelsIntervalMs), log = console.log }) {
+export async function imagesPass({ sb, cfg, max = 20, country = null, fetchImpl = fetch, throttle = new Throttle(cfg.pexelsIntervalMs), log = console.log }) {
   if (!cfg.pexelsKey) throw new Error('PEXELS_API_KEY manquante (secret GitHub ou variable locale).');
   const runId = await startRun(sb, { pass: 'images', source: 'pexels', license: 'Pexels License' });
   const stats = { read: 0, kept: 0, written: 0 };
   try {
     // Villes sans photo de couverture, les plus peuplées d'abord
     const cities = await sb.select('cities',
-      `select=id,name,country_code,countries(name_en)&cover_media_id=is.null&order=population.desc.nullslast&limit=${max}`);
+      `select=id,name,country_code,countries(name_en)&cover_media_id=is.null${country ? `&country_code=eq.${encodeURIComponent(String(country).toUpperCase())}` : ''}&order=population.desc.nullslast&limit=${max}`);
     for (const city of cities) {
       await throttle.wait();
       const q = `${city.name} ${city.countries?.name_en ?? ''} city`.trim();
