@@ -9,7 +9,8 @@ import { organizeTimes } from '../../domain/itinerary.ts';
 import { applyTimes } from '../../data/itinerary';
 import { paymentState } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
-import { addItem, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
+import { swapWithNeighbor } from '../../domain/reorder.ts';
+import { addItem, applyItemMoves, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
 import { deriveAltPlan } from '../../domain/altplan.ts';
 import { DEFAULT_DEPART, DEFAULT_RETURN, dayHours, hoursIssues, liveStatus } from '../../domain/dayhours.ts';
 import { todayIso } from '../../lib/dates.ts';
@@ -120,6 +121,13 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
       startTime: s.item.start_time, durationMin: s.item.duration_min, position: s.item.position,
     })));
     setError(await applyTimes(changes));
+    onChanged();
+  }
+
+  async function move(index: number, dir: -1 | 1) {
+    const moves = swapWithNeighbor(schedule.map((x) => ({ id: x.item.id, start_time: x.item.start_time, position: x.item.position })), index, dir);
+    if (!moves.length) return;
+    setError(await applyItemMoves(moves));
     onChanged();
   }
 
@@ -247,15 +255,27 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                       </View>
                     </View>
                   ) : null}
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={`Retirer ${name}`}
-                    hitSlop={8}
-                    onPress={async () => { setError(await deleteItem(s.item.id)); onChanged(); }}
-                    style={{ alignSelf: 'flex-start', minHeight: 32, justifyContent: 'center' }}
-                  >
-                    <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>Retirer</RNText>
-                  </Pressable>
+                  <View style={{ flexDirection: 'row', gap: space.lg, alignItems: 'center' }}>
+                    <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Retirer ${name}`}
+                      hitSlop={8}
+                      onPress={async () => { setError(await deleteItem(s.item.id)); onChanged(); }}
+                      style={{ minHeight: 32, justifyContent: 'center' }}
+                    >
+                      <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>Retirer</RNText>
+                    </Pressable>
+                    {index > 0 ? (
+                      <Pressable accessibilityRole="button" accessibilityLabel={`Monter ${name}`} hitSlop={8} onPress={() => move(index, -1)} style={{ minHeight: 32, justifyContent: 'center' }}>
+                        <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>↑ Monter</RNText>
+                      </Pressable>
+                    ) : null}
+                    {!isLast ? (
+                      <Pressable accessibilityRole="button" accessibilityLabel={`Descendre ${name}`} hitSlop={8} onPress={() => move(index, 1)} style={{ minHeight: 32, justifyContent: 'center' }}>
+                        <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>↓ Descendre</RNText>
+                      </Pressable>
+                    ) : null}
+                  </View>
                 </View>
                 <PayBadge state={state} />
               </View>

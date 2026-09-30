@@ -188,3 +188,12 @@ export async function setBudgetLine(tripId: string, poste: Poste, amount: number
   const { error } = await supabase.from('trip_budget_lines').upsert({ trip_id: tripId, poste, amount }, { onConflict: 'trip_id,poste' });
   return msg(error);
 }
+
+/** Enregistre l'échange de deux étapes voisines (heure de début et rang). */
+export async function applyItemMoves(moves: { id: string; start_time: string | null; position: number }[]): Promise<string | null> {
+  for (const m of moves) {
+    const { error } = await supabase.from('trip_items').update({ start_time: m.start_time, position: m.position }).eq('id', m.id);
+    if (error) return msg(error);
+  }
+  return null;
+}
