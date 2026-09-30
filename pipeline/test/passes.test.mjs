@@ -6,7 +6,7 @@ import { loadConfig } from '../src/lib/config.mjs';
 import { countriesPass } from '../src/passes/countries.mjs';
 import { citiesPass } from '../src/passes/cities.mjs';
 import { placesPass } from '../src/passes/places.mjs';
-import { imagesPass, photoToMedia } from '../src/passes/images.mjs';
+import { bestPhoto, imagesPass, photoToMedia } from '../src/passes/images.mjs';
 import { queuePass } from '../src/passes/queue.mjs';
 import { parseRates, ratesPass } from '../src/passes/rates.mjs';
 import { Throttle } from '../src/lib/http.mjs';
@@ -255,4 +255,15 @@ test('passe taux : écrit par (base, quote) et journalise', async () => {
     assert.equal(write.body.length, 10);
     assert.equal(fake.calls.at(-1).body.status, 'done');
   } finally { await fake.close(); }
+});
+
+test('images : choisit la photo qui montre la ville, pas un portrait ni une photo verticale', () => {
+  const photos = [
+    { id: 1, alt: 'Woman posing in Kyoto street', width: 4000, height: 3000 },
+    { id: 2, alt: 'Tall shot of Kyoto pagoda', width: 3000, height: 4500 },
+    { id: 3, alt: 'Kyoto skyline with temple at dusk', width: 5000, height: 3300 },
+  ];
+  assert.equal(bestPhoto(photos, 'Kyoto').id, 3);
+  assert.equal(bestPhoto([{ id: 9, alt: '', width: 100, height: 50 }], 'Rabat').id, 9, 'sans meilleur choix, la première');
+  assert.equal(bestPhoto([], 'Rabat'), undefined);
 });

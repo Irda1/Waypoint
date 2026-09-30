@@ -4,7 +4,7 @@
 //   node src/cli.mjs countries [--file countryInfo.txt] [--dry-run]
 //   node src/cli.mjs cities    [--country PT] [--min-population 15000] [--file cities15000.zip] [--dry-run]
 //   node src/cli.mjs places    --city 12 | --name Lisbonne [--radius 6000] [--dry-run]
-//   node src/cli.mjs images    [--max 20] [--country PT]
+//   node src/cli.mjs images    [--max 20] [--country PT] [--redo]
 //   node src/cli.mjs queue     [--max 3]      (traite les villes demandées par l'app)
 //   node src/cli.mjs rates                    (taux de change du jour, BCE)
 //
@@ -68,7 +68,7 @@ async function main() {
       return placesPass({ sb, cfg, city, radiusM: flags.radius ? Number(flags.radius) : null, log });
     }
     case 'images':
-      return imagesPass({ sb, cfg, max: Number(flags.max || 20), country: flags.country, log });
+      return imagesPass({ sb, cfg, max: Number(flags.max || 20), country: flags.country, redo: !!flags.redo, log });
     case 'queue':
       return queuePass({ sb, cfg, max: Number(flags.max || 3), log });
     case 'rates':

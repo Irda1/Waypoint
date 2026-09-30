@@ -9,7 +9,6 @@ import type { TripSummary } from '../src/data/trips';
 import { formatDay, tripStatusLabel } from '../src/lib/format';
 import { todayIso, tripStatus } from '../src/lib/dates';
 import { photoKeyFor } from '../src/lib/photoKey';
-import { coverSource } from '../src/data/cityCover';
 import { photos } from '../src/theme/photos';
 import { fonts, radius, space } from '../src/theme/tokens';
 import { useTheme } from '../src/theme/useTheme';
@@ -102,7 +101,7 @@ export default function Home() {
               {trips.map((t) => (
                 <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={`Ouvrir ${t.title}`} onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }], opacity: pressed ? 0.92 : 1 })}>
-                  <ImageBackground source={coverSource(photoKeyFor(t.title), photos[photoKeyFor(t.title)], t.cover)} resizeMode="cover" style={styles.tripCard} imageStyle={{ borderRadius: radius.card }}>
+                  <ImageBackground source={t.cover ? { uri: t.cover.small } : photos[photoKeyFor(t.title)]} resizeMode="cover" style={styles.tripCard} imageStyle={{ borderRadius: radius.card }}>
                     <View style={styles.tripVeil} pointerEvents="none" />
                     <View style={[styles.statusPill, { backgroundColor: colors.accent }]}>
                       <RNText style={[styles.statusLabel, { color: colors.onAccent }]}>{tripStatusLabel(tripStatus(t.starts_on, t.ends_on, today))}</RNText>

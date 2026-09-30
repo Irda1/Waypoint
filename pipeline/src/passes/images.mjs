@@ -22,24 +22,47 @@ export function photoToMedia(photo) {
   };
 }
 
-export async function imagesPass({ sb, cfg, max = 20, country = null, fetchImpl = fetch, throttle = new Throttle(cfg.pexelsIntervalMs), log = console.log }) {
+const norm = (t) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const LANDMARK = /skyline|cityscape|landmark|tower|bridge|temple|old town|palace|castle|cathedral|square|aerial|panorama|harbor|harbour|mosque|shrine|streets?\b/;
+const OFF_TOPIC = /woman|man\b|men\b|girl|boy|portrait|selfie|couple|food|dish|meal|coffee|dog|cat\b|flower|car\b|interior|room|fashion|model/;
+
+/** Note une photo : nom de la ville dans la description, monument ou vue d'ensemble, grande définition, pas de portrait. */
+export function scorePhoto(photo, cityName) {
+  const alt = norm(photo.alt);
+  let score = 0;
+  if (alt.includes(norm(cityName))) score += 4;
+  if (LANDMARK.test(alt)) score += 2;
+  if (OFF_TOPIC.test(alt)) score -= 4;
+  if ((photo.width ?? 0) >= 3500) score += 1;
+  if ((photo.width ?? 0) < (photo.height ?? 0)) score -= 5;
+  return score;
+}
+
+export function bestPhoto(photos, cityName) {
+  return photos.map((p, i) => ({ p, i, s: scorePhoto(p, cityName) }))
+    .sort((a, b) => b.s - a.s || a.i - b.i)[0]?.p;
+}
+
+export async function imagesPass({ sb, cfg, max = 20, country = null, redo = false, fetchImpl = fetch, throttle = new Throttle(cfg.pexelsIntervalMs), log = console.log }) {
   if (!cfg.pexelsKey) throw new Error('PEXELS_API_KEY manquante (secret GitHub ou variable locale).');
   const runId = await startRun(sb, { pass: 'images', source: 'pexels', license: 'Pexels License' });
   const stats = { read: 0, kept: 0, written: 0 };
   try {
-    // Villes sans photo de couverture, les plus peuplées d'abord
+    // Sans `redo` : villes sans photo, capitales et villes phares d'abord. Avec `redo` : on refait
+    // les photos des seules capitales et villes phares (choix plus soigné qu'avant).
+    const filter = redo ? '&or=(is_capital.eq.true,featured_rank.not.is.null)' : '&cover_media_id=is.null';
     const cities = await sb.select('cities',
-      `select=id,name,country_code,countries(name_en)&cover_media_id=is.null${country ? `&country_code=eq.${encodeURIComponent(String(country).toUpperCase())}` : ''}&order=population.desc.nullslast&limit=${max}`);
+      `select=id,name,country_code,countries(name_en)${filter}${country ? `&country_code=eq.${encodeURIComponent(String(country).toUpperCase())}` : ''}&order=is_capital.desc,featured_rank.asc.nullslast,population.desc.nullslast&limit=${max}`);
     for (const city of cities) {
       await throttle.wait();
       const q = `${city.name} ${city.countries?.name_en ?? ''} city`.trim();
       const res = await fetchRetry(
-        `https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=5&orientation=landscape`,
+        `https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=15&orientation=landscape`,
         { headers: { Authorization: cfg.pexelsKey } }, { fetchImpl, retries: 2, baseDelayMs: 5000 });
       const remaining = Number(res.headers.get('x-ratelimit-remaining'));
       const { photos = [] } = await res.json();
       stats.read++;
-      const best = photos[0];
+      const best = bestPhoto(photos, city.name);
       if (best) {
         const [media] = await sb.upsert('media', [photoToMedia(best)], { onConflict: 'provider,provider_id', returning: 'id' });
         if (media) await sb.patch('cities', `id=eq.${city.id}`, { cover_media_id: media.id });

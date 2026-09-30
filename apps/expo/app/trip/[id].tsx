@@ -21,7 +21,7 @@ import { AddExpenseCard } from '../../src/features/trip/AddExpenseCard';
 import { formatDay, isIsoDate } from '../../src/lib/format';
 import { photoKeyFor } from '../../src/lib/photoKey';
 import { checkNewDay, suggestNewDay, todayIso } from '../../src/lib/dates.ts';
-import { coverSource } from '../../src/data/cityCover';
+import { pickSource } from '../../src/data/cityCover';
 import { photos } from '../../src/theme/photos';
 import { FloatingNav } from '../../src/features/nav/FloatingNav';
 import type { NavTab } from '../../src/features/nav/FloatingNav';
@@ -87,6 +87,8 @@ export default function TripScreen() {
   const travelers = Math.max(1, active.length);
   const { trip } = data;
   const destNames = destinationOptions.map((d) => d.name).join(' · ');
+  // Grande photo : la capitale du pays, sinon la première ville, sinon l'image intégrée à l'appli.
+  const heroPick = pickSource(photos[photoKeyFor(`${data?.trip.title ?? ''} ${destNames}`)], data?.capitalCover, data?.destinations[0]?.cover);
   const destDetail = data.destinations.map((d) => (d.nights > 0 ? `${d.name} (${d.nights} nuit${d.nights > 1 ? 's' : ''})` : d.name)).join(' → ');
 
   async function changeDestination(action: () => Promise<string | null>) {
@@ -129,7 +131,7 @@ export default function TripScreen() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
         {tab === 'voyage' ? (
-          <ImageBackground source={coverSource(photoKeyFor(`${trip.title} ${destNames}`), photos[photoKeyFor(`${trip.title} ${destNames}`)], data.destinations[0]?.cover ?? null)} resizeMode="cover" style={styles.cover}>
+          <ImageBackground source={heroPick.source} resizeMode="cover" style={styles.cover}>
             <View style={styles.veil} pointerEvents="none" />
             <SafeAreaView edges={['top']} style={styles.coverInner}>
               <View style={styles.coverBar}>
@@ -146,8 +148,8 @@ export default function TripScreen() {
                 </RNText>
                 <RNText style={styles.poster} accessibilityRole="header">{trip.title}</RNText>
                 <RNText style={styles.lead}>{dates}</RNText>
-                {photoKeyFor(`${trip.title} ${destNames}`) === 'horizon' && data.destinations[0]?.cover?.credit ? (
-                  <RNText style={{ fontFamily: fonts.sans, fontSize: 10, color: ON_PHOTO_SOFT }}>{data.destinations[0].cover.credit}</RNText>
+                {heroPick.cover?.credit ? (
+                  <RNText style={{ fontFamily: fonts.sans, fontSize: 10, color: ON_PHOTO_SOFT }}>{heroPick.cover.credit}</RNText>
                 ) : null}
               </View>
             </SafeAreaView>
@@ -166,10 +168,12 @@ export default function TripScreen() {
               <Text variant="label">Les journées · {data.days.length} jour{data.days.length > 1 ? 's' : ''}</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
                 {data.days.map((d, i) => {
-                  const city = data.destinations.find((x) => x.city_id === d.city_id)?.name ?? destinationOptions[0]?.name ?? '';
+                  const dest = data.destinations.find((x) => x.city_id === d.city_id);
+                  const city = dest?.name ?? destinationOptions[0]?.name ?? '';
+                  const tile = pickSource(photos[photoKeyFor(`${city} ${trip.title}`)], dest?.cover, data.capitalCover);
                   return (
                     <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={`Ouvrir le jour ${i + 1}`} onPress={() => { setChosenDay(i); setTab('jour'); }}>
-                      <ImageBackground source={photos[photoKeyFor(`${city} ${trip.title}`)]} resizeMode="cover" style={styles.dayTile} imageStyle={{ borderRadius: radius.card }}>
+                      <ImageBackground source={tile.cover ? { uri: tile.cover.small } : tile.source} resizeMode="cover" style={styles.dayTile} imageStyle={{ borderRadius: radius.card }}>
                         <View style={styles.tileVeil} pointerEvents="none" />
                         <RNText style={styles.tileNumber}>{d.day_date.slice(8, 10).replace(/^0/, '')}</RNText>
                         <RNText style={styles.tileCity} numberOfLines={2}>{city || weekdayShort(d.day_date)}</RNText>
