@@ -8,6 +8,7 @@ import { listTrips } from '../src/data/trips';
 import type { TripSummary } from '../src/data/trips';
 import { formatDay, tripStatusLabel } from '../src/lib/format';
 import { todayIso, tripStatus } from '../src/lib/dates';
+import { Globe } from '../src/features/globe/Globe';
 import { photoKeyFor } from '../src/lib/photoKey';
 import { photos } from '../src/theme/photos';
 import { fonts, radius, space } from '../src/theme/tokens';
@@ -55,6 +56,7 @@ export default function Home() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }} keyboardShouldPersistTaps="handled">
         <ImageBackground source={horizon} resizeMode="cover" style={styles.hero}>
+          <View style={styles.globe} pointerEvents="none"><Globe mode="hero" /></View>
           <View style={styles.veil}>
           <SafeAreaView edges={['top']} style={styles.heroInner}>
             <View style={styles.heroBar}>
@@ -123,7 +125,8 @@ export default function Home() {
 
 const styles = StyleSheet.create({
   hero: { minHeight: 500, width: '100%', overflow: 'hidden' },
-  veil: { width: '100%', backgroundColor: 'rgba(7, 9, 11, 0.52)' },
+  veil: { width: '100%', backgroundColor: 'rgba(0, 0, 0, 0.28)' },
+  globe: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   heroInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xxl, minHeight: 500, width: '100%', maxWidth: 880, alignSelf: 'center' },
   heroBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: space.sm },
   brand: { fontFamily: fonts.serif, fontSize: 22, color: ON_PHOTO },

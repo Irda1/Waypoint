@@ -6,6 +6,7 @@ import { autoTitle } from '../../domain/wizard.ts';
 import type { WizardState } from '../../domain/wizard.ts';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, radius, space } from '../../theme/tokens';
+import { Globe } from '../globe/Globe';
 import { Choice, StepTitle } from './parts';
 import type { StepProps } from './parts';
 
@@ -29,6 +30,10 @@ export function StepCountry({ state, update }: StepProps<WizardState>) {
   return (
     <View style={{ gap: space.md }}>
       <StepTitle title="Où veux-tu aller ?" hint="Choisis un pays. Tu sélectionneras les villes ensuite." />
+      <View style={{ height: 360, borderRadius: radius.card, overflow: 'hidden', backgroundColor: '#000' }}>
+        <Globe mode="pick" onPick={(code) => { if (COUNTRY_NAME[code]) pick(code); }} />
+      </View>
+      {state.country ? <Text variant="body">Pays choisi : {flagEmoji(state.country)} {COUNTRY_NAME[state.country] ?? state.country}</Text> : null}
       <Field label="Rechercher un pays" value={query} onChangeText={setQuery} placeholder="Ex. Japon, Portugal…" autoCorrect={false} />
       {results ? (
         results.length ? results.map((c) => row(c.code)) : <Text variant="muted">Aucun pays ne correspond.</Text>

@@ -1,0 +1,174 @@
+// Page du globe 3D (Three.js) : terre noire sur fond étoilé, contours des pays en couleur, pays survolé mis en avant.
+// La même page sert sur le web (public/globe.html, dans un cadre) et sur mobile (WebView). Fichier pur : testable avec Node.
+// Réglages passés dans l'adresse (?mode=hero|pick&color=5FD3BC&zoom=1) ou dans window.__GLOBE__ (mobile).
+//   hero : fond de l'accueil, la terre tourne doucement, rien à toucher.
+//   pick : choix d'un pays, avec zoom d'ouverture, survol et toucher.
+// Messages vers l'appli : {type:'ready'} puis {type:'pick', code:'PT', name:'Portugal'}.
+
+export function globeHtml(): string {
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Globe</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+canvas{display:block;width:100%;height:100%}
+#nom{position:fixed;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;color:#fff;font-size:clamp(28px,7vw,56px);font-weight:700;letter-spacing:-.02em;pointer-events:none;text-shadow:0 2px 24px rgba(0,0,0,.8);opacity:0;transition:opacity .18s}
+#nom.on{opacity:1}
+.autour{position:fixed;color:#fff;opacity:.22;font-size:12px;letter-spacing:.06em;text-transform:uppercase;pointer-events:none;transform:translate(-50%,-50%);white-space:nowrap}
+#msg{position:fixed;left:0;right:0;bottom:14px;text-align:center;color:#A7ADAB;font-size:13px;pointer-events:none}
+</style></head><body>
+<canvas id="c"></canvas><div id="nom"></div><div id="msg"></div>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var q = new URLSearchParams(location.search), G = window.__GLOBE__ || {};
+  var MODE = G.mode || q.get("mode") || "pick";
+  var COLOR = "#" + String(G.color || q.get("color") || "5FD3BC").replace("#", "");
+  var post = function (o) {
+    var s = JSON.stringify(o);
+    if (window.ReactNativeWebView) window.ReactNativeWebView.postMessage(s); else if (window.parent !== window) window.parent.postMessage(s, "*");
+  };
+  var msg = document.getElementById("msg"), nomEl = document.getElementById("nom");
+  if (!window.THREE || !window.topojson) { msg.textContent = "Globe indisponible : connexion requise."; post({ type: "ready" }); return; }
+
+  var canvas = document.getElementById("c");
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  var scene = new THREE.Scene(); scene.background = new THREE.Color(0x000000);
+  var camera = new THREE.PerspectiveCamera(40, 1, 0.1, 200);
+  function resize() { var w = window.innerWidth, h = window.innerHeight; renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix(); }
+  window.addEventListener("resize", resize); resize();
+
+  // étoiles
+  var N = 900, pos = new Float32Array(N * 3);
+  for (var i = 0; i < N; i++) { var u = Math.random() * 2 - 1, t = Math.random() * 6.2832, r = Math.sqrt(1 - u * u), d = 60 + Math.random() * 30; pos[i * 3] = d * r * Math.cos(t); pos[i * 3 + 1] = d * u; pos[i * 3 + 2] = d * r * Math.sin(t); }
+  var sg = new THREE.BufferGeometry(); sg.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ color: 0xffffff, size: 0.28, sizeAttenuation: true, transparent: true, opacity: 0.85 })));
+
+  // soleil : halo en fond, en haut à droite
+  function halo(size, stops) {
+    var c = document.createElement("canvas"); c.width = c.height = 256; var x = c.getContext("2d");
+    var g = x.createRadialGradient(128, 128, 0, 128, 128, 128); stops.forEach(function (s) { g.addColorStop(s[0], s[1]); });
+    x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+    var m = new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true });
+    var s = new THREE.Sprite(m); s.scale.set(size, size, 1); return s;
+  }
+  var sun = halo(26, [[0, "rgba(255,244,214,1)"], [0.08, "rgba(255,226,160,.9)"], [0.3, "rgba(255,170,90,.28)"], [1, "rgba(255,140,60,0)"]]);
+  sun.position.set(20, 11, -30); scene.add(sun);
+  var rim = halo(6.4, [[0.62, "rgba(0,0,0,0)"], [0.8, "rgba(120,190,255,.10)"], [1, "rgba(120,190,255,0)"]]);
+  scene.add(rim);
+
+  // terre : sphère noire, texture de contours dessinée à la volée
+  var W = 2048, H = 1024, tex = document.createElement("canvas"); tex.width = W; tex.height = H;
+  var ctx = tex.getContext("2d"), texture = new THREE.CanvasTexture(tex);
+  texture.colorSpace = THREE.SRGBColorSpace; texture.anisotropy = renderer.capabilities.getMaxAnisotropy();
+  var globe = new THREE.Mesh(new THREE.SphereGeometry(2, 96, 64), new THREE.MeshBasicMaterial({ map: texture }));
+  var group = new THREE.Group(); group.add(globe); scene.add(group);
+  group.rotation.y = -1.2; group.rotation.x = 0.35;
+
+  var feats = [], fr = new Intl.DisplayNames(["fr"], { type: "region" }), en = new Intl.DisplayNames(["en"], { type: "region" }), byEn = {}, byFr = {};
+  for (var a = 65; a <= 90; a++) for (var b = 65; b <= 90; b++) {
+    var code = String.fromCharCode(a, b), n1, n2; try { n1 = en.of(code); n2 = fr.of(code); } catch (e) { continue; }
+    if (n1 && n1 !== code) byEn[n1] = code; if (n2 && n2 !== code) byFr[n2] = code;
+  }
+  var ALIAS = { "United States of America": "US", "Dem. Rep. Congo": "CD", "Congo": "CG", "Central African Rep.": "CF", "Dominican Rep.": "DO", "Czechia": "CZ", "Bosnia and Herz.": "BA", "Eq. Guinea": "GQ", "Côte d'Ivoire": "CI", "Myanmar": "MM", "eSwatini": "SZ", "S. Sudan": "SS", "Solomon Is.": "SB", "Macedonia": "MK", "N. Cyprus": "CY", "Falkland Is.": "FK", "Fr. S. Antarctic Lands": "TF", "W. Sahara": "EH", "Timor-Leste": "TL", "Palestine": "PS", "Kosovo": "XK" };
+  function codeOf(f) { var n = (f.properties && f.properties.name) || ""; return ALIAS[n] || byEn[n] || null; }
+  function frName(f, code) { if (code) { try { var n = fr.of(code); if (n && n !== code) return n; } catch (e) {} } return (f.properties && f.properties.name) || ""; }
+  var px = function (lon) { return (lon + 180) / 360 * W; }, py = function (lat) { return (90 - lat) / 180 * H; };
+  function path(f) {
+    ctx.beginPath();
+    var g = f.geometry, polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+    polys.forEach(function (poly) { poly.forEach(function (ring) { ring.forEach(function (p, i) { var jump = i && Math.abs(p[0] - ring[i - 1][0]) > 180; i && !jump ? ctx.lineTo(px(p[0]), py(p[1])) : ctx.moveTo(px(p[0]), py(p[1])); }); }); });
+  }
+  var hover = -1;
+  function paint() {
+    ctx.fillStyle = "#03060A"; ctx.fillRect(0, 0, W, H);
+    ctx.lineJoin = "round"; ctx.strokeStyle = COLOR; ctx.globalAlpha = 0.85; ctx.lineWidth = 1.6;
+    feats.forEach(function (f) { path(f.f); ctx.stroke(); });
+    ctx.globalAlpha = 1;
+    if (hover >= 0) { var h = feats[hover]; path(h.f); ctx.fillStyle = COLOR; ctx.globalAlpha = 0.38; ctx.fill("evenodd"); ctx.globalAlpha = 1; ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 2.4; ctx.stroke(); }
+    texture.needsUpdate = true;
+  }
+  paint();
+
+  function inRing(lon, lat, ring) { var c = false; for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) { var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1]; if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) c = !c; } return c; }
+  function inFeature(f, lon, lat) {
+    var g = f.geometry, polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
+    for (var k = 0; k < polys.length; k++) { var n = 0; for (var r = 0; r < polys[k].length; r++) if (inRing(lon, lat, polys[k][r])) n++; if (n % 2 === 1) return true; }
+    return false;
+  }
+  function centroid(f) {
+    var g = f.geometry, polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [], best = null, size = -1;
+    polys.forEach(function (p) { if (p[0].length > size) { size = p[0].length; best = p[0]; } });
+    if (!best) return null; var x = 0, y = 0; best.forEach(function (c) { x += c[0]; y += c[1]; }); return [x / best.length, y / best.length];
+  }
+  function vec(lon, lat, r) { var phi = (90 - lat) * Math.PI / 180, th = (lon + 180) * Math.PI / 180; return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(th), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(th)); }
+
+  // caméra : distance courante et cible (zoom d'ouverture en mode « pick »)
+  var dist = MODE === "pick" ? 16 : 7.4, target = MODE === "pick" ? 6.2 : 7.4, t0 = performance.now();
+  var drag = null, vx = 0, moved = 0, autoSpin = MODE === "hero" ? 0.0012 : 0.0004;
+  var ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+  function pick(clientX, clientY) {
+    var r = canvas.getBoundingClientRect(); mouse.set((clientX - r.left) / r.width * 2 - 1, -((clientY - r.top) / r.height) * 2 + 1);
+    ray.setFromCamera(mouse, camera); var hit = ray.intersectObject(globe)[0]; if (!hit) return -1;
+    var p = globe.worldToLocal(hit.point.clone()).normalize(), lat = Math.asin(p.y) * 180 / Math.PI, th = Math.atan2(p.z, -p.x), lon = th * 180 / Math.PI - 180;
+    if (lon < -180) lon += 360;
+    for (var i = 0; i < feats.length; i++) if (inFeature(feats[i].f, lon, lat)) return i; return -1;
+  }
+  function setHover(i) {
+    if (i === hover) return; hover = i; paint();
+    if (i >= 0) { nomEl.textContent = feats[i].name; nomEl.classList.add("on"); } else nomEl.classList.remove("on");
+    updateAround();
+  }
+  var labels = [];
+  function updateAround() {
+    labels.forEach(function (l) { l.remove(); }); labels = [];
+    if (MODE !== "pick" || hover < 0) return;
+    var c0 = feats[hover].c; if (!c0) return;
+    var list = feats.map(function (f, i) { return { f: f, i: i, d: f.c && i !== hover ? Math.hypot(f.c[0] - c0[0], f.c[1] - c0[1]) : 1e9 }; }).sort(function (a, b) { return a.d - b.d; }).slice(0, 10);
+    var w = window.innerWidth, h = window.innerHeight;
+    list.forEach(function (o) {
+      var v = vec(o.f.c[0], o.f.c[1], 2.02); v.applyMatrix4(group.matrixWorld);
+      var cam = camera.position, n = v.clone().normalize(); if (n.dot(cam.clone().normalize()) < 0.2) return;
+      var s = v.clone().project(camera), el = document.createElement("div"); el.className = "autour"; el.textContent = o.f.name;
+      el.style.left = (s.x + 1) / 2 * w + "px"; el.style.top = (1 - s.y) / 2 * h + "px"; document.body.appendChild(el); labels.push(el);
+    });
+  }
+
+  if (MODE === "pick") {
+    canvas.addEventListener("pointerdown", function (e) { drag = { x: e.clientX, y: e.clientY }; moved = 0; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove", function (e) {
+      if (drag) { var dx = e.clientX - drag.x, dy = e.clientY - drag.y; moved += Math.abs(dx) + Math.abs(dy); drag = { x: e.clientX, y: e.clientY }; var k = 0.005 * (dist / 6); group.rotation.y += dx * k; group.rotation.x = Math.max(-1.2, Math.min(1.2, group.rotation.x + dy * k)); vx = dx * k; }
+      else if (e.pointerType === "mouse") setHover(pick(e.clientX, e.clientY));
+    });
+    canvas.addEventListener("pointerup", function (e) {
+      var wasTap = moved < 8; drag = null;
+      if (wasTap) { var i = pick(e.clientX, e.clientY); setHover(i); if (i >= 0 && feats[i].code) post({ type: "pick", code: feats[i].code, name: feats[i].name }); }
+    });
+    canvas.addEventListener("wheel", function (e) { e.preventDefault(); target = Math.max(3.4, Math.min(11, target + e.deltaY * 0.004)); }, { passive: false });
+    var pinch = null;
+    canvas.addEventListener("touchmove", function (e) { if (e.touches.length === 2) { var d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY); if (pinch) target = Math.max(3.4, Math.min(11, target * pinch / d)); pinch = d; } }, { passive: true });
+    canvas.addEventListener("touchend", function () { pinch = null; });
+  }
+
+  function frame(now) {
+    var k = Math.min(1, (now - t0) / 2600), ease = 1 - Math.pow(1 - k, 3);
+    if (MODE === "pick" && k < 1) dist = 16 + (target - 16) * ease; else dist += (target - dist) * 0.12;
+    camera.position.set(0, 0, dist); camera.lookAt(0, 0, 0);
+    if (!drag) { group.rotation.y += autoSpin + vx; vx *= 0.94; }
+    group.updateMatrixWorld(); renderer.render(scene, camera);
+    if (labels.length && !drag) updateAround();
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json").then(function (r) { return r.json(); }).then(function (topo) {
+    var fc = topojson.feature(topo, topo.objects.countries);
+    feats = fc.features.map(function (f) { var code = codeOf(f); return { f: f, name: frName(f, code), code: code, c: centroid(f) }; });
+    paint(); post({ type: "ready" });
+  }).catch(function () { msg.textContent = "Globe indisponible : connexion requise."; post({ type: "ready" }); });
+  if (MODE === "pick") msg.textContent = "Glisse pour tourner, touche un pays pour le choisir";
+})();
+</script></body></html>`;
+}
