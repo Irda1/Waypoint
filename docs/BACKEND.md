@@ -181,3 +181,4 @@ Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` rempli
 - **v1.10.17** : jour : « ↑ Monter » / « ↓ Descendre » sur chaque étape (échange heure de début et rang avec la voisine, `swapWithNeighbor` testé). Aucune migration.
 - **v1.10.18** : bouton « ＋ » flottant sur l'écran voyage : menu « Ajouter… » (une activité, une dépense, une note) qui ouvre la bonne carte. Aucune migration.
 - v1.10.19 : Paramètres « Style des icônes » (couleur / trait / plein) appliqué à la barre du bas et au menu ＋ (rendu trait/plein sur le web).
+- v1.10.20 : assistant de voyage, étape « Propositions » (aperçu du programme jour par jour, lieux à retirer, ou jours vides) ; le programme est écrit à la création du voyage. Aucune migration.

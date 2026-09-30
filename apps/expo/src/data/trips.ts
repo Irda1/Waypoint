@@ -7,8 +7,9 @@ import type { CityCover } from './cityCover';
 import { POSTES } from '../domain/types.ts';
 import type { Poste, TripItem } from '../domain/types.ts';
 import { addDays } from '../lib/dates.ts';
-import { autoTitle, budgetTotal, cityPerDay, dayCount, splitBudget } from '../domain/wizard.ts';
+import { autoTitle, budgetTotal, cityPerDay, dayCount, splitBudget, wizardPlan } from '../domain/wizard.ts';
 import type { WizardState } from '../domain/wizard.ts';
+import { applyPlan, loadCandidates } from './itinerary';
 
 const msg = (e: { message: string; code?: string } | null): string | null => {
   if (!e) return null;
@@ -150,7 +151,7 @@ export async function leaveTrip(tripId: string): Promise<string | null> {
 }
 
 /** Crée le voyage décrit par le parcours : voyage, destinations avec leurs nuits, jours (avec leur ville) et budget par poste. */
-export async function createTripFromWizard(s: WizardState): Promise<{ id: string | null; error: string | null }> {
+export async function createTripFromWizard(s: WizardState, rootOf?: (code: string) => string): Promise<{ id: string | null; error: string | null }> {
   const total = budgetTotal(s);
   const days = dayCount(s);
   if (!s.country || !s.start || !s.end || !days || !s.party || total === null) return { id: null, error: 'Il manque des informations pour créer le voyage.' };
@@ -174,7 +175,24 @@ export async function createTripFromWizard(s: WizardState): Promise<{ id: string
   const split = splitBudget(total);
   const r3 = await supabase.from('trip_budget_lines').insert(POSTES.map((poste) => ({ trip_id: id, poste, amount: split[poste] })));
   if (r3.error) return fail('le budget n\'a pas pu être réparti', r3.error);
+  if (s.program && rootOf && s.cities.length) {
+    const err = await fillProgram(id, s, rootOf);
+    if (err) return fail('le programme proposé n\'a pas pu être ajouté', { message: err });
+  }
   return { id, error: null };
+}
+
+/** Remplit les jours d'un voyage tout juste créé avec le programme proposé par l'assistant. */
+async function fillProgram(tripId: string, s: WizardState, rootOf: (code: string) => string): Promise<string | null> {
+  const { candidates, error } = await loadCandidates(s.cities.map((c) => c.id), rootOf);
+  if (error) return error;
+  const { data, error: e2 } = await supabase.from('trip_days').select('id,day_date').eq('trip_id', tripId);
+  if (e2) return e2.message;
+  const idByDate = new Map(((data ?? []) as { id: string; day_date: string }[]).map((d) => [d.day_date, d.id]));
+  const plan = wizardPlan(s, candidates)
+    .map((p) => ({ dayId: idByDate.get(p.date) ?? '', plan: p }))
+    .filter((p) => p.dayId && p.plan.items.length);
+  return applyPlan(tripId, plan);
 }
 
 /** Enregistre le mémo du voyage (notes libres partagées entre les voyageurs). */
