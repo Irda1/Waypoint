@@ -3,7 +3,7 @@ import { Pressable, Text as RNText, View } from 'react-native';
 import { Card, Field, Text } from '../../ui';
 import { formatMoney } from '../../lib/format';
 import { dateRange } from '../../lib/dates.ts';
-import { COUNTRY_NAME, flagEmoji } from '../../domain/countries.ts';
+import { COUNTRY_NAME } from '../../domain/countries.ts';
 import { BUDGET_LEVELS, INTERESTS, PARTY_OPTIONS, autoTitle, budgetTotal, dayCount, nightCount } from '../../domain/wizard.ts';
 import type { WizardState } from '../../domain/wizard.ts';
 import { useTheme } from '../../theme/useTheme';
@@ -39,7 +39,7 @@ export function StepRecap({ state, update, goTo }: StepProps<WizardState> & { go
       <StepTitle title="Tout est bon ?" hint="Vérifie, puis crée ton voyage. Tu pourras tout modifier ensuite." />
       <Field label="Nom du voyage" value={state.title} onChangeText={(t) => update({ ...state, title: t, titleEdited: true })} placeholder={autoTitle(state)} />
       <Card>
-        <Line label="Pays" value={`${state.country ? flagEmoji(state.country) : ''} ${COUNTRY_NAME[state.country ?? ''] ?? ''}`.trim()} onEdit={() => goTo('pays')} />
+        <Line label="Pays" value={COUNTRY_NAME[state.country ?? ''] ?? ''} onEdit={() => goTo('pays')} />
         <Line label="Dates" value={state.start && state.end ? `${state.indicative ? 'Indicatives · ' : ''}${dateRange(state.start, state.end)} · ${days} j / ${nightCount(state)} nuits` : ''} onEdit={() => goTo('dates')} />
         <Line label="Villes" value={state.cities.length ? state.cities.map((c) => `${c.name} (${c.nights})`).join(' → ') : 'Je choisirai sur place'} onEdit={() => goTo('villes')} />
         <Line label="Voyageurs" value={`${party} · ${state.travelers} personne${state.travelers > 1 ? 's' : ''}`} onEdit={() => goTo('voyageurs')} />

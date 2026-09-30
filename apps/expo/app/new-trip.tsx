@@ -118,7 +118,6 @@ export default function NewTrip() {
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line }}>
         <View style={{ padding: space.lg, gap: space.sm, width: '100%', maxWidth: 880, alignSelf: 'center' }}>
           <ErrorNote message={error} />
-          {step === 'propositions' ? <StepProposals {...props} /> : null}
         {step === 'recap' ? (
             <Button label={`Créer « ${state.title.trim() || autoTitle(state)} »`} onPress={create} loading={busy} />
           ) : (
