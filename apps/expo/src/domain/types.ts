@@ -24,6 +24,7 @@ export interface Place {
   price_amount: number | null;
   visit_duration_min: number | null;
   closed_days: number[];
+  opening_hours?: string | null;
 }
 
 export interface TripItem {

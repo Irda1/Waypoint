@@ -73,7 +73,7 @@ export function useTrip(tripId: string) {
     const places = new Map<number, Place>();
     if (placeIds.length) {
       const { data: rows } = await supabase.from('places')
-        .select('id,name,kind,category_code,lat,lng,price_amount,visit_duration_min,closed_days').in('id', placeIds);
+        .select('id,name,kind,category_code,lat,lng,price_amount,visit_duration_min,closed_days,opening_hours').in('id', placeIds);
       for (const p of (rows ?? []) as Place[]) places.set(p.id, p);
     }
     // Table ajoutée par la migration 1100 : son absence ne doit jamais empêcher d'ouvrir le voyage.
