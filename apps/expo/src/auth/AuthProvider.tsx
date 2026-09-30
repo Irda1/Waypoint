@@ -4,6 +4,7 @@ import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
 import type { Session } from '@supabase/supabase-js';
 import { clearOffline } from '../data/offline';
+import { clearAllReminders } from '../lib/reminders';
 import { supabase } from '../lib/supabase';
 
 // Termine proprement la fenêtre de connexion Google sur le web.
@@ -90,7 +91,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return sessionFromUrl(result.url);
   }, []);
 
-  const signOut = useCallback(async () => { await supabase.auth.signOut(); await clearOffline(); }, []);
+  const signOut = useCallback(async () => { await supabase.auth.signOut(); await clearOffline(); await clearAllReminders(); }, []);
 
   const resetPassword = useCallback(async (email: string) => {
     const redirectTo = Platform.OS === 'web' ? window.location.origin : undefined;
@@ -112,6 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
     await supabase.auth.signOut();
     await clearOffline();
+    await clearAllReminders();
     return null;
   }, []);
 

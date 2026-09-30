@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, Text as RNText, View } from 'react-native';
 import { router } from 'expo-router';
 import { useAuth } from '../src/auth/AuthProvider';
@@ -12,6 +12,7 @@ import { palette } from '../src/theme/tokens';
 import type { AccentName } from '../src/theme/tokens';
 import { fonts, space } from '../src/theme/tokens';
 import { useTheme } from '../src/theme/useTheme';
+import { remindersEnabled, remindersSupported, setRemindersEnabled } from '../src/lib/reminders';
 
 const MODE_LABELS: Record<ModePref, string> = { auto: 'Auto', nuit: 'Nuit', jour: 'Jour' };
 const ICON_LABELS: Record<IconStyle, string> = { couleur: 'Couleur', trait: 'Trait', plein: 'Plein' };
@@ -26,9 +27,20 @@ export default function Settings() {
   const [typed, setTyped] = useState('');
   const [delError, setDelError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [remind, setRemind] = useState(false);
+  const [remindNote, setRemindNote] = useState<string | null>(null);
+  useEffect(() => { void remindersEnabled().then(setRemind); }, []);
   const { colors, mode } = useTheme();
   const pref = useAppearance();
   if (guard) return guard;
+
+  async function toggleReminders() {
+    setRemindNote(null);
+    const r = await setRemindersEnabled(!remind);
+    setRemind(r.enabled);
+    if (r.denied) setRemindNote('Les notifications sont refusées : autorise-les dans les réglages du téléphone pour Waypoint.');
+    else if (r.enabled) setRemindNote('Rappels activés : ils se programment à l\'ouverture de chaque voyage.');
+  }
 
   async function savePassword() {
     if (newPwd.length < 6) { setPwdNote({ ok: false, text: 'Mot de passe : 6 caractères minimum.' }); return; }
@@ -88,6 +100,15 @@ export default function Settings() {
         </View>
         <Text variant="muted">Couleur : icônes d'origine. Trait : contour fin. Plein : silhouette à la couleur d'accent.</Text>
       </Card>
+
+      {remindersSupported ? (
+        <Card>
+          <Text variant="label">Rappels</Text>
+          <Text variant="muted">Une notification la veille du départ (18 h) et une heure avant la première activité horaire de chaque jour.</Text>
+          <Button label={remind ? 'Rappels activés : désactiver' : 'Activer les rappels'} variant={remind ? 'ghost' : 'primary'} onPress={toggleReminders} />
+          {remindNote ? <Text variant="muted" accessibilityLiveRegion="polite">{remindNote}</Text> : null}
+        </Card>
+      ) : null}
 
       <Card>
         <Text variant="label">Compte</Text>
