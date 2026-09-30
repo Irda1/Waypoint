@@ -134,3 +134,23 @@ test('remboursement reçu : les virements restants diminuent, puis tout est à l
   const done = applyPayments(half, [{ from_user: 'c', to_user: 'a', amount: 30 }]);
   assert.equal(settlements(done).length, 0);
 });
+
+test('détail d\'un poste : dépenses saisies puis reste estimé des étapes non payées', async () => {
+  const { posteDetail } = await import('./budget.ts');
+  const places = new Map([[1, { price_amount: 20, category_code: 'gastronomie', name: 'Time Out' }], [2, { price_amount: 10, category_code: 'culture', name: 'Musée' }]]);
+  const items = [
+    { id: 'i1', place_id: 1, category_code: null, plan: 'A' as const, title: null },
+    { id: 'i2', place_id: 2, category_code: null, plan: 'A' as const, title: null },
+    { id: 'i3', place_id: 1, category_code: null, plan: 'B' as const, title: null },
+  ];
+  const expenses = [
+    { amount: 15, poste: 'repas' as const, item_id: 'i1', label: 'Acompte' },
+    { amount: 40, poste: 'transports' as const, item_id: null, label: 'Métro' },
+  ];
+  const repas = posteDetail('repas', { expenses, items, places, travelers: 2 });
+  assert.deepEqual(repas, [
+    { kind: 'paid', label: 'Acompte', amount: 15 },
+    { kind: 'forecast', label: 'Time Out', amount: 25 },   // 20 € × 2 − 15 € déjà payés
+  ]);
+  assert.deepEqual(posteDetail('activites', { expenses, items, places, travelers: 1 }), [{ kind: 'forecast', label: 'Musée', amount: 10 }]);
+});
