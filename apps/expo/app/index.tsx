@@ -3,7 +3,7 @@ import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNTe
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useRequireAuth } from '../src/auth/useRequireAuth';
-import { Button, Card, Columns, ErrorNote, Text } from '../src/ui';
+import { Button, Card, Columns, ErrorNote, Field, Text } from '../src/ui';
 import { listTrips } from '../src/data/trips';
 import type { TripSummary } from '../src/data/trips';
 import { formatDay, tripStatusLabel } from '../src/lib/format';
@@ -35,6 +35,7 @@ export default function Home() {
   const { colors } = useTheme();
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [joinCode, setJoinCode] = useState('');
   const today = todayIso();
 
   const refresh = useCallback(async () => {
@@ -117,6 +118,13 @@ export default function Home() {
               ))}
             </Columns>
           )}
+
+          <Text variant="label">Rejoindre un voyage</Text>
+          <Card>
+            <Text variant="muted">Un ami t'a envoyé un code d'invitation ? Entre-le ici.</Text>
+            <Field label="Code d'invitation" value={joinCode} onChangeText={(t) => setJoinCode(t.trim())} placeholder="Ex. AB12CD34" autoCapitalize="characters" autoCorrect={false} />
+            <Button label="Rejoindre" disabled={joinCode.length < 4} onPress={() => router.push({ pathname: '/join/[code]', params: { code: joinCode } })} />
+          </Card>
         </View>
       </ScrollView>
     </View>

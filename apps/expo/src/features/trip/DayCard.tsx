@@ -46,6 +46,8 @@ interface Props {
   forecast?: Forecast | null;
   /** Hébergement de la nuit (avec coordonnées) : trajets vers la première étape et depuis la dernière. */
   lodging?: (Point & { name: string }) | null;
+  /** Tous les jours du voyage : permet d'appliquer les heures de départ et de retour à chacun. */
+  allDayIds?: string[];
   /** Monnaie du voyage et budget « activités » par jour, pour la recommandation de budget. */
   currency?: string;
   dailyActivityBudget?: number | null;
@@ -55,7 +57,7 @@ interface Props {
   onOpenedAdd?: () => void;
 }
 
-export function DayCard({ tripId, tripTitle, destinations, day, number, items, places, expenses, travelers, forecast, lodging, currency = 'EUR', dailyActivityBudget = null, onChanged, openAdd = false, onOpenedAdd }: Props) {
+export function DayCard({ tripId, tripTitle, destinations, day, number, items, places, expenses, travelers, forecast, lodging, allDayIds, currency = 'EUR', dailyActivityBudget = null, onChanged, openAdd = false, onOpenedAdd }: Props) {
   const { colors, mode } = useTheme();
   const categories = useCategories();
   const { session } = useAuth();
@@ -116,6 +118,16 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
   const now = new Date();
   const live = isToday && schedule.some((s) => s.startMin != null) ? liveStatus(schedule, now.getHours() * 60 + now.getMinutes()) : null;
   function openHours() { setDepartInput(hours.depart); setReturnInput(hours.return); setEditHours(true); setError(null); }
+  async function saveHoursAll() {
+    if (!isTime(departInput) || !isTime(returnInput)) { setError('Heures au format 09:30.'); return; }
+    let err: string | null = null;
+    for (const id of allDayIds ?? [day.id]) {
+      err = await setDayHours(id, departInput === DEFAULT_DEPART ? null : departInput, returnInput === DEFAULT_RETURN ? null : returnInput);
+      if (err) break;
+    }
+    setError(err);
+    if (!err) { setEditHours(false); onChanged(); }
+  }
   async function saveHours(reset: boolean) {
     const d = reset ? DEFAULT_DEPART : departInput;
     const r = reset ? DEFAULT_RETURN : returnInput;
@@ -334,6 +346,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
           <Field label="Retour souhaité" value={returnInput} onChangeText={setReturnInput} placeholder="23:30" keyboardType="numbers-and-punctuation" />
           <ErrorNote message={error} />
           <Button label="Enregistrer" onPress={() => saveHours(false)} />
+          {allDayIds && allDayIds.length > 1 ? <Button label={`Appliquer à tous les jours (${allDayIds.length})`} variant="ghost" onPress={saveHoursAll} /> : null}
           <Button label="Remettre par défaut" variant="ghost" onPress={() => saveHours(true)} />
           <Button label="Annuler" variant="ghost" onPress={() => { setEditHours(false); setError(null); }} />
         </View>
