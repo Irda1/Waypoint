@@ -4,8 +4,9 @@ import { router } from 'expo-router';
 import { useAuth } from '../src/auth/AuthProvider';
 import { useRequireAuth } from '../src/auth/useRequireAuth';
 import { Button, Card, Chip, Screen, Text } from '../src/ui';
-import { ACCENTS } from '../src/theme/settings';
-import type { ModePref } from '../src/theme/settings';
+import { Icon } from '../src/ui/Icon';
+import { ACCENTS, ICON_STYLES } from '../src/theme/settings';
+import type { IconStyle, ModePref } from '../src/theme/settings';
 import { setAppearance, useAppearance } from '../src/theme/store';
 import { palette } from '../src/theme/tokens';
 import type { AccentName } from '../src/theme/tokens';
@@ -13,6 +14,7 @@ import { fonts, space } from '../src/theme/tokens';
 import { useTheme } from '../src/theme/useTheme';
 
 const MODE_LABELS: Record<ModePref, string> = { auto: 'Auto', nuit: 'Nuit', jour: 'Jour' };
+const ICON_LABELS: Record<IconStyle, string> = { couleur: 'Couleur', trait: 'Trait', plein: 'Plein' };
 const ACCENT_LABELS: Record<AccentName, string> = { soleil: 'Soleil', turquoise: 'Turquoise', corail: 'Corail', lavande: 'Lavande' };
 
 export default function Settings() {
@@ -51,6 +53,19 @@ export default function Settings() {
             );
           })}
         </View>
+      </Card>
+
+      <Card>
+        <Text variant="label">Style des icônes</Text>
+        <View style={{ flexDirection: 'row', gap: space.sm }} accessibilityRole="radiogroup">
+          {ICON_STYLES.map((i) => (
+            <Chip key={i} label={ICON_LABELS[i]} selected={pref.icons === i} onPress={() => setAppearance({ icons: i })} />
+          ))}
+        </View>
+        <View style={{ flexDirection: 'row', gap: space.lg, alignItems: 'center' }}>
+          {['🗺️', '☀️', '💶', '👥'].map((g) => <Icon key={g} glyph={g} size={26} />)}
+        </View>
+        <Text variant="muted">Couleur : icônes d'origine. Trait : contour fin. Plein : silhouette à la couleur d'accent.</Text>
       </Card>
 
       <Card>

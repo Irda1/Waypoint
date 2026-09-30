@@ -12,7 +12,7 @@ function emit() { listeners.forEach((l) => l()); }
 // Relecture au démarrage : l'appli s'affiche d'abord avec le défaut, puis bascule si un réglage existe.
 void AsyncStorage.getItem(KEY).then((raw) => {
   const saved = parseAppearance(raw);
-  if (saved.mode !== current.mode || saved.accent !== current.accent) { current = saved; emit(); }
+  if (saved.mode !== current.mode || saved.accent !== current.accent || saved.icons !== current.icons) { current = saved; emit(); }
 }).catch(() => {});
 
 export function setAppearance(patch: Partial<Appearance>) {

@@ -2,10 +2,12 @@
 import type { AccentName, Mode } from './tokens.ts';
 
 export type ModePref = 'auto' | 'nuit' | 'jour';
-export interface Appearance { mode: ModePref; accent: AccentName }
+export type IconStyle = 'couleur' | 'trait' | 'plein';
+export interface Appearance { mode: ModePref; accent: AccentName; icons: IconStyle }
 
-export const DEFAULT_APPEARANCE: Appearance = { mode: 'auto', accent: 'soleil' };
+export const DEFAULT_APPEARANCE: Appearance = { mode: 'auto', accent: 'soleil', icons: 'couleur' };
 export const ACCENTS: AccentName[] = ['soleil', 'turquoise', 'corail', 'lavande'];
+export const ICON_STYLES: IconStyle[] = ['couleur', 'trait', 'plein'];
 export const MODES: ModePref[] = ['auto', 'nuit', 'jour'];
 
 /** « Auto » suit le téléphone ; sans information du téléphone, on reste en nuit. */
@@ -22,6 +24,7 @@ export function parseAppearance(raw: string | null | undefined): Appearance {
     return {
       mode: MODES.includes(v.mode as ModePref) ? (v.mode as ModePref) : DEFAULT_APPEARANCE.mode,
       accent: ACCENTS.includes(v.accent as AccentName) ? (v.accent as AccentName) : DEFAULT_APPEARANCE.accent,
+      icons: ICON_STYLES.includes(v.icons as IconStyle) ? (v.icons as IconStyle) : DEFAULT_APPEARANCE.icons,
     };
   } catch {
     return DEFAULT_APPEARANCE;

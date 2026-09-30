@@ -14,7 +14,9 @@ test('mode forcé : ignore le téléphone', () => {
 });
 
 test('réglage enregistré : valeurs valides relues, le reste retombe sur le défaut', () => {
-  assert.deepEqual(parseAppearance('{"mode":"jour","accent":"lavande"}'), { mode: 'jour', accent: 'lavande' });
+  assert.deepEqual(parseAppearance('{"mode":"jour","accent":"lavande"}'), { mode: 'jour', accent: 'lavande', icons: 'couleur' });
+  assert.equal(parseAppearance('{"icons":"plein"}').icons, 'plein');
+  assert.equal(parseAppearance('{"icons":"neon"}').icons, 'couleur');
   assert.deepEqual(parseAppearance('{"mode":"bizarre","accent":"x"}'), DEFAULT_APPEARANCE);
   assert.deepEqual(parseAppearance('pas du json'), DEFAULT_APPEARANCE);
   assert.deepEqual(parseAppearance(null), DEFAULT_APPEARANCE);

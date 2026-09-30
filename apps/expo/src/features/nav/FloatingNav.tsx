@@ -2,6 +2,7 @@ import React from 'react';
 import { Pressable, StyleSheet, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fonts, radius } from '../../theme/tokens';
+import { Icon } from '../../ui/Icon';
 import { useTheme } from '../../theme/useTheme';
 
 export interface NavTab { key: string; label: string; icon: string }
@@ -23,7 +24,7 @@ export function FloatingNav({ tabs, active, onSelect }: Props) {
           return (
             <Pressable key={t.key} accessibilityRole="tab" accessibilityLabel={t.label} accessibilityState={{ selected: on }} onPress={() => onSelect(t.key)}
               style={[styles.tab, on && { backgroundColor: colors.accent, paddingHorizontal: 16 }]}>
-              <RNText style={styles.icon} accessibilityElementsHidden importantForAccessibility="no">{t.icon}</RNText>
+              <Icon glyph={t.icon} size={20} onAccent={on} />
               {on ? <RNText style={[styles.label, { color: colors.onAccent }]}>{t.label}</RNText> : null}
             </Pressable>
           );
@@ -37,6 +38,5 @@ const styles = StyleSheet.create({
   wrap: { position: 'absolute', left: 0, right: 0, bottom: 0, alignItems: 'center', paddingBottom: 12 },
   bar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 2, width: '92%', maxWidth: 440, padding: 6, borderRadius: radius.pill, borderWidth: 1 },
   tab: { minHeight: 48, minWidth: 48, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  icon: { fontSize: 20 },
   label: { fontFamily: fonts.sansBold, fontSize: 14.5 },
 });

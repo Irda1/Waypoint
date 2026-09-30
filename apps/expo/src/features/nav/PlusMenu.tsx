@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Pressable, Text as RNText, View } from 'react-native';
 import { Text } from '../../ui';
+import { Icon } from '../../ui/Icon';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
 
@@ -24,7 +25,7 @@ export function PlusMenu({ visible, onPick, onClose }: { visible: boolean; onPic
           {CHOICES.map((c) => (
             <Pressable key={c.key} accessibilityRole="button" accessibilityLabel={`Ajouter ${c.title.toLowerCase()}`} onPress={() => onPick(c.key)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 64, paddingVertical: space.sm, borderTopWidth: 1, borderTopColor: colors.line }}>
-              <RNText style={{ fontSize: 26 }} accessibilityElementsHidden importantForAccessibility="no">{c.icon}</RNText>
+              <Icon glyph={c.icon} size={26} />
               <View style={{ flex: 1, gap: 2 }}>
                 <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 16, color: colors.text }}>{c.title}</RNText>
                 <Text variant="muted">{c.hint}</Text>
