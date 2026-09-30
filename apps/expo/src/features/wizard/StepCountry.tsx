@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Pressable, Text as RNText, View, useWindowDimensions } from 'react-native';
 import { Field, Text } from '../../ui';
 import { Flag } from '../../ui/Flag';
 import { Button } from '../../ui';
@@ -16,6 +16,7 @@ export function StepCountry({ state, update }: StepProps<WizardState>) {
   const { colors } = useTheme();
   const [query, setQuery] = useState('');
   const [showList, setShowList] = useState(false);
+  const { height } = useWindowDimensions();
   const results = query.trim() ? searchCountries(query) : null;
 
   function pick(code: string) {
@@ -33,7 +34,7 @@ export function StepCountry({ state, update }: StepProps<WizardState>) {
   return (
     <View style={{ gap: space.md }}>
       <StepTitle title="Où veux-tu aller ?" hint="Choisis un pays. Tu sélectionneras les villes ensuite." />
-      <View style={{ height: 360, borderRadius: radius.card, overflow: 'hidden', backgroundColor: '#000' }}>
+      <View style={{ height: Math.max(420, Math.min(700, height - 240)), borderRadius: radius.card, overflow: 'hidden', backgroundColor: '#000' }}>
         <Globe mode="pick" focus={state.country} onPick={(code) => { if (COUNTRY_NAME[code]) pick(code); }} />
       </View>
       {state.country ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}><Flag code={state.country} width={26} /><Text variant="body">Pays choisi : {COUNTRY_NAME[state.country] ?? state.country}</Text></View> : null}
