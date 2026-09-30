@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
@@ -15,6 +15,8 @@ import { DayCard } from '../../src/features/trip/DayCard';
 import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
 import { ProgramCard } from '../../src/features/trip/ProgramCard';
+import { buildReminders } from '../../src/domain/reminders.ts';
+import { syncTripReminders } from '../../src/lib/reminders';
 import { savedLabel } from '../../src/domain/offlineSnapshot.ts';
 import { shareText } from '../../src/lib/share';
 import { ChecklistCard } from '../../src/features/trip/ChecklistCard';
@@ -92,6 +94,13 @@ export default function TripScreen() {
 
   const spots = useMemo(() => (data?.destinations ?? []).map((d) => ({ id: d.city_id, lat: d.lat, lng: d.lng })), [data?.destinations]);
   const weather = useForecasts(spots);
+
+  // Rappels du téléphone : reprogrammés à chaque changement du voyage (sans effet sur le web ni si les rappels sont coupés).
+  useEffect(() => {
+    if (!data || savedAt) return;
+    const placeName = (pid: number) => data.places.get(pid)?.name;
+    void syncTripReminders(data.trip.id, buildReminders({ tripTitle: data.trip.title, startsOn: data.trip.starts_on, days: data.days, items: data.items, placeName })).catch(() => {});
+  }, [data, savedAt]);
 
   if (guard) return guard;
   if (loading) return <Screen><Text variant="muted">Chargement du voyage…</Text></Screen>;
