@@ -1,12 +1,13 @@
 import React, { useState } from 'react';
 import { Pressable, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useRequireAuth } from '../src/auth/useRequireAuth';
 import { Button, ErrorNote } from '../src/ui';
 import { createTripFromWizard } from '../src/data/trips';
 import { MAX_TRIP_DAYS, autoTitle, dayCount, missingSteps, newWizard } from '../src/domain/wizard.ts';
 import type { WizardState } from '../src/domain/wizard.ts';
+import { COUNTRY_NAME } from '../src/domain/countries.ts';
 import { StepCountry } from '../src/features/wizard/StepCountry';
 import { StepDates } from '../src/features/wizard/StepDates';
 import { StepCities } from '../src/features/wizard/StepCities';
@@ -36,8 +37,12 @@ function blocker(step: StepId, s: WizardState): string | null {
 export default function NewTrip() {
   const guard = useRequireAuth();
   const { colors } = useTheme();
-  const [state, setState] = useState<WizardState>(newWizard);
-  const [step, setStep] = useState<StepId>('pays');
+  // « Envie de… » : pays et ville déjà choisis, on démarre aux dates.
+  const params = useLocalSearchParams<{ country?: string; city?: string }>();
+  const preCountry = typeof params.country === 'string' && COUNTRY_NAME[params.country] ? params.country : null;
+  const preCity = preCountry && typeof params.city === 'string' ? params.city : null;
+  const [state, setState] = useState<WizardState>(() => ({ ...newWizard(), country: preCountry }));
+  const [step, setStep] = useState<StepId>(preCountry ? 'dates' : 'pays');
   const [fromRecap, setFromRecap] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,7 +104,7 @@ export default function NewTrip() {
       <ScrollView contentContainerStyle={{ padding: space.lg, paddingBottom: space.xxl * 2, width: '100%', maxWidth: 880, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
         {step === 'pays' ? <StepCountry {...props} /> : null}
         {step === 'dates' ? <StepDates {...props} /> : null}
-        {step === 'villes' ? <StepCities {...props} /> : null}
+        {step === 'villes' ? <StepCities {...props} preferCity={preCity} /> : null}
         {step === 'voyageurs' ? <StepTravelers {...props} /> : null}
         {step === 'interets' ? <StepInterests {...props} /> : null}
         {step === 'budget' ? <StepBudget {...props} /> : null}

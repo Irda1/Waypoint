@@ -171,3 +171,4 @@ Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` rempli
 - **v1.10.7** : plans de repli créés depuis le plan A (plan B « journée allégée » : repas gardés, visites les plus lourdes retirées ; plan C « à l'abri » : sans nature ni sport). Aucune migration.
 - **v1.10.8** : accueil : carrousel « Envie de… » (Lisbonne, Porto, Alfama, photos déjà dans l'appli) qui ouvre l'assistant de création. Aucune migration.
 - **v1.10.9** : identité : icône de l'appli, icône adaptative Android, favicon et logo dans l'en-tête de l'accueil (générés par `scripts/generate-icons.mjs`, dessin du logo v0.9). Aucune migration.
+- **v1.10.10** : accueil : toucher une idée « Envie de… » ouvre l'assistant avec le pays (Portugal) déjà choisi, la ville cochée et l'étape « Dates » directement. Aucune migration.
