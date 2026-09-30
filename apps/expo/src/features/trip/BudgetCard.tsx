@@ -6,7 +6,7 @@ import { useTheme } from '../../theme/useTheme';
 import { formatMoney } from '../../lib/format';
 import { useLocalMoney } from '../../data/rates';
 import { convert, formatApprox } from '../../domain/currency.ts';
-import { budgetSummary, computeBalances, settlements } from '../../domain/budget.ts';
+import { budgetSummary, computeBalances, costByDay, savingSuggestions, settlements } from '../../domain/budget.ts';
 import { POSTES } from '../../domain/types.ts';
 import type { Poste } from '../../domain/types.ts';
 import type { TripData } from '../../data/useTrip';
@@ -24,6 +24,10 @@ export function BudgetCard({ data }: { data: TripData }) {
   const balances = computeBalances(expenses, active.map((m) => m.user_id));
   const transfers = settlements(balances);
   const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const travelers = Math.max(1, active.length);
+  const savings = savingSuggestions({ expenses, items, places, envelopes, travelers });
+  const dayCosts = costByDay(data.days, items, places, travelers);
+  const maxDay = Math.max(0, ...dayCosts);
   const { rates, local } = useLocalMoney(data.destinations[0]?.country_code ?? null);
   const localTotal = local && local !== trip.currency ? convert(total, trip.currency, local, rates) : null;
 
@@ -62,6 +66,39 @@ export function BudgetCard({ data }: { data: TripData }) {
           </View>
         );
       })}
+
+      {savings.length ? (
+        <View style={{ gap: space.sm, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }} accessibilityLabel="Revenir sous le budget">
+          <Text variant="label" style={{ color: colors.warm }}>Revenir sous le budget</Text>
+          {savings.map((sv) => (
+            <View key={sv.poste} style={{ gap: 2 }}>
+              <Text variant="body">{NOMS[sv.poste]} : {formatMoney(sv.over, trip.currency)} de trop.</Text>
+              {sv.remove.length ? (
+                <Text variant="muted">
+                  Retire {sv.remove.map((r) => `${r.name} (${formatMoney(r.cost, trip.currency)})`).join(' + ')}
+                  {sv.margin >= 0 ? sv.margin > 0 ? ` : il te resterait ${formatMoney(sv.margin, trip.currency)}.` : ' : tu reviens pile au budget.' : ` : il manquerait encore ${formatMoney(-sv.margin, trip.currency)}.`}
+                </Text>
+              ) : <Text variant="muted">Aucune étape à retirer : les dépenses déjà saisies dépassent le budget.</Text>}
+            </View>
+          ))}
+          <Text variant="muted">Ou garde le programme et augmente le budget de ce poste à la création du voyage.</Text>
+        </View>
+      ) : null}
+
+      {maxDay > 0 ? (
+        <View style={{ gap: space.sm, marginTop: space.md }}>
+          <Text variant="label">Coût des activités, par jour</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.sm, height: 110 }}>
+            {dayCosts.map((c, i) => (
+              <View key={data.days[i].id} accessible accessibilityLabel={`Jour ${i + 1} : ${formatMoney(c, trip.currency)}`} style={{ flex: 1, maxWidth: 40, alignItems: 'center', gap: 4, justifyContent: 'flex-end', height: '100%' }}>
+                <Text variant="muted" style={{ fontSize: 11 }}>{c > 0 ? formatMoney(c, trip.currency) : ''}</Text>
+                <View style={{ width: '100%', height: `${Math.max(3, (c / maxDay) * 62)}%`, borderRadius: 4, backgroundColor: c === maxDay ? colors.accent : colors.lineStrong }} />
+                <Text variant="muted" style={{ fontSize: 12 }}>{i + 1}</Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : null}
 
       <Text variant="label" style={{ marginTop: space.md }}>Comptes entre amis</Text>
       {transfers.length === 0 ? <Text variant="muted">Tout le monde est à l'équilibre.</Text> : transfers.map((t, i) => (

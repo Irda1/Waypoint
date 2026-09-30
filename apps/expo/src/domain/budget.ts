@@ -128,3 +128,69 @@ export function budgetSummary(args: {
     envelope: args.envelopes[p] ?? 0,
   }])) as Record<Poste, PosteSummary>;
 }
+
+export interface SavingItem { itemId: string; name: string; cost: number }
+export interface Saving {
+  poste: Poste;
+  /** Dépassement du budget prévu pour ce poste. */
+  over: number;
+  /** Étapes prévues à retirer pour revenir sous le budget (de la moins chère suffisante, sinon les plus chères d'abord). */
+  remove: SavingItem[];
+  /** Ce qu'il resterait sous le budget après ces retraits (≥ 0), ou ce qui dépasserait encore si les étapes ne suffisent pas (< 0). */
+  margin: number;
+}
+
+/**
+ * « Revenir sous le budget » : pour chaque poste qui dépasse, propose des étapes du programme (plan A)
+ * pas encore payées dont le retrait ramène le poste sous son enveloppe.
+ */
+export function savingSuggestions(args: {
+  expenses: Pick<Expense, 'amount' | 'poste' | 'item_id'>[];
+  items: Pick<TripItem, 'id' | 'place_id' | 'category_code' | 'plan' | 'title'>[];
+  places: Map<number, Pick<Place, 'price_amount' | 'category_code'> & { name?: string }>;
+  envelopes: Partial<Record<Poste, number>>;
+  travelers: number;
+}): Saving[] {
+  const summary = budgetSummary(args);
+  const out: Saving[] = [];
+  for (const p of POSTES) {
+    const s = summary[p];
+    const spent = toCents(s.paid + s.forecast);
+    const envelope = toCents(s.envelope);
+    if (!envelope || spent <= envelope) continue;
+    const over = spent - envelope;
+    const candidates: { itemId: string; name: string; cents: number }[] = [];
+    for (const it of args.items) {
+      if (it.plan !== 'A' || it.place_id == null) continue;
+      const place = args.places.get(it.place_id);
+      if (posteForCategory(it.category_code ?? place?.category_code) !== p) continue;
+      const price = toCents((place?.price_amount ?? 0) * Math.max(1, args.travelers));
+      const paid = args.expenses.filter((e) => e.item_id === it.id).reduce((sum, e) => sum + toCents(e.amount), 0);
+      const remaining = Math.max(0, price - paid);
+      if (remaining > 0) candidates.push({ itemId: it.id, name: place?.name ?? it.title ?? 'Étape', cents: remaining });
+    }
+    const single = candidates.filter((c) => c.cents >= over).sort((a, b) => a.cents - b.cents)[0];
+    let picked: typeof candidates;
+    if (single) picked = [single];
+    else {
+      picked = [];
+      let left = over;
+      for (const c of [...candidates].sort((a, b) => b.cents - a.cents)) {
+        if (left <= 0) break;
+        picked.push(c);
+        left -= c.cents;
+      }
+    }
+    const saved = picked.reduce((sum, c) => sum + c.cents, 0);
+    out.push({ poste: p, over: fromCents(over), remove: picked.map((c) => ({ itemId: c.itemId, name: c.name, cost: fromCents(c.cents) })), margin: fromCents(saved - over) });
+  }
+  return out;
+}
+
+/** Coût prévu des étapes du plan A pour chaque jour (prix par personne × voyageurs), pour le graphique du budget. */
+export function costByDay(days: { id: string }[], items: Pick<TripItem, 'day_id' | 'place_id' | 'plan'>[],
+  places: Map<number, Pick<Place, 'price_amount'>>, travelers: number): number[] {
+  return days.map((d) => fromCents(items
+    .filter((it) => it.day_id === d.id && it.plan === 'A' && it.place_id != null)
+    .reduce((sum, it) => sum + toCents((places.get(it.place_id!)?.price_amount ?? 0) * Math.max(1, travelers)), 0)));
+}
