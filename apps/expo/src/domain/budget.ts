@@ -231,3 +231,8 @@ export function costByDay(days: { id: string }[], items: Pick<TripItem, 'day_id'
     .filter((it) => it.day_id === d.id && it.plan === 'A' && it.place_id != null)
     .reduce((sum, it) => sum + toCents((places.get(it.place_id!)?.price_amount ?? 0) * Math.max(1, travelers)), 0)));
 }
+
+/** Part d'une personne : le montant du groupe divisé par le nombre de voyageurs (au moins 1). */
+export function share(amount: number, travelers: number): number {
+  return amount / Math.max(1, travelers);
+}
