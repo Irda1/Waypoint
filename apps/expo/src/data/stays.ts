@@ -33,3 +33,20 @@ export async function setStayNights(stayId: string, change: { assign: string[]; 
   }
   return null;
 }
+
+/** Ajoute un hébergement saisi à la main (nom, adresse facultative) et le rattache aux jours donnés. */
+export async function addManualStay(args: { tripId: string; cityId: number | null; name: string; address: string; dayIds: string[] }): Promise<string | null> {
+  const { data, error } = await supabase.from('trip_stays').insert({
+    trip_id: args.tripId, city_id: args.cityId, name: args.name.trim(), address: args.address.trim() || null,
+  }).select('id').single();
+  if (error || !data) return error?.message ?? 'Hébergement non enregistré.';
+  if (!args.dayIds.length) return null;
+  const { error: linkError } = await supabase.from('trip_days').update({ stay_id: data.id }).in('id', args.dayIds);
+  return linkError?.message ?? null;
+}
+
+/** Change le nom et l'adresse d'un hébergement. */
+export async function updateStay(stayId: string, fields: { name: string; address: string }): Promise<string | null> {
+  const { error } = await supabase.from('trip_stays').update({ name: fields.name.trim(), address: fields.address.trim() || null }).eq('id', stayId);
+  return error?.message ?? null;
+}
