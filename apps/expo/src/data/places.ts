@@ -65,7 +65,7 @@ export async function setDayCity(dayId: string, cityId: number): Promise<string 
   return error?.message ?? null;
 }
 
-export async function searchPlaces(args: { cityId: number; text: string; categories: string[] | null; kind?: 'activity' | 'service'; limit?: number }): Promise<{ places: PlaceHit[]; error: string | null }> {
+export async function searchPlaces(args: { cityId: number; text: string; categories: string[] | null; kind?: 'activity' | 'service' | 'lodging'; limit?: number }): Promise<{ places: PlaceHit[]; error: string | null }> {
   let q = supabase
     .from('places')
     .select('id,name,kind,category_code,lat,lng,price_amount,price_currency,price_is_estimate,visit_duration_min,duration_is_estimate,closed_days,address')

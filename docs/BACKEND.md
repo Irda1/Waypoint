@@ -146,6 +146,8 @@ Un seul flux au départ, et rien à construire : l'application n'ouvre **jamais*
 
 - **v1.9.10** : recommandations textuelles d'une journée (`domain/advice.ts`, testé, règles lisibles, 3 conseils au plus, rien de modifié automatiquement) : journée vide, journée chargée (≥ 10 h), trajets lourds (≥ 1 h 30), aucun repas, créneau libre (≥ 2 h, si heures connues), beau temps sans plein air, jour au-dessus de 1,5 × le budget activités moyen. Bloc « Conseils » dans chaque jour. La pluie garde son conseil météo existant. Aucune migration, aucune IA.
 
+- **v1.9.11** : hébergement. Carte « Hébergement » sur l'écran voyage : recherche d'un hôtel ou d'une auberge parmi les lieux collectés (`kind = lodging`), création d'une ligne `trip_stays` rattachée aux jours de la ville (`trip_days.stay_id`, `domain/stays.ts` testé), retrait possible. Les journées affichent alors le volet Itinéraire entre l'hébergement et la première / la dernière étape. Aucune migration.
+
 Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` remplit la ville, la recherche et l'ajout à un jour fonctionnent, les durées estimées sont marquées « ≈ ».
 
 ## Prochaines étapes

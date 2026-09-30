@@ -14,6 +14,7 @@ import { DayCard } from '../../src/features/trip/DayCard';
 import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
 import { ProgramCard } from '../../src/features/trip/ProgramCard';
+import { StayCard } from '../../src/features/trip/StayCard';
 import { BudgetCard } from '../../src/features/trip/BudgetCard';
 import { AddExpenseCard } from '../../src/features/trip/AddExpenseCard';
 import { formatDay, isIsoDate } from '../../src/lib/format';
@@ -154,6 +155,8 @@ export default function TripScreen() {
             <ErrorNote message={destError} />
             <Button label={editingDest ? 'Terminer' : destinationOptions.length ? 'Modifier les destinations' : 'Choisir une destination'} variant="ghost" onPress={() => setEditingDest((v) => !v)} />
           </Card>
+
+          <StayCard data={data} onChanged={reload} />
 
           <Button label="Voir la carte" onPress={() => router.push({ pathname: '/map/[id]', params: { id: trip.id } })} />
 
