@@ -124,3 +124,13 @@ test('revenir sous le budget : retire la plus petite étape qui suffit, sinon le
   assert.equal(savingSuggestions({ expenses: [], items, places, envelopes: { activites: 200 }, travelers: 1 }).length, 0);
   assert.deepEqual(costByDay([{ id: 'd1' }, { id: 'd2' }], items, places, 2), [84, 100]);
 });
+
+test('remboursement reçu : les virements restants diminuent, puis tout est à l\'équilibre', async () => {
+  const { applyPayments } = await import('./budget.ts');
+  const balances = computeBalances([exp(90, 'a')], ['a', 'b', 'c']);   // a a avancé 90 : b et c lui doivent 30 chacun
+  assert.deepEqual(settlements(balances).map((t) => [t.from, t.to, t.amount]), [['b', 'a', 30], ['c', 'a', 30]]);
+  const half = applyPayments(balances, [{ from_user: 'b', to_user: 'a', amount: 30 }]);
+  assert.deepEqual(settlements(half).map((t) => [t.from, t.to, t.amount]), [['c', 'a', 30]]);
+  const done = applyPayments(half, [{ from_user: 'c', to_user: 'a', amount: 30 }]);
+  assert.equal(settlements(done).length, 0);
+});

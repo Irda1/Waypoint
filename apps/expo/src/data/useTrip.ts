@@ -26,6 +26,8 @@ export interface TripData {
   budgetLines: BudgetLine[];
   destinations: Destination[];
   stays: Stay[];
+  /** Remboursements déjà reçus ; `null` tant que la migration 1100 n'est pas installée. */
+  payments: { id: string; from_user: string; to_user: string; amount: number }[] | null;
 }
 
 export type LiveStatus = 'connecting' | 'live' | 'offline';
@@ -70,6 +72,8 @@ export function useTrip(tripId: string) {
         .select('id,name,kind,category_code,lat,lng,price_amount,visit_duration_min,closed_days').in('id', placeIds);
       for (const p of (rows ?? []) as Place[]) places.set(p.id, p);
     }
+    // Table ajoutée par la migration 1100 : son absence ne doit jamais empêcher d'ouvrir le voyage.
+    const pay = await supabase.from('settlement_payments').select('id,from_user,to_user,amount').eq('trip_id', tripId).order('created_at');
     const next: TripData = {
       trip: trip.data as Trip,
       members: (members.data ?? []) as unknown as Member[],
@@ -80,6 +84,7 @@ export function useTrip(tripId: string) {
       budgetLines: (budget.data ?? []) as BudgetLine[],
       destinations: toDestinations(dest.data),
       stays: (stays.data ?? []) as Stay[],
+      payments: pay.error ? null : ((pay.data ?? []) as { id: string; from_user: string; to_user: string; amount: number }[]).map((x) => ({ ...x, amount: Number(x.amount) })),
     };
     known.current = new Set([next.trip.id, ...next.days.map((d) => d.id), ...next.items.map((i) => i.id), ...next.expenses.map((e) => e.id), ...next.members.map((m) => m.user_id), ...next.stays.map((x) => x.id)]);
     setData(next);
