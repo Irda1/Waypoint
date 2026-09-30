@@ -25,6 +25,8 @@ import { checkNewDay, suggestNewDay, todayIso } from '../../src/lib/dates.ts';
 import { cityRuns } from '../../src/domain/dayruns.ts';
 import { pickSource } from '../../src/data/cityCover';
 import { photos } from '../../src/theme/photos';
+import { PlusMenu } from '../../src/features/nav/PlusMenu';
+import type { PlusChoice } from '../../src/features/nav/PlusMenu';
 import { FloatingNav } from '../../src/features/nav/FloatingNav';
 import type { NavTab } from '../../src/features/nav/FloatingNav';
 import { fonts, radius, space } from '../../src/theme/tokens';
@@ -64,6 +66,9 @@ export default function TripScreen() {
   const { data, error, loading, status, reload } = useTrip(String(id));
   const [tab, setTab] = useState<'voyage' | 'jour' | 'budget' | 'amis'>('voyage');
   const [chosenDay, setChosenDay] = useState<number | null>(null);
+  const [plusOpen, setPlusOpen] = useState(false);
+  const [pendingAdd, setPendingAdd] = useState(false);
+  const [pendingMemo, setPendingMemo] = useState(false);
   const [newDay, setNewDay] = useState('');
   const [addingDay, setAddingDay] = useState(false);
   const [dayError, setDayError] = useState<string | null>(null);
@@ -120,6 +125,13 @@ export default function TripScreen() {
   // Sans choix, on ouvre le jour d'aujourd'hui s'il fait partie du voyage, sinon le premier.
   const todayIdx = data.days.findIndex((d) => d.day_date === todayIso());
   const dayIndex = chosenDay ?? Math.max(0, todayIdx);
+
+  function onPlus(c: PlusChoice) {
+    setPlusOpen(false);
+    if (c === 'activite') { setTab('jour'); setPendingAdd(true); }
+    else if (c === 'depense') setTab('budget');
+    else { setTab('voyage'); setPendingMemo(true); }
+  }
 
   function onNav(key: string) {
     if (key === 'accueil') router.replace('/');
@@ -224,7 +236,7 @@ export default function TripScreen() {
             <Button label={editingDest ? 'Terminer' : destinationOptions.length ? 'Modifier les destinations' : 'Choisir une destination'} variant="ghost" onPress={() => setEditingDest((v) => !v)} />
           </Card>
 
-          <MemoCard tripId={trip.id} memo={trip.memo ?? ''} onChanged={reload} />
+          <MemoCard tripId={trip.id} memo={trip.memo ?? ''} onChanged={reload} startEditing={pendingMemo} onStarted={() => setPendingMemo(false)} />
           <StayCard data={data} onChanged={reload} />
 
           <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
@@ -268,7 +280,7 @@ export default function TripScreen() {
               {(() => {
                 const i = Math.min(dayIndex, data.days.length - 1);
                 const d = data.days[i];
-                return <DayCard key={d.id} tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={i + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} />;
+                return <DayCard key={d.id} tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={i + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} openAdd={pendingAdd} onOpenedAdd={() => setPendingAdd(false)} />;
               })()}
             </>
           )}
@@ -319,7 +331,12 @@ export default function TripScreen() {
         </View>
         ) : null}
       </ScrollView>
+      <Pressable accessibilityRole="button" accessibilityLabel="Ajouter" onPress={() => setPlusOpen(true)}
+        style={{ position: 'absolute', right: 20, bottom: 84, width: 52, height: 52, borderRadius: 26, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}>
+        <RNText style={{ fontSize: 28, lineHeight: 30, color: colors.onAccent, fontFamily: fonts.sansBold }}>＋</RNText>
+      </Pressable>
       <FloatingNav tabs={TABS} active={tab} onSelect={onNav} />
+      <PlusMenu visible={plusOpen} onPick={onPlus} onClose={() => setPlusOpen(false)} />
     </View>
   );
 }

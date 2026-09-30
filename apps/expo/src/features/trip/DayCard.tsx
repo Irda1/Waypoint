@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Pressable, Text as RNText, View } from 'react-native';
 import { Button, Card, Chip, ErrorNote, Field, PayBadge, Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
@@ -46,13 +46,17 @@ interface Props {
   currency?: string;
   dailyActivityBudget?: number | null;
   onChanged: () => void;
+  /** Le menu « + » demande d'ouvrir tout de suite la recherche de lieux. */
+  openAdd?: boolean;
+  onOpenedAdd?: () => void;
 }
 
-export function DayCard({ tripId, tripTitle, destinations, day, number, items, places, expenses, travelers, forecast, lodging, currency = 'EUR', dailyActivityBudget = null, onChanged }: Props) {
+export function DayCard({ tripId, tripTitle, destinations, day, number, items, places, expenses, travelers, forecast, lodging, currency = 'EUR', dailyActivityBudget = null, onChanged, openAdd = false, onOpenedAdd }: Props) {
   const { colors, mode } = useTheme();
   const categories = useCategories();
   const [plan, setPlan] = useState<'A' | 'B' | 'C'>('A');
   const [adding, setAdding] = useState<null | 'place' | 'free'>(null);
+  useEffect(() => { if (openAdd) { setAdding('place'); onOpenedAdd?.(); } }, [openAdd]); // eslint-disable-line react-hooks/exhaustive-deps
   const [title, setTitle] = useState('');
   const [time, setTime] = useState('');
   const [error, setError] = useState<string | null>(null);
