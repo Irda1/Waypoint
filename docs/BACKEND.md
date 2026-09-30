@@ -142,6 +142,10 @@ Un seul flux au départ, et rien à construire : l'application n'ouvre **jamais*
 
 - **v1.9.7** : taux de change. Migration 1000 (`exchange_rates`, lecture publique), passe `rates` du pipeline (Frankfurter / BCE, sans clé, ajoutée au workflow), `domain/currency.ts` (conversion via l'euro, jamais de taux inventé, « ≈ ») et `data/rates.ts`. La carte Budget affiche le total dépensé en monnaie locale du premier pays du voyage (« ≈ », taux BCE daté) quand elle diffère de la monnaie du voyage (v1.9.8). **Migration à exécuter seule dans le SQL Editor** (`supabase/migrations/20260929001000_exchange_rates.sql`), puis lancer la passe `rates`.
 
+- **v1.9.9** : météo : heure de mise à jour affichée. Transports : volet « Itinéraire » entre deux étapes (et entre l'hébergement et la première/dernière étape quand le jour a un hébergement avec coordonnées) : replié, il montre le mode le plus rapide ; ouvert, à pied / à vélo / transports en commun / voiture avec la durée, chaque ligne ouvrant Google Maps (format « Maps URLs », sans clé) avec le bon mode de déplacement. À pied, vélo et voiture : itinéraire calculé sans circulation (serveur OSRM public FOSSGIS, une requête par seconde, demandé seulement à l'ouverture du volet, repli sur l'estimation ≈ de la maquette) ; transports : toujours estimation. `EXPO_PUBLIC_ROUTING_URL` remplace le serveur avant une ouverture au public. La durée réelle ne modifie pas encore la détection de chevauchements. Aucune migration. L'appli n'a pas encore d'écran pour créer un hébergement : les liens hébergement ne s'affichent qu'avec une ligne de `trip_stays` rattachée au jour.
+
+- **v1.9.10** : recommandations textuelles d'une journée (`domain/advice.ts`, testé, règles lisibles, 3 conseils au plus, rien de modifié automatiquement) : journée vide, journée chargée (≥ 10 h), trajets lourds (≥ 1 h 30), aucun repas, créneau libre (≥ 2 h, si heures connues), beau temps sans plein air, jour au-dessus de 1,5 × le budget activités moyen. Bloc « Conseils » dans chaque jour. La pluie garde son conseil météo existant. Aucune migration, aucune IA.
+
 Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` remplit la ville, la recherche et l'ajout à un jour fonctionnent, les durées estimées sont marquées « ≈ ».
 
 ## Prochaines étapes
@@ -150,3 +154,9 @@ Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` rempli
 2. ~~Recherche et ajout de lieux réels dans un jour~~ (fait : bouton « Ajouter un lieu », recherche par ville, nom et catégorie ; heure modifiable). Reste : filtre « Pratique », carte, recherche sans accents (Belem / Belém).
 3. Portage des écrans de la maquette (accueil, itinéraire, budget) avec le thème Crépuscule et les polices.
 4. Météo, puis transports, seulement après lieux et carte réels.
+
+## Transports et trafic : où on en est
+
+- **À pied, vélo, voiture** : faits (v1.9.9), itinéraire calculé sans circulation, service public à usage léger, plus lien Google Maps pour les horaires et le trafic réels.
+- **Transports en commun** : toujours estimés (« ≈ … · estimé »). Une vraie source demande des horaires GTFS par ville ou un service à clé (Navitia, Transitland, Google, HERE…) : couverture, prix et licence de stockage sont à vérifier un par un avant de choisir. Non faits ici : aucun de ces services n'a été testé.
+- **Trafic en temps réel** : uniquement chez des services payants ou à clé ; ne jamais présenter comme temps réel une estimation.

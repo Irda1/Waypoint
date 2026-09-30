@@ -16,7 +16,7 @@ export async function fetchForecast(lat: number, lng: number): Promise<{ forecas
     const res = await fetch(forecastUrl(lat, lng), { signal: AbortSignal.timeout(8000) });
     if (res.status === 429) return { forecast: hit?.forecast ?? null, error: 'Trop de demandes météo : réessaie dans quelques minutes.' };
     if (!res.ok) return { forecast: hit?.forecast ?? null, error: 'Le service météo ne répond pas pour le moment.' };
-    const forecast = parseForecast(await res.json());
+    const forecast = { ...parseForecast(await res.json()), fetchedAt: Date.now() };
     cache.set(key, { at: Date.now(), forecast });
     return { forecast, error: null };
   } catch {
