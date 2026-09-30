@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ImageBackground, Pressable, ScrollView, Share, StyleSheet, Text as RNText, View } from 'react-native';
+import { ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
@@ -15,6 +15,8 @@ import { DayCard } from '../../src/features/trip/DayCard';
 import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
 import { ProgramCard } from '../../src/features/trip/ProgramCard';
+import { shareText } from '../../src/lib/share';
+import { UnplannedCard } from '../../src/features/trip/UnplannedCard';
 import { MemoCard } from '../../src/features/trip/MemoCard';
 import { StayCard } from '../../src/features/trip/StayCard';
 import { FriendsCard } from '../../src/features/trip/FriendsCard';
@@ -74,6 +76,8 @@ export default function TripScreen() {
   const [addingDay, setAddingDay] = useState(false);
   const [dayError, setDayError] = useState<string | null>(null);
   const [inviteError, setInviteError] = useState<string | null>(null);
+  const [inviteCode, setInviteCode] = useState<string | null>(null);
+  const [inviteNote, setInviteNote] = useState<string | null>(null);
   const [editingDest, setEditingDest] = useState(false);
   const [destError, setDestError] = useState<string | null>(null);
   // Stable entre deux rendus : le sélecteur de lieux en dépend.
@@ -108,10 +112,13 @@ export default function TripScreen() {
   async function invite() {
     const res = await createInvite(data!.trip.id);
     setInviteError(res.error);
-    if (res.code) {
-      const link = Linking.createURL(`/join/${res.code}`);
-      await Share.share({ message: `Rejoins « ${data!.trip.title} » sur Waypoint : ${link}\nCode : ${res.code}` });
-    }
+    if (res.code) setInviteCode(res.code);
+  }
+  async function shareInvite() {
+    if (!inviteCode) return;
+    const link = Linking.createURL(`/join/${inviteCode}`);
+    const r = await shareText(`Rejoins « ${data!.trip.title} » sur Waypoint : ${link}\nCode : ${inviteCode}`);
+    setInviteNote(r === 'copied' ? 'Invitation copiée : colle-la dans un message.' : r === 'failed' ? 'Partage impossible ici : recopie le code.' : null);
   }
 
   async function submitDay() {
@@ -226,6 +233,7 @@ export default function TripScreen() {
           <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
 
           <ProgramCard data={data} onApplied={reload} />
+          <UnplannedCard data={data} onChanged={reload} />
         </View>
         ) : null}
 
@@ -264,7 +272,7 @@ export default function TripScreen() {
               {(() => {
                 const i = Math.min(dayIndex, data.days.length - 1);
                 const d = data.days[i];
-                return <DayCard key={d.id} tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={i + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} openAdd={pendingAdd} onOpenedAdd={() => setPendingAdd(false)} />;
+                return <DayCard key={d.id} tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={i + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} allDayIds={data.days.map((x) => x.id)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} openAdd={pendingAdd} onOpenedAdd={() => setPendingAdd(false)} />;
               })()}
             </>
           )}
@@ -310,7 +318,16 @@ export default function TripScreen() {
               })}
             </View>
             <ErrorNote message={inviteError} />
-            <Button label="Inviter un ami" variant="ghost" onPress={invite} />
+            {inviteCode ? (
+              <View style={{ gap: space.sm, padding: space.md, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface2 }}>
+                <Text variant="label">Code d'invitation</Text>
+                <RNText selectable style={{ fontFamily: fonts.sansBold, fontSize: 28, letterSpacing: 4, color: colors.text }}>{inviteCode}</RNText>
+                <Text variant="muted">Ton ami l'entre dans « Rejoindre un voyage » sur l'accueil, ou ouvre le lien partagé.</Text>
+                <Button label="Partager" onPress={shareInvite} />
+                {inviteNote ? <Text variant="muted">{inviteNote}</Text> : null}
+              </View>
+            ) : null}
+            <Button label={inviteCode ? 'Nouveau code' : 'Inviter un ami'} variant="ghost" onPress={invite} />
           </Card>
 
         </View>
