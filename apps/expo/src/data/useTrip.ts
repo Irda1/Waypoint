@@ -11,7 +11,7 @@ import type { CityCover } from './cityCover';
 import { supabase } from '../lib/supabase';
 import type { Expense, Place, TripItem } from '../domain/types.ts';
 
-export interface Trip { id: string; title: string; starts_on: string | null; ends_on: string | null; currency: string; travelers: number; styles: string[]; budget_total: number | null; memo: string; deleted_at: string | null; version: number }
+export interface Trip { id: string; title: string; starts_on: string | null; ends_on: string | null; currency: string; country_code?: string | null; travelers: number; styles: string[]; budget_total: number | null; memo: string; deleted_at: string | null; version: number }
 export interface Member { user_id: string; color: string; left_at: string | null; profiles: { display_name: string; avatar_url: string | null } | null }
 export interface Day { id: string; day_date: string; city_id: number | null; stay_id: string | null; depart_time: string | null; return_time: string | null }
 export interface Stay { id: string; name: string; address: string | null; lat: number | null; lng: number | null }

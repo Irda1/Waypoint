@@ -36,13 +36,15 @@ const toOption = (r: CityRow): CityOption => ({
  * voyage (les cinq premières lettres suffisent : « lisbo » trouve Lisbon, Lisboa et Lisbonne). Avec un texte :
  * les villes dont le nom le contient, sur toute la base.
  */
-export async function listCities(opts: { words?: string[]; query?: string } = {}): Promise<{ cities: CityOption[]; error: string | null }> {
+export async function listCities(opts: { words?: string[]; query?: string; country?: string | null; limit?: number } = {}): Promise<{ cities: CityOption[]; error: string | null }> {
   const term = likeTerm(opts.query ?? '');
   const queries = [];
   if (term) {
     queries.push(supabase.from('cities').select(CITY_COLUMNS)
       .or(`name.ilike.%${term}%,name_fr.ilike.%${term}%,name_ascii.ilike.%${term}%`)
       .order('population', { ascending: false, nullsFirst: false }).limit(30));
+  } else if (opts.country) {
+    queries.push(supabase.from('cities').select(CITY_COLUMNS).eq('country_code', opts.country).order('population', { ascending: false, nullsFirst: false }).limit(opts.limit ?? 40));
   } else {
     queries.push(supabase.from('cities').select(CITY_COLUMNS).order('population', { ascending: false, nullsFirst: false }).limit(40));
     const words = (opts.words ?? []).slice(0, 4).map((w) => likeTerm(w.slice(0, 5))).filter(Boolean);

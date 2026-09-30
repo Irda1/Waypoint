@@ -9,7 +9,7 @@ import { Button, Card, Columns, ErrorNote, Field, Screen, Text } from '../../src
 import { useTrip } from '../../src/data/useTrip';
 import { addDay, addDestination, createInvite, removeDestination } from '../../src/data/trips';
 import type { CityOption } from '../../src/data/places';
-import { CityPicker } from '../../src/features/trip/CityPicker';
+import { DestinationsCard } from '../../src/features/trip/DestinationsCard';
 import { DayCard } from '../../src/features/trip/DayCard';
 import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
@@ -217,24 +217,7 @@ export default function TripScreen() {
             </View>
           ) : null}
 
-          <Card>
-            <Text variant="label">Destinations</Text>
-            {destinationOptions.length === 0 ? (
-              <Text variant="muted">Aucune destination choisie : ajoutes-en pour retrouver directement les bonnes villes dans la recherche de lieux.</Text>
-            ) : !editingDest ? (
-              <Text variant="body">{destDetail}</Text>
-            ) : null}
-            {editingDest ? (
-              <CityPicker
-                label="Ajouter une ville"
-                selected={destinationOptions}
-                onAdd={(c) => changeDestination(() => addDestination(trip.id, c.id, destinationOptions.length))}
-                onRemove={(cityId) => changeDestination(() => removeDestination(trip.id, cityId))}
-              />
-            ) : null}
-            <ErrorNote message={destError} />
-            <Button label={editingDest ? 'Terminer' : destinationOptions.length ? 'Modifier les destinations' : 'Choisir une destination'} variant="ghost" onPress={() => setEditingDest((v) => !v)} />
-          </Card>
+          <DestinationsCard data={data} onChanged={reload} />
 
           <MemoCard tripId={trip.id} memo={trip.memo ?? ''} onChanged={reload} startEditing={pendingMemo} onStarted={() => setPendingMemo(false)} />
           <StayCard data={data} userId={session?.user.id ?? null} onChanged={reload} />
