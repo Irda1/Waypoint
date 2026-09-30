@@ -42,7 +42,7 @@ export default function Home() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }} keyboardShouldPersistTaps="handled">
         <ImageBackground source={horizon} resizeMode="cover" style={styles.hero}>
-          <View style={styles.veil} pointerEvents="none" />
+          <View style={styles.veil}>
           <SafeAreaView edges={['top']} style={styles.heroInner}>
             <View style={styles.heroBar}>
               <RNText style={styles.brand} accessibilityRole="header">Waypoint</RNText>
@@ -57,6 +57,7 @@ export default function Home() {
               <Button label="Démarrer un voyage" onPress={() => router.push('/new-trip')} />
             </View>
           </SafeAreaView>
+          </View>
         </ImageBackground>
 
         <View style={styles.page}>
@@ -91,14 +92,14 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  hero: { minHeight: 460, width: '100%' },
-  veil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(7, 9, 11, 0.52)' },
-  heroInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xxl, minHeight: 460, width: '100%', maxWidth: 880, alignSelf: 'center' },
+  hero: { minHeight: 500, width: '100%', overflow: 'hidden' },
+  veil: { width: '100%', backgroundColor: 'rgba(7, 9, 11, 0.52)' },
+  heroInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xxl, minHeight: 500, width: '100%', maxWidth: 880, alignSelf: 'center' },
   heroBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: space.sm },
   brand: { fontFamily: fonts.serif, fontSize: 22, color: ON_PHOTO },
   glass: { minHeight: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: 'rgba(7, 9, 11, 0.45)', borderWidth: 1, borderColor: 'rgba(245, 245, 242, 0.25)' },
   glassLabel: { fontFamily: fonts.sansSemi, fontSize: 14, color: ON_PHOTO },
-  heroText: { gap: space.md, alignItems: 'flex-start', marginTop: 96 },
+  heroText: { gap: space.md, alignItems: 'flex-start', marginTop: 32 },
   eyebrow: { fontFamily: fonts.sansSemi, fontSize: 11.5, letterSpacing: 1.6, textTransform: 'uppercase' },
   poster: { fontFamily: fonts.serif, fontSize: 56, lineHeight: 60, color: ON_PHOTO },
   lead: { fontFamily: fonts.sans, fontSize: 16, lineHeight: 23, color: ON_PHOTO_SOFT, maxWidth: 440 },
