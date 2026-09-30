@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
+import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { useRequireAuth } from '../src/auth/useRequireAuth';
@@ -58,7 +58,10 @@ export default function Home() {
           <View style={styles.veil}>
           <SafeAreaView edges={['top']} style={styles.heroInner}>
             <View style={styles.heroBar}>
-              <RNText style={styles.brand} accessibilityRole="header">Waypoint</RNText>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                <Image source={require('../assets/logo.png')} accessibilityLabel="Logo Waypoint" style={{ width: 32, height: 32, borderRadius: 8 }} />
+                <RNText style={styles.brand} accessibilityRole="header">Waypoint</RNText>
+              </View>
               <Pressable accessibilityRole="button" accessibilityLabel="Paramètres" onPress={() => router.push('/settings')} style={styles.glass}>
                 <RNText style={styles.glassLabel}>⚙️ Paramètres</RNText>
               </Pressable>

@@ -64,6 +64,13 @@ await png("web/icons/apple-touch-icon.png", 180, 0.56, "carre");
 await png("web/icons/favicon-32.png", 32, 0.78, "arrondi");
 await writeFile(join(racine, "web/icons/logo.svg"), svg(64, 0.7, "arrondi"));
 
+// ---- appli Expo (icône, icône adaptative Android, favicon, écran de démarrage)
+await png("apps/expo/assets/icon.png", 1024, 0.62, "carre");
+await png("apps/expo/assets/adaptive-icon.png", 1024, 0.44, "transparent");
+await png("apps/expo/assets/splash-icon.png", 512, 0.9, "transparent");
+await png("apps/expo/assets/favicon.png", 48, 0.78, "arrondi");
+await png("apps/expo/assets/logo.png", 192, 0.84, "arrondi");
+
 // ---- Android (copiées par la CI par-dessus le projet généré par Capacitor)
 const res = "resources/android/res";
 const densites = { mdpi: 1, hdpi: 1.5, xhdpi: 2, xxhdpi: 3, xxxhdpi: 4 };
