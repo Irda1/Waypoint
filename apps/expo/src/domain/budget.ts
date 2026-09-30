@@ -244,3 +244,25 @@ export function costByDay(days: { id: string }[], items: Pick<TripItem, 'day_id'
 export function share(amount: number, travelers: number): number {
   return amount / Math.max(1, travelers);
 }
+
+export interface ActivityLine { itemId: string; name: string; day: number; total: number; paid: number; due: number }
+
+/** Activités du programme (plan A) qui ont un prix : coût total du groupe, déjà payé et reste à payer / réserver. */
+export function activityLines(args: {
+  days: { id: string }[];
+  items: Pick<TripItem, 'id' | 'day_id' | 'place_id' | 'plan' | 'title'>[];
+  places: Map<number, Pick<Place, 'price_amount' | 'name'>>;
+  expenses: Pick<Expense, 'amount' | 'item_id'>[];
+  travelers: number;
+}): ActivityLine[] {
+  const out: ActivityLine[] = [];
+  for (const it of args.items) {
+    if (it.plan !== 'A' || it.place_id == null) continue;
+    const place = args.places.get(it.place_id);
+    const total = toCents((place?.price_amount ?? 0) * Math.max(1, args.travelers));
+    if (total <= 0) continue;
+    const paid = args.expenses.filter((e) => e.item_id === it.id).reduce((s, e) => s + toCents(e.amount), 0);
+    out.push({ itemId: it.id, name: place?.name ?? it.title ?? 'Étape', day: args.days.findIndex((d) => d.id === it.day_id) + 1, total: fromCents(total), paid: fromCents(Math.min(paid, total)), due: fromCents(Math.max(0, total - paid)) });
+  }
+  return out.sort((a, b) => a.day - b.day);
+}

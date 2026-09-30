@@ -24,7 +24,7 @@ export interface TripData {
   days: Day[];
   items: TripItem[];
   places: Map<number, Place>;
-  expenses: (Expense & { label: string; currency: string })[];
+  expenses: (Expense & { label: string; currency: string; spent_on?: string | null })[];
   budgetLines: BudgetLine[];
   destinations: Destination[];
   /** Photo de la capitale du pays du voyage. */
@@ -60,7 +60,7 @@ export function useTrip(tripId: string) {
       supabase.from('trip_members').select('user_id,color,left_at,profiles(display_name,avatar_url)').eq('trip_id', tripId),
       supabase.from('trip_days').select('id,day_date,city_id,stay_id,depart_time,return_time').eq('trip_id', tripId).order('day_date'),
       supabase.from('trip_items').select('*').eq('trip_id', tripId),
-      supabase.from('expenses').select('id,poste,amount,paid_by,item_id,stay_id,label,currency').eq('trip_id', tripId).order('spent_on'),
+      supabase.from('expenses').select('id,poste,amount,paid_by,item_id,stay_id,label,currency,spent_on').eq('trip_id', tripId).order('spent_on'),
       supabase.from('trip_budget_lines').select('poste,amount').eq('trip_id', tripId),
       supabase.from('trip_destinations').select(`city_id,position,nights,cities(name,name_fr,lat,lng,country_code,collection_status,${COVER_FIELDS})`).eq('trip_id', tripId).order('position'),
       supabase.from('trip_stays').select('id,name,address,lat,lng').eq('trip_id', tripId),
