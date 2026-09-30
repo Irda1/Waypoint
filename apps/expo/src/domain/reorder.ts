@@ -18,3 +18,22 @@ export function swapWithNeighbor(ordered: MovableItem[], index: number, dir: -1 
     { id: b.id, start_time: a.start_time, position: bPos },
   ];
 }
+
+/**
+ * Glisser-déposer : l'étape `from` va à la place `to`. Les créneaux (heure de début, rang) restent en place et les étapes
+ * s'y redistribuent dans le nouvel ordre. Si les rangs ne sont pas strictement croissants, on les renumérote 1, 2, 3…
+ */
+export function moveToIndex(ordered: MovableItem[], from: number, to: number): ItemMove[] {
+  if (from === to || !ordered[from] || to < 0 || to >= ordered.length) return [];
+  const next = ordered.slice();
+  const [moved] = next.splice(from, 1);
+  next.splice(to, 0, moved);
+  const strict = ordered.every((x, i) => i === 0 || x.position > ordered[i - 1].position);
+  const moves: ItemMove[] = [];
+  next.forEach((item, i) => {
+    const slot = ordered[i];
+    const position = strict ? slot.position : i + 1;
+    if (item.id !== slot.id || item.position !== position) moves.push({ id: item.id, start_time: slot.start_time, position });
+  });
+  return moves;
+}

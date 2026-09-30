@@ -9,7 +9,8 @@ import { organizeTimes } from '../../domain/itinerary.ts';
 import { applyTimes } from '../../data/itinerary';
 import { amountDue, paymentState, posteForCategory } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
-import { swapWithNeighbor } from '../../domain/reorder.ts';
+import { moveToIndex, swapWithNeighbor } from '../../domain/reorder.ts';
+import { DragRow } from './DragRow';
 import { addExpense, addItem, applyItemMoves, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
 import { deriveAltPlan } from '../../domain/altplan.ts';
 import { DEFAULT_DEPART, DEFAULT_RETURN, dayHours, hoursIssues, liveStatus } from '../../domain/dayhours.ts';
@@ -137,6 +138,13 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
     onChanged();
   }
 
+  async function dragMove(from: number, to: number) {
+    const moves = moveToIndex(schedule.map((x) => ({ id: x.item.id, start_time: x.item.start_time, position: x.item.position })), from, to);
+    if (!moves.length) return;
+    setError(await applyItemMoves(moves));
+    onChanged();
+  }
+
   async function saveTime(itemId: string) {
     if (editTime && !isTime(editTime)) { setError('Heure au format 09:30.'); return; }
     const err = await setItemTime(itemId, editTime || null);
@@ -217,7 +225,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
           const isLast = index === schedule.length - 1;
           const name = s.place?.name ?? s.item.title ?? 'Étape';
           return (
-            <View key={s.item.id}>
+            <DragRow key={s.item.id} index={index} onMove={dragMove}>
               {index === 0 && lodging && s.place ? <LegRow from={lodging} to={s.place} fromName={lodging.name} toName={s.place.name} /> : null}
               {index > 0 && schedule[index - 1].place && s.place ? <LegRow from={schedule[index - 1].place!} to={s.place} fromName={schedule[index - 1].place!.name} toName={s.place.name} /> : null}
               <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: space.md, minHeight: 56 }}>
@@ -285,7 +293,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                 </View>
                 <PayBadge state={state} />
               </View>
-            </View>
+            </DragRow>
           );
         })}
         {lodging && schedule.length > 0 && schedule[schedule.length - 1].place ? <LegRow from={schedule[schedule.length - 1].place!} to={lodging} fromName={schedule[schedule.length - 1].place!.name} toName={lodging.name} /> : null}
