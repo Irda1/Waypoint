@@ -36,6 +36,7 @@ export default function TripMap() {
   const [term, setTerm] = useState('');
   const [focus, setFocus] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
 
   const cityIds = useMemo(() => [...new Set((data?.days ?? []).map((d) => d.city_id).filter((c): c is number => c != null).concat((data?.destinations ?? []).map((d) => d.city_id)))], [data?.days, data?.destinations]);
 
@@ -132,6 +133,23 @@ export default function TripMap() {
             </View>
           </View>
         </SafeAreaView>
+        {listOpen ? (
+          <View style={{ position: 'absolute', left: space.sm, right: space.sm, bottom: 64, maxHeight: 280, backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, overflow: 'hidden' }}>
+            <ScrollView>
+              {points.length === 0 ? <Text variant="muted" style={{ padding: space.md }}>Aucun repère à lister.</Text> : points.map((p, i) => (
+                <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`Voir ${p.label} sur la carte`}
+                  onPress={() => { setSelected(p.id); setFocus(p.id); setNotice(null); setListOpen(false); }}
+                  style={{ minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.md, borderTopWidth: i ? 1 : 0, borderTopColor: colors.line }}>
+                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: p.color }} />
+                  <View style={{ flex: 1 }}>
+                    <RNText numberOfLines={1} style={{ fontFamily: fonts.sansSemi, fontSize: 15, color: colors.text }}>{p.label}</RNText>
+                    <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: colors.text3 }}>{p.kind === 'plan' ? `Jour ${p.day} · étape ${p.order}` : 'À découvrir'}</RNText>
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        ) : null}
         <View pointerEvents="box-none" style={{ position: 'absolute', left: space.sm, bottom: space.sm, gap: space.xs, alignItems: 'flex-start' }}>
           {legendOpen ? (
             <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, padding: space.md, gap: space.xs }}>
@@ -151,10 +169,16 @@ export default function TripMap() {
               </View>
             </View>
           ) : null}
-          <Pressable accessibilityRole="button" accessibilityLabel={legendOpen ? 'Masquer la légende' : 'Afficher la légende'} onPress={() => setLegendOpen((v) => !v)}
-            style={{ minHeight: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
-            <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text }}>Légende</RNText>
-          </Pressable>
+          <View style={{ flexDirection: 'row', gap: space.sm }}>
+            <Pressable accessibilityRole="button" accessibilityLabel={legendOpen ? 'Masquer la légende' : 'Afficher la légende'} onPress={() => setLegendOpen((v) => !v)}
+              style={{ minHeight: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
+              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text }}>Légende</RNText>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel={listOpen ? 'Masquer la liste des lieux' : 'Afficher la liste des lieux'} onPress={() => setListOpen((v) => !v)}
+              style={{ minHeight: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: listOpen ? colors.accent : colors.surface, borderWidth: 1, borderColor: colors.line }}>
+              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: listOpen ? colors.onAccent : colors.text }}>{`Liste (${points.length})`}</RNText>
+            </Pressable>
+          </View>
         </View>
       </View>
 
