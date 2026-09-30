@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
-import { useAuth } from '../src/auth/AuthProvider';
 import { useRequireAuth } from '../src/auth/useRequireAuth';
 import { Button, Card, Columns, ErrorNote, Text } from '../src/ui';
 import { listTrips } from '../src/data/trips';
@@ -25,7 +24,6 @@ const ON_PHOTO_ACCENT = '#FFD08A';
 
 export default function Home() {
   const guard = useRequireAuth();
-  const { signOut } = useAuth();
   const { colors } = useTheme();
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,6 +38,12 @@ export default function Home() {
 
   if (guard) return guard;
 
+  // Prochain départ : le voyage à venir le plus proche.
+  const next = (trips ?? [])
+    .map((t) => ({ title: t.title, st: tripStatus(t.starts_on, t.ends_on, today) }))
+    .flatMap((x) => (x.st.kind === 'upcoming' && x.st.inDays > 0 ? [{ title: x.title, inDays: x.st.inDays }] : []))
+    .sort((a, b) => a.inDays - b.inDays)[0];
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }} keyboardShouldPersistTaps="handled">
@@ -48,12 +52,12 @@ export default function Home() {
           <SafeAreaView edges={['top']} style={styles.heroInner}>
             <View style={styles.heroBar}>
               <RNText style={styles.brand} accessibilityRole="header">Waypoint</RNText>
-              <Pressable accessibilityRole="button" accessibilityLabel="Se déconnecter" onPress={signOut} style={styles.glass}>
-                <RNText style={styles.glassLabel}>Déconnexion</RNText>
+              <Pressable accessibilityRole="button" accessibilityLabel="Paramètres" onPress={() => router.push('/settings')} style={styles.glass}>
+                <RNText style={styles.glassLabel}>⚙️ Paramètres</RNText>
               </Pressable>
             </View>
             <View style={styles.heroText}>
-              <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>Nouveau voyage</RNText>
+              <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>{next ? `Plus que ${next.inDays} jour${next.inDays > 1 ? 's' : ''} avant ${next.title}` : 'Nouveau voyage'}</RNText>
               <RNText style={styles.poster} accessibilityRole="header">Où part-on ?</RNText>
               <RNText style={styles.lead}>Un pays, tes dates, tes envies. Waypoint te propose un programme jour par jour, avec la carte.</RNText>
               <Button label="Démarrer un voyage" onPress={() => router.push('/new-trip')} />

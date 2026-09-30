@@ -1,10 +1,13 @@
 import { useColorScheme } from 'react-native';
 import { palette } from './tokens';
 import type { AccentName, Palette } from './tokens';
+import { resolveMode } from './settings';
+import { useAppearance } from './store';
 
-/** Palette selon le mode du téléphone (nuit / jour). Accent Soleil par défaut. */
-export function useTheme(accent: AccentName = 'soleil'): { colors: Palette; mode: 'nuit' | 'jour' } {
+/** Palette selon le réglage de l'utilisateur (Auto = mode du téléphone) et son accent. */
+export function useTheme(accent?: AccentName): { colors: Palette; mode: 'nuit' | 'jour' } {
   const scheme = useColorScheme();
-  const mode = scheme === 'light' ? 'jour' : 'nuit';
-  return { colors: palette(mode, accent), mode };
+  const pref = useAppearance();
+  const mode = resolveMode(pref.mode, scheme);
+  return { colors: palette(mode, accent ?? pref.accent), mode };
 }
