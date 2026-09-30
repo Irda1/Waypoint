@@ -19,6 +19,7 @@ import { BudgetCard } from '../../src/features/trip/BudgetCard';
 import { AddExpenseCard } from '../../src/features/trip/AddExpenseCard';
 import { formatDay, isIsoDate } from '../../src/lib/format';
 import { photoKeyFor } from '../../src/lib/photoKey';
+import { checkNewDay, suggestNewDay } from '../../src/lib/dates.ts';
 import { photos } from '../../src/theme/photos';
 import { fonts, radius, space } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/useTheme';
@@ -86,6 +87,8 @@ export default function TripScreen() {
 
   async function submitDay() {
     if (!isIsoDate(newDay)) { setDayError('Date au format AAAA-MM-JJ (ex. 2026-10-13).'); return; }
+    const outside = checkNewDay(newDay, data!.trip.starts_on, data!.trip.ends_on);
+    if (outside) { setDayError(outside); return; }
     const err = await addDay(data!.trip.id, newDay);
     setDayError(err);
     if (!err) { setNewDay(''); setAddingDay(false); void reload(); }
@@ -181,7 +184,7 @@ export default function TripScreen() {
               <Button label="Annuler" variant="ghost" onPress={() => { setAddingDay(false); setDayError(null); }} />
             </Card>
           ) : (
-            <Button label="+ Ajouter un jour" variant="ghost" onPress={() => setAddingDay(true)} />
+            <Button label="+ Ajouter un jour" variant="ghost" onPress={() => { setNewDay(suggestNewDay(data.days.map((d) => d.day_date), trip.starts_on, trip.ends_on)); setAddingDay(true); }} />
           )}
 
           <BudgetCard data={data} />

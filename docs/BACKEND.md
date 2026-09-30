@@ -148,6 +148,8 @@ Un seul flux au départ, et rien à construire : l'application n'ouvre **jamais*
 
 - **v1.9.11** : hébergement. Carte « Hébergement » sur l'écran voyage : recherche d'un hôtel ou d'une auberge parmi les lieux collectés (`kind = lodging`), création d'une ligne `trip_stays` rattachée aux jours de la ville (`trip_days.stay_id`, `domain/stays.ts` testé), retrait possible. Les journées affichent alors le volet Itinéraire entre l'hébergement et la première / la dernière étape. Aucune migration.
 
+- **v1.9.12** : montants affichés en nombres entiers ; ajout d'un jour à la main : la date doit rester dans les dates du voyage (avant, un jour du 18 octobre pouvait être ajouté à un voyage du 13 au 16) et la date du lendemain du dernier jour est proposée. Aucune migration.
+
 Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` remplit la ville, la recherche et l'ajout à un jour fonctionnent, les durées estimées sont marquées « ≈ ».
 
 ## Prochaines étapes
