@@ -51,6 +51,20 @@ export interface Transfer {
   amount: number;
 }
 
+export interface SettlementPayment { from_user: string; to_user: string; amount: number }
+
+/** Tient compte des remboursements déjà reçus : celui qui a remboursé doit moins, celui qui a reçu doit moins qu'on ne lui doit. */
+export function applyPayments(balances: Balance[], payments: SettlementPayment[]): Balance[] {
+  return balances.map((b) => {
+    let cents = toCents(b.balance);
+    for (const p of payments) {
+      if (p.from_user === b.userId) cents += toCents(p.amount);
+      if (p.to_user === b.userId) cents -= toCents(p.amount);
+    }
+    return { ...b, balance: fromCents(cents) };
+  });
+}
+
 /** Virements minimaux pour solder les comptes (méthode de la maquette : plus gros débiteur vers plus gros créancier). */
 export function settlements(balances: Balance[]): Transfer[] {
   const creditors = balances.map((b) => ({ id: b.userId, cents: toCents(b.balance) })).filter((b) => b.cents > 0).sort((a, b) => b.cents - a.cents);

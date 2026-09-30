@@ -15,6 +15,7 @@ import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
 import { ProgramCard } from '../../src/features/trip/ProgramCard';
 import { StayCard } from '../../src/features/trip/StayCard';
+import { FriendsCard } from '../../src/features/trip/FriendsCard';
 import { BudgetCard } from '../../src/features/trip/BudgetCard';
 import { AddExpenseCard } from '../../src/features/trip/AddExpenseCard';
 import { formatDay, isIsoDate } from '../../src/lib/format';
@@ -246,6 +247,7 @@ export default function TripScreen() {
 
         {tab === 'amis' ? (
         <View style={styles.page}>
+          {session ? <FriendsCard data={data} userId={session.user.id} onChanged={reload} /> : null}
           <Card>
             <Text variant="label">Voyageurs</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>

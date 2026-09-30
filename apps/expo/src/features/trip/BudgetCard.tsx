@@ -6,7 +6,7 @@ import { useTheme } from '../../theme/useTheme';
 import { formatMoney } from '../../lib/format';
 import { useLocalMoney } from '../../data/rates';
 import { convert, formatApprox } from '../../domain/currency.ts';
-import { budgetSummary, computeBalances, costByDay, savingSuggestions, settlements } from '../../domain/budget.ts';
+import { budgetSummary, costByDay, savingSuggestions } from '../../domain/budget.ts';
 import { POSTES } from '../../domain/types.ts';
 import type { Poste } from '../../domain/types.ts';
 import type { TripData } from '../../data/useTrip';
@@ -17,12 +17,9 @@ export function BudgetCard({ data }: { data: TripData }) {
   const { colors } = useTheme();
   const { trip, members, expenses, items, places, budgetLines } = data;
   const active = members.filter((m) => !m.left_at);
-  const nameOf = (id: string) => members.find((m) => m.user_id === id)?.profiles?.display_name ?? 'Ancien membre';
 
   const envelopes = Object.fromEntries(budgetLines.map((l) => [l.poste, Number(l.amount)])) as Partial<Record<Poste, number>>;
   const summary = budgetSummary({ expenses, items, places, envelopes, travelers: Math.max(1, active.length) });
-  const balances = computeBalances(expenses, active.map((m) => m.user_id));
-  const transfers = settlements(balances);
   const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
   const travelers = Math.max(1, active.length);
   const savings = savingSuggestions({ expenses, items, places, envelopes, travelers });
@@ -100,10 +97,6 @@ export function BudgetCard({ data }: { data: TripData }) {
         </View>
       ) : null}
 
-      <Text variant="label" style={{ marginTop: space.md }}>Comptes entre amis</Text>
-      {transfers.length === 0 ? <Text variant="muted">Tout le monde est à l'équilibre.</Text> : transfers.map((t, i) => (
-        <Text key={i} variant="body">{nameOf(t.from)} doit <Text variant="mono">{formatMoney(t.amount, trip.currency)}</Text> à {nameOf(t.to)}</Text>
-      ))}
     </Card>
   );
 }
