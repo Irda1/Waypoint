@@ -85,9 +85,9 @@ export async function addItem(args: { tripId: string; dayId: string; title: stri
   return msg(error);
 }
 
-export async function addExpense(args: { tripId: string; label: string; poste: Poste; amount: number; currency: string; paidBy: string; itemId?: string | null }): Promise<string | null> {
+export async function addExpense(args: { tripId: string; label: string; poste: Poste; amount: number; currency: string; paidBy: string; itemId?: string | null; stayId?: string | null }): Promise<string | null> {
   const { error } = await supabase.from('expenses').insert({
-    trip_id: args.tripId, label: args.label.trim(), poste: args.poste, amount: args.amount, currency: args.currency, paid_by: args.paidBy, item_id: args.itemId ?? null,
+    trip_id: args.tripId, label: args.label.trim(), poste: args.poste, amount: args.amount, currency: args.currency, paid_by: args.paidBy, item_id: args.itemId ?? null, stay_id: args.stayId ?? null,
   });
   return msg(error);
 }

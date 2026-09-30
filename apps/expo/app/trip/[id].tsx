@@ -237,7 +237,7 @@ export default function TripScreen() {
           </Card>
 
           <MemoCard tripId={trip.id} memo={trip.memo ?? ''} onChanged={reload} startEditing={pendingMemo} onStarted={() => setPendingMemo(false)} />
-          <StayCard data={data} onChanged={reload} />
+          <StayCard data={data} userId={session?.user.id ?? null} onChanged={reload} />
 
           <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
 

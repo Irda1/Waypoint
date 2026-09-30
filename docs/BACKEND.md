@@ -184,3 +184,4 @@ Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` rempli
 - v1.10.20 : assistant de voyage, étape « Propositions » (aperçu du programme jour par jour, lieux à retirer, ou jours vides) ; le programme est écrit à la création du voyage. Aucune migration.
 - v1.10.21 : carte, recherche d'un lieu par son nom (accents ignorés, centre la carte dessus) et légende (couleur des jours, trajet, lieux à découvrir). Aucune migration.
 - v1.10.22 : hébergements multiples, bouton « Nuits » pour choisir les nuits de chaque hébergement (une nuit prise à un autre lui est retirée). Aucune migration.
+- v1.10.23 : paiement d'un hébergement (bouton « Payer », dépense du poste Hébergement liée à l'hébergement, comptée dans le budget). Aucune migration.
