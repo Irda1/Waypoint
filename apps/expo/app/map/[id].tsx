@@ -8,6 +8,7 @@ import { useTrip } from '../../src/data/useTrip';
 import { useCategories } from '../../src/data/categories';
 import { loadCandidates } from '../../src/data/itinerary';
 import { addPlaceItem } from '../../src/data/places';
+import { useFavorites } from '../../src/data/favorites';
 import { discoverPoints, planPoints, visiblePoints } from '../../src/domain/map.ts';
 import type { MapPoint } from '../../src/domain/map.ts';
 import { MapCanvas } from '../../src/features/map/MapCanvas';
@@ -30,14 +31,16 @@ export default function TripMap() {
   const [notice, setNotice] = useState<string | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [onlyFav, setOnlyFav] = useState(false);
+  const favorites = useFavorites(String(id));
 
   const cityIds = useMemo(() => [...new Set((data?.days ?? []).map((d) => d.city_id).filter((c): c is number => c != null).concat((data?.destinations ?? []).map((d) => d.city_id)))], [data?.days, data?.destinations]);
 
   // Les lieux à découvrir se chargent la première fois qu'on les demande.
   useEffect(() => {
-    if (!discover || loaded !== null || !cityIds.length) return;
+    if (!(discover || onlyFav) || loaded !== null || !cityIds.length) return;
     void loadCandidates(cityIds, categories.rootOf).then((r) => { setLoaded(r.candidates); if (r.error) setProblem(r.error); });
-  }, [discover, loaded, cityIds, categories]);
+  }, [discover, onlyFav, loaded, cityIds, categories]);
 
   const plan = useMemo(() => (data ? planPoints({ days: data.days, items: data.items, places: data.places, rootOf: categories.rootOf }) : []), [data, categories]);
   const disc = useMemo(() => {
@@ -45,7 +48,8 @@ export default function TripMap() {
     const inTrip = new Set(data.items.map((i) => i.place_id).filter((p): p is number => p != null));
     return discoverPoints({ candidates: loaded, inTrip, colorOf: (r) => categoryColors[mode][r] ?? colors.text3 });
   }, [data, loaded, mode, colors.text3]);
-  const points = useMemo(() => visiblePoints([...plan, ...disc], { day, discover, roots }), [plan, disc, day, discover, roots]);
+  const shown = useMemo(() => visiblePoints([...plan, ...disc], { day, discover: discover || onlyFav, roots }), [plan, disc, day, discover, onlyFav, roots]);
+  const points = useMemo(() => (onlyFav ? shown.filter((p) => p.placeId != null && favorites.ids.has(p.placeId)) : shown), [shown, onlyFav, favorites.ids]);
   const point: MapPoint | undefined = points.find((p) => p.id === selected);
 
   if (guard) return guard;
@@ -87,6 +91,7 @@ export default function TripMap() {
             </View>
             <View style={{ flexDirection: 'row', gap: space.sm }}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+                <Chip label="♥ Favoris" selected={onlyFav} onPress={() => setOnlyFav((v) => !v)} />
                 <Chip label={discover ? 'Lieux à découvrir : oui' : 'Lieux à découvrir'} selected={discover} onPress={() => setDiscover((v) => !v)} />
                 {discover ? categories.activityRoots.map((c) => (
                   <Chip key={c.code} label={c.name_fr} selected={roots.includes(c.code)} onPress={() => setRoots((r) => (r.includes(c.code) ? r.filter((x) => x !== c.code) : [...r, c.code]))} />
@@ -107,6 +112,7 @@ export default function TripMap() {
                   place?.visit_duration_min ? `≈ ${formatDuration(place.visit_duration_min)}` : null,
                   place?.price_amount != null ? `≈ ${formatMoney(place.price_amount, data.trip.currency)}` : null].filter(Boolean).join(' · ')}
               </Text>
+              {point.placeId != null ? <Button label={favorites.ids.has(point.placeId) ? '♥ Dans mes favoris' : '♡ Ajouter aux favoris'} variant="ghost" onPress={() => { void favorites.toggle(point.placeId!); }} /> : null}
               {point.kind === 'disc' ? (dayId ? <Button label={`Ajouter au jour ${day}`} onPress={add} loading={busy} /> : <Text variant="muted">Choisis un jour en haut pour l'ajouter à ton programme.</Text>) : null}
             </>
           ) : (
