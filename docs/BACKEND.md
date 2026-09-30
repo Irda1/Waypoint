@@ -144,6 +144,8 @@ Un seul flux au départ, et rien à construire : l'application n'ouvre **jamais*
 
 - **v1.9.9** : météo : heure de mise à jour affichée. Transports : volet « Itinéraire » entre deux étapes (et entre l'hébergement et la première/dernière étape quand le jour a un hébergement avec coordonnées) : replié, il montre le mode le plus rapide ; ouvert, à pied / à vélo / transports en commun / voiture avec la durée, chaque ligne ouvrant Google Maps (format « Maps URLs », sans clé) avec le bon mode de déplacement. À pied, vélo et voiture : itinéraire calculé sans circulation (serveur OSRM public FOSSGIS, une requête par seconde, demandé seulement à l'ouverture du volet, repli sur l'estimation ≈ de la maquette) ; transports : toujours estimation. `EXPO_PUBLIC_ROUTING_URL` remplace le serveur avant une ouverture au public. La durée réelle ne modifie pas encore la détection de chevauchements. Aucune migration. L'appli n'a pas encore d'écran pour créer un hébergement : les liens hébergement ne s'affichent qu'avec une ligne de `trip_stays` rattachée au jour.
 
+- **v1.9.10** : recommandations textuelles d'une journée (`domain/advice.ts`, testé, règles lisibles, 3 conseils au plus, rien de modifié automatiquement) : journée vide, journée chargée (≥ 10 h), trajets lourds (≥ 1 h 30), aucun repas, créneau libre (≥ 2 h, si heures connues), beau temps sans plein air, jour au-dessus de 1,5 × le budget activités moyen. Bloc « Conseils » dans chaque jour. La pluie garde son conseil météo existant. Aucune migration, aucune IA.
+
 Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` remplit la ville, la recherche et l'ajout à un jour fonctionnent, les durées estimées sont marquées « ≈ ».
 
 ## Prochaines étapes

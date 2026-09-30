@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Pressable, Text as RNText, View } from 'react-native';
 import { Button, Card, Chip, ErrorNote, Field, PayBadge, Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
-import { categoryColors, fonts, space } from '../../theme/tokens';
+import { categoryColors, fonts, radius, space } from '../../theme/tokens';
 import { formatDay, isTime } from '../../lib/format';
 import { formatTime, scheduleDay } from '../../domain/planning.ts';
 import { organizeTimes } from '../../domain/itinerary.ts';
@@ -12,6 +12,8 @@ import type { Expense, Place, TripItem } from '../../domain/types.ts';
 import { addItem, deleteItem, setItemTime } from '../../data/trips';
 import { useCategories } from '../../data/categories';
 import { LegRow } from './LegRow';
+import { dayTips } from '../../domain/advice.ts';
+import { formatMoney } from '../../lib/format';
 import type { Point } from '../../domain/routes.ts';
 import { PlacePicker } from './PlacePicker';
 import type { CityOption } from '../../data/places';
@@ -34,10 +36,13 @@ interface Props {
   forecast?: Forecast | null;
   /** Hébergement de la nuit (avec coordonnées) : trajets vers la première étape et depuis la dernière. */
   lodging?: (Point & { name: string }) | null;
+  /** Monnaie du voyage et budget « activités » par jour, pour la recommandation de budget. */
+  currency?: string;
+  dailyActivityBudget?: number | null;
   onChanged: () => void;
 }
 
-export function DayCard({ tripId, tripTitle, destinations, day, number, items, places, expenses, travelers, forecast, lodging, onChanged }: Props) {
+export function DayCard({ tripId, tripTitle, destinations, day, number, items, places, expenses, travelers, forecast, lodging, currency = 'EUR', dailyActivityBudget = null, onChanged }: Props) {
   const { colors, mode } = useTheme();
   const categories = useCategories();
   const [plan, setPlan] = useState<'A' | 'B' | 'C'>('A');
@@ -60,6 +65,19 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
   }
 
   const weather = forecast ? weatherForDay(forecast, day.day_date, schedule.map((s) => categories.rootOf(s.place?.category_code ?? s.item.category_code ?? ''))) : null;
+  const tips = dayTips({
+    stops: schedule.map((s) => ({
+      name: s.place?.name ?? s.item.title ?? 'Étape',
+      root: categories.rootOf(s.place?.category_code ?? s.item.category_code ?? ''),
+      startMin: s.startMin, endMin: s.endMin,
+      durationMin: s.startMin != null && s.endMin != null ? s.endMin - s.startMin : s.item.duration_min ?? s.place?.visit_duration_min ?? 60,
+      travelMin: s.travelFromPrevious?.minutes ?? 0,
+    })),
+    weather,
+    dayCost: schedule.reduce((sum, s) => sum + (s.place?.price_amount ?? 0) * travelers, 0),
+    dailyActivityBudget,
+    formatMoney: (n) => formatMoney(n, currency),
+  });
   const untimed = schedule.filter((s) => s.startMin == null).length;
   async function tidy() {
     const changes = organizeTimes(schedule.map((s) => ({
@@ -94,6 +112,12 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
       </View>
 
       {schedule.length === 0 ? <Text variant="muted">Rien de prévu dans ce plan.</Text> : null}
+      {tips.length ? (
+        <View style={{ gap: space.xs, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }} accessibilityLabel="Conseils pour cette journée">
+          <Text variant="label">Conseils</Text>
+          {tips.map((t) => <Text key={t.id} variant="muted">💡 {t.text}</Text>)}
+        </View>
+      ) : null}
       <View>
         {schedule.map((s, index) => {
           const state = paymentState(s.item, s.place, expenses, travelers);

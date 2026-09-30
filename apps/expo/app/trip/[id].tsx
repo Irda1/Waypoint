@@ -90,6 +90,8 @@ export default function TripScreen() {
     if (!err) { setNewDay(''); setAddingDay(false); void reload(); }
   }
 
+  const activitiesLine = data.budgetLines.find((l) => l.poste === 'activites');
+  const dailyActivityBudget = activitiesLine && data.days.length ? Number(activitiesLine.amount) / data.days.length : null;
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }} keyboardShouldPersistTaps="handled">
@@ -163,7 +165,7 @@ export default function TripScreen() {
           {data.days.length === 0 ? <Card><Text variant="muted">Aucun jour pour l'instant. Ajoute le premier ci-dessous.</Text></Card> : null}
           <Columns>
             {data.days.map((d, index) => (
-              <DayCard key={d.id} tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={index + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} onChanged={reload} />
+              <DayCard key={d.id} tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={index + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} />
             ))}
           </Columns>
 
