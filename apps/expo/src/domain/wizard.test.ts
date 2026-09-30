@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BUDGET_LEVELS, POSTE_SHARES, autoTitle, budgetTotal, changeNights, cityPerDay, dayCount, flexibleDates, missingSteps, newWizard, nightCount, pickDate, pickDuration, pickParty, spreadNights, splitBudget, toggleCity } from './wizard.ts';
+import { BUDGET_LEVELS, POSTE_SHARES, autoTitle, budgetTotal, changeNights, cityPerDay, dayCount, flexibleDates, missingSteps, newWizard, nightCount, pickDate, pickDuration, pickParty, spreadNights, splitBudget, toggleCity, toggleExcluded, wizardPlan } from './wizard.ts';
 import { addDays, diffDays, monthGrid, nextMonths, todayIso } from '../lib/dates.ts';
 import { COUNTRIES, POPULAR, COUNTRY_NAME, flagEmoji, searchCountries } from './countries.ts';
 
@@ -116,4 +116,17 @@ test('pays : liste de la maquette, recherche sans accents, drapeaux', () => {
   assert.equal(searchCountries('  ').length, 199);
   assert.equal(searchCountries('zzz').length, 0);
   assert.equal(flagEmoji('PT'), '🇵🇹');
+});
+
+test('propositions : un jour par jour du voyage, lieux retirés écartés, rien sans ville', () => {
+  const cands = Array.from({ length: 8 }, (_, i) => ({ place: { id: 100 + i, name: `Lieu ${i}`, kind: 'activity', category_code: 'musee', lat: 38.7 + i * 0.001, lng: -9.14, price_amount: null, visit_duration_min: 60, closed_days: [] } as never, cityId: 1, root: 'culture', popularity: 10 - i }));
+  const s = { ...newWizard(), country: 'PT', start: '2026-10-13', end: '2026-10-15', travelers: 2, interests: ['culture'], cities: [{ id: 1, name: 'Lisbonne', nights: 2 }] };
+  assert.equal(wizardPlan({ ...s, cities: [] }, cands).length, 0);
+  const plan = wizardPlan(s, cands);
+  assert.deepEqual(plan.map((d) => d.date), ['2026-10-13', '2026-10-14', '2026-10-15']);
+  const first = plan.flatMap((d) => d.items).find((i) => i.place)!.place!.id;
+  const s2 = toggleExcluded(s, first);
+  assert.deepEqual(s2.excluded, [first]);
+  assert.ok(!wizardPlan(s2, cands).flatMap((d) => d.items).some((i) => i.place?.id === first));
+  assert.deepEqual(toggleExcluded(s2, first).excluded, []);
 });

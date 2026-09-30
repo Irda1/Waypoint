@@ -14,12 +14,14 @@ import { StepCities } from '../src/features/wizard/StepCities';
 import { StepTravelers } from '../src/features/wizard/StepTravelers';
 import { StepInterests } from '../src/features/wizard/StepInterests';
 import { StepBudget } from '../src/features/wizard/StepBudget';
+import { StepProposals } from '../src/features/wizard/StepProposals';
 import { StepRecap } from '../src/features/wizard/StepRecap';
 import type { StepId } from '../src/features/wizard/StepRecap';
+import { useCategories } from '../src/data/categories';
 import { fonts, space } from '../src/theme/tokens';
 import { useTheme } from '../src/theme/useTheme';
 
-const ORDER: StepId[] = ['pays', 'dates', 'villes', 'voyageurs', 'interets', 'budget', 'recap'];
+const ORDER: StepId[] = ['pays', 'dates', 'villes', 'voyageurs', 'interets', 'budget', 'propositions', 'recap'];
 
 /** Ce qu'il faut avoir choisi pour quitter une étape (null = on peut continuer). */
 function blocker(step: StepId, s: WizardState): string | null {
@@ -36,6 +38,7 @@ function blocker(step: StepId, s: WizardState): string | null {
 
 export default function NewTrip() {
   const guard = useRequireAuth();
+  const categories = useCategories();
   const { colors } = useTheme();
   // « Envie de… » : pays et ville déjà choisis, on démarre aux dates.
   const params = useLocalSearchParams<{ country?: string; city?: string }>();
@@ -76,7 +79,7 @@ export default function NewTrip() {
     const missing = missingSteps(state);
     if (missing.length) { setError('Il manque encore des informations. Reviens sur les étapes précédentes.'); return; }
     setBusy(true);
-    const res = await createTripFromWizard(state);
+    const res = await createTripFromWizard(state, categories.rootOf);
     setBusy(false);
     if (!res.id) { setError(res.error ?? 'Création impossible.'); return; }
     router.replace({ pathname: '/trip/[id]', params: { id: res.id } });
@@ -108,13 +111,15 @@ export default function NewTrip() {
         {step === 'voyageurs' ? <StepTravelers {...props} /> : null}
         {step === 'interets' ? <StepInterests {...props} /> : null}
         {step === 'budget' ? <StepBudget {...props} /> : null}
+        {step === 'propositions' ? <StepProposals {...props} /> : null}
         {step === 'recap' ? <StepRecap {...props} goTo={goTo} /> : null}
       </ScrollView>
 
       <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line }}>
         <View style={{ padding: space.lg, gap: space.sm, width: '100%', maxWidth: 880, alignSelf: 'center' }}>
           <ErrorNote message={error} />
-          {step === 'recap' ? (
+          {step === 'propositions' ? <StepProposals {...props} /> : null}
+        {step === 'recap' ? (
             <Button label={`Créer « ${state.title.trim() || autoTitle(state)} »`} onPress={create} loading={busy} />
           ) : (
             <>

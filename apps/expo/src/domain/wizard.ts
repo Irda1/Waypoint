@@ -4,6 +4,8 @@
 import { COUNTRY_NAME } from './countries.ts';
 import { addDays, diffDays } from '../lib/dates.ts';
 import type { Poste } from './types.ts';
+import { buildPlan } from './itinerary.ts';
+import type { Candidate, PlannedDay } from './itinerary.ts';
 
 export type PartyType = 'seul' | 'deux' | 'amis' | 'famille';
 export type BudgetLevelId = 'economique' | 'moyen' | 'confortable' | 'premium';
@@ -23,11 +25,15 @@ export interface WizardState {
   budget: { level: BudgetLevelId | 'montant' | null; amount: number | null; currency: string };
   title: string;
   titleEdited: boolean;
+  /** Étape « Propositions » : remplir automatiquement les jours à la création. */
+  program: boolean;
+  /** Lieux retirés de la proposition par l'utilisateur. */
+  excluded: number[];
 }
 
 export const newWizard = (): WizardState => ({
   country: null, start: null, end: null, indicative: false, cities: [], party: null, travelers: 1,
-  interests: [], budget: { level: null, amount: null, currency: 'EUR' }, title: '', titleEdited: false,
+  interests: [], budget: { level: null, amount: null, currency: 'EUR' }, title: '', titleEdited: false, program: true, excluded: [],
 });
 
 export const dayCount = (s: Pick<WizardState, 'start' | 'end'>): number => (s.start && s.end ? diffDays(s.start, s.end) + 1 : 0);
@@ -175,4 +181,25 @@ export function missingSteps(s: WizardState): ('pays' | 'dates' | 'voyageurs' | 
   if (!s.interests.length) out.push('interets');
   if (budgetTotal(s) === null) out.push('budget');
   return out;
+}
+
+// ---------------------------------------------------------------- Propositions
+
+/** Programme proposé pour tous les jours du voyage en cours de création (mêmes règles que « Programme automatique »). */
+export function wizardPlan(s: WizardState, candidates: Candidate[]): PlannedDay[] {
+  const days = dayCount(s);
+  const total = budgetTotal(s);
+  if (!s.start || !days || !s.cities.length) return [];
+  const perDay = cityPerDay(s.cities, days);
+  return buildPlan(perDay.map((cityId, i) => ({ date: addDays(s.start!, i), cityId })), candidates, {
+    interests: s.interests,
+    travelers: Math.max(s.travelers, 1),
+    activityBudgetPerDay: total ? (total * 0.15) / days : null,
+    excluded: new Set(s.excluded),
+  });
+}
+
+/** Retire ou remet un lieu dans la proposition. */
+export function toggleExcluded(s: WizardState, placeId: number): WizardState {
+  return { ...s, excluded: s.excluded.includes(placeId) ? s.excluded.filter((id) => id !== placeId) : [...s.excluded, placeId] };
 }
