@@ -37,3 +37,17 @@ export function moveToIndex(ordered: MovableItem[], from: number, to: number): I
   });
   return moves;
 }
+
+/** Échange deux étapes (glisser une étape sur une autre) : elles s'échangent l'heure de début et le rang. */
+export function swapItems(ordered: MovableItem[], a: number, b: number): ItemMove[] {
+  const x = ordered[a];
+  const y = ordered[b];
+  if (a === b || !x || !y) return [];
+  // Rangs identiques : on garde l'ordre relatif attendu (x prend la place de y et inversement).
+  const same = x.position === y.position;
+  const xPos = same ? y.position + (b > a ? 1 : -1) : y.position;
+  return [
+    { id: x.id, start_time: y.start_time, position: xPos },
+    { id: y.id, start_time: x.start_time, position: x.position },
+  ];
+}

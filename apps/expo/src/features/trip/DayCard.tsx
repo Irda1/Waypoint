@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Platform, Pressable, Text as RNText, View } from 'react-native';
 import { Button, Card, Chip, ErrorNote, Field, PayBadge, Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
 import { categoryColors, fonts, radius, space } from '../../theme/tokens';
@@ -9,7 +9,8 @@ import { organizeTimes } from '../../domain/itinerary.ts';
 import { applyTimes } from '../../data/itinerary';
 import { amountDue, paymentState, posteForCategory } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
-import { moveToIndex, swapWithNeighbor } from '../../domain/reorder.ts';
+import { swapItems, swapWithNeighbor } from '../../domain/reorder.ts';
+import { glyphFor } from '../../theme/categoryIcons';
 import { DragRow } from './DragRow';
 import { addExpense, addItem, applyItemMoves, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
 import { deriveAltPlan } from '../../domain/altplan.ts';
@@ -139,7 +140,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
   }
 
   async function dragMove(from: number, to: number) {
-    const moves = moveToIndex(schedule.map((x) => ({ id: x.item.id, start_time: x.item.start_time, position: x.item.position })), from, to);
+    const moves = swapItems(schedule.map((x) => ({ id: x.item.id, start_time: x.item.start_time, position: x.item.position })), from, to);
     if (!moves.length) return;
     setError(await applyItemMoves(moves));
     onChanged();
@@ -240,8 +241,10 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                   </Text>
                   {s.endMin != null ? <Text variant="mono" style={{ color: colors.text3, fontSize: 12.5 }}>{formatTime(s.endMin)}</Text> : null}
                 </Pressable>
-                <View style={{ alignItems: 'center', width: 16 }}>
-                  <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dot, marginTop: 5 }} />
+                <View style={{ alignItems: 'center', width: 28 }}>
+                  <View accessible={false} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${dot}33`, alignItems: 'center', justifyContent: 'center' }}>
+                    <RNText style={{ fontSize: 15 }}>{glyphFor(categories.rootOf(category))}</RNText>
+                  </View>
                   {!isLast ? <View style={{ flex: 1, width: 1, backgroundColor: colors.lineStrong, marginTop: 4 }} /> : null}
                 </View>
                 <View style={{ flex: 1, paddingBottom: space.md, gap: 2 }}>
@@ -279,12 +282,12 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                     >
                       <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>Retirer</RNText>
                     </Pressable>
-                    {index > 0 ? (
+                    {Platform.OS !== 'web' && index > 0 ? (
                       <Pressable accessibilityRole="button" accessibilityLabel={`Monter ${name}`} hitSlop={8} onPress={() => move(index, -1)} style={{ minHeight: 32, justifyContent: 'center' }}>
                         <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>↑ Monter</RNText>
                       </Pressable>
                     ) : null}
-                    {!isLast ? (
+                    {Platform.OS !== 'web' && !isLast ? (
                       <Pressable accessibilityRole="button" accessibilityLabel={`Descendre ${name}`} hitSlop={8} onPress={() => move(index, 1)} style={{ minHeight: 32, justifyContent: 'center' }}>
                         <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>↓ Descendre</RNText>
                       </Pressable>
