@@ -11,9 +11,9 @@ export function globeHtml(): string {
 <style>
 html,body{margin:0;height:100%;background:#000;overflow:hidden;touch-action:none;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
 canvas{display:block;width:100%;height:100%}
-#nom{position:fixed;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;color:#fff;font-size:clamp(28px,7vw,56px);font-weight:700;letter-spacing:-.02em;pointer-events:none;text-shadow:0 2px 24px rgba(0,0,0,.8);opacity:0;transition:opacity .18s}
+#nom{position:fixed;left:16px;top:14px;max-width:70%;text-align:left;color:#fff;font-size:clamp(22px,4.5vw,36px);font-weight:700;letter-spacing:-.02em;pointer-events:none;text-shadow:0 2px 18px rgba(0,0,0,.9);opacity:0;transition:opacity .18s}
 #nom.on{opacity:1}
-.autour{position:fixed;color:#fff;opacity:.22;font-size:12px;letter-spacing:.06em;text-transform:uppercase;pointer-events:none;transform:translate(-50%,-50%);white-space:nowrap}
+.autour{position:fixed;color:#fff;opacity:.6;text-shadow:0 1px 8px rgba(0,0,0,.9);font-size:12px;letter-spacing:.06em;text-transform:uppercase;pointer-events:none;transform:translate(-50%,-50%);white-space:nowrap}
 #msg{position:fixed;left:0;right:0;bottom:14px;text-align:center;color:#A7ADAB;font-size:13px;pointer-events:none}
 </style></head><body>
 <canvas id="c"></canvas><div id="nom"></div><div id="msg"></div>
@@ -81,12 +81,13 @@ canvas{display:block;width:100%;height:100%}
     var g = f.geometry, polys = g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : [];
     polys.forEach(function (poly) { poly.forEach(function (ring) { ring.forEach(function (p, i) { var jump = i && Math.abs(p[0] - ring[i - 1][0]) > 180; i && !jump ? ctx.lineTo(px(p[0]), py(p[1])) : ctx.moveTo(px(p[0]), py(p[1])); }); }); });
   }
-  var hover = -1;
+  var hover = -1, sel = -1;
   function paint() {
     ctx.fillStyle = "#03060A"; ctx.fillRect(0, 0, W, H);
     ctx.lineJoin = "round"; ctx.strokeStyle = COLOR; ctx.globalAlpha = 0.85; ctx.lineWidth = 1.6;
     feats.forEach(function (f) { path(f.f); ctx.stroke(); });
     ctx.globalAlpha = 1;
+    if (sel >= 0 && sel !== hover) { var q = feats[sel]; path(q.f); ctx.fillStyle = COLOR; ctx.globalAlpha = 0.34; ctx.fill("evenodd"); ctx.globalAlpha = 1; ctx.strokeStyle = COLOR; ctx.lineWidth = 3; ctx.stroke(); }
     if (hover >= 0) { var h = feats[hover]; path(h.f); ctx.fillStyle = COLOR; ctx.globalAlpha = 0.38; ctx.fill("evenodd"); ctx.globalAlpha = 1; ctx.strokeStyle = "#FFFFFF"; ctx.lineWidth = 2.4; ctx.stroke(); }
     texture.needsUpdate = true;
   }
@@ -117,16 +118,37 @@ canvas{display:block;width:100%;height:100%}
     for (var i = 0; i < feats.length; i++) if (inFeature(feats[i].f, lon, lat)) return i; return -1;
   }
   function setHover(i) {
-    if (i === hover) return; hover = i; paint();
+    if (i === hover) return; hover = i; paint(); refresh();
+  }
+  // Nom affiché en haut à gauche : le pays survolé, sinon le pays choisi ; les pays voisins en transparence autour.
+  function shown() { return hover >= 0 ? hover : sel; }
+  function refresh() {
+    var i = shown();
     if (i >= 0) { nomEl.textContent = feats[i].name; nomEl.classList.add("on"); } else nomEl.classList.remove("on");
     updateAround();
   }
-  var labels = [];
+  // Fait pivoter le globe vers un pays (code ISO à 2 lettres) et le met en évidence.
+  var anim = null;
+  function focus(code) {
+    if (!feats.length) { pending = code; return; }
+    var i = -1; for (var k = 0; k < feats.length; k++) if (feats[k].code === code) { i = k; break; }
+    sel = i; paint(); refresh();
+    if (i >= 0 && feats[i].c) {
+      var v = vec(feats[i].c[0], feats[i].c[1], 1), ry = -Math.atan2(v.x, v.z), rx = Math.max(-1.2, Math.min(1.2, feats[i].c[1] * Math.PI / 180));
+      var cur = group.rotation.y; ry = cur + Math.atan2(Math.sin(ry - cur), Math.cos(ry - cur));
+      anim = { ry: ry, rx: rx }; target = Math.min(target, 5);
+    }
+  }
+  var pending = null;
+  window.__focus = focus;
+  function onMsg(e) { try { var m = typeof e.data === "string" ? JSON.parse(e.data) : e.data; if (m && m.type === "focus") focus(m.code); } catch (err) {} }
+  window.addEventListener("message", onMsg); document.addEventListener("message", onMsg);
+  var labels = [], tick = 0;
   function updateAround() {
     labels.forEach(function (l) { l.remove(); }); labels = [];
-    if (MODE !== "pick" || hover < 0) return;
-    var c0 = feats[hover].c; if (!c0) return;
-    var list = feats.map(function (f, i) { return { f: f, i: i, d: f.c && i !== hover ? Math.hypot(f.c[0] - c0[0], f.c[1] - c0[1]) : 1e9 }; }).sort(function (a, b) { return a.d - b.d; }).slice(0, 10);
+    var cur = shown(); if (MODE !== "pick" || cur < 0) return;
+    var c0 = feats[cur].c; if (!c0) return;
+    var list = feats.map(function (f, i) { return { f: f, i: i, d: f.c && i !== cur ? Math.hypot(f.c[0] - c0[0], f.c[1] - c0[1]) : 1e9 }; }).sort(function (a, b) { return a.d - b.d; }).slice(0, 10);
     var w = window.innerWidth, h = window.innerHeight;
     list.forEach(function (o) {
       var v = vec(o.f.c[0], o.f.c[1], 2.02); v.applyMatrix4(group.matrixWorld);
@@ -137,14 +159,14 @@ canvas{display:block;width:100%;height:100%}
   }
 
   if (MODE === "pick") {
-    canvas.addEventListener("pointerdown", function (e) { drag = { x: e.clientX, y: e.clientY }; moved = 0; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointerdown", function (e) { drag = { x: e.clientX, y: e.clientY }; anim = null; moved = 0; canvas.setPointerCapture(e.pointerId); });
     canvas.addEventListener("pointermove", function (e) {
       if (drag) { var dx = e.clientX - drag.x, dy = e.clientY - drag.y; moved += Math.abs(dx) + Math.abs(dy); drag = { x: e.clientX, y: e.clientY }; var k = 0.005 * (dist / 6); group.rotation.y += dx * k; group.rotation.x = Math.max(-1.2, Math.min(1.2, group.rotation.x + dy * k)); vx = dx * k; }
       else if (e.pointerType === "mouse") setHover(pick(e.clientX, e.clientY));
     });
     canvas.addEventListener("pointerup", function (e) {
       var wasTap = moved < 8; drag = null;
-      if (wasTap) { var i = pick(e.clientX, e.clientY); setHover(i); if (i >= 0 && feats[i].code) post({ type: "pick", code: feats[i].code, name: feats[i].name }); }
+      if (wasTap) { var i = pick(e.clientX, e.clientY); setHover(i); if (i >= 0 && feats[i].code) { sel = i; paint(); refresh(); post({ type: "pick", code: feats[i].code, name: feats[i].name }); } }
     });
     canvas.addEventListener("wheel", function (e) { e.preventDefault(); target = Math.max(3.4, Math.min(11, target + e.deltaY * 0.004)); }, { passive: false });
     var pinch = null;
@@ -156,9 +178,13 @@ canvas{display:block;width:100%;height:100%}
     var k = Math.min(1, (now - t0) / 2600), ease = 1 - Math.pow(1 - k, 3);
     if (MODE === "pick" && k < 1) dist = 16 + (target - 16) * ease; else dist += (target - dist) * 0.12;
     camera.position.set(0, 0, dist); camera.lookAt(0, 0, 0);
-    if (!drag) { group.rotation.y += autoSpin + vx; vx *= 0.94; }
+    if (anim && !drag) {
+      group.rotation.y += (anim.ry - group.rotation.y) * 0.08; group.rotation.x += (anim.rx - group.rotation.x) * 0.08;
+      if (Math.abs(anim.ry - group.rotation.y) < 0.002 && Math.abs(anim.rx - group.rotation.x) < 0.002) anim = null;
+    } else if (!drag && sel < 0) { group.rotation.y += autoSpin + vx; vx *= 0.94; }
+    else if (!drag) { group.rotation.y += vx; vx *= 0.94; }
     group.updateMatrixWorld(); renderer.render(scene, camera);
-    if (labels.length && !drag) updateAround();
+    if (MODE === "pick" && shown() >= 0 && !drag && (++tick % 5 === 0)) updateAround();
     requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
@@ -166,7 +192,7 @@ canvas{display:block;width:100%;height:100%}
   fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json").then(function (r) { return r.json(); }).then(function (topo) {
     var fc = topojson.feature(topo, topo.objects.countries);
     feats = fc.features.map(function (f) { var code = codeOf(f); return { f: f, name: frName(f, code), code: code, c: centroid(f) }; });
-    paint(); post({ type: "ready" });
+    paint(); post({ type: "ready" }); if (pending) { var c = pending; pending = null; focus(c); }
   }).catch(function () { msg.textContent = "Globe indisponible : connexion requise."; post({ type: "ready" }); });
   if (MODE === "pick") msg.textContent = "Glisse pour tourner, touche un pays pour le choisir";
 })();
