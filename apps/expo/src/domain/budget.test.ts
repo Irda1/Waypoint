@@ -97,3 +97,30 @@ test('bilan par poste : payé, prévisionnel sans double compte, plan A seulemen
   assert.equal(s.hebergement.envelope, 530);
   assert.equal(s.shopping.paid + s.shopping.forecast, 0);
 });
+
+test('revenir sous le budget : retire la plus petite étape qui suffit, sinon les plus chères', async () => {
+  const { savingSuggestions, costByDay } = await import('./budget.ts');
+  const places = new Map([
+    [1, { price_amount: 30, category_code: 'culture', name: 'Musée' }],
+    [2, { price_amount: 12, category_code: 'culture', name: 'Tour' }],
+    [3, { price_amount: 50, category_code: 'culture', name: 'Château' }],
+  ]);
+  const items = [
+    { id: 'a', day_id: 'd1', place_id: 1, category_code: 'culture', plan: 'A' as const, title: null },
+    { id: 'b', day_id: 'd1', place_id: 2, category_code: 'culture', plan: 'A' as const, title: null },
+    { id: 'c', day_id: 'd2', place_id: 3, category_code: 'culture', plan: 'A' as const, title: null },
+  ];
+  // 92 € prévus pour 80 € de budget : dépassement 12 €, la Tour (12 €) suffit exactement.
+  const one = savingSuggestions({ expenses: [], items, places, envelopes: { activites: 80 }, travelers: 1 });
+  assert.equal(one.length, 1);
+  assert.equal(one[0].over, 12);
+  assert.deepEqual(one[0].remove.map((r) => r.name), ['Tour']);
+  assert.equal(one[0].margin, 0);
+  // Dépassement 62 € : aucune étape seule ne suffit → les plus chères d'abord.
+  const many = savingSuggestions({ expenses: [], items, places, envelopes: { activites: 30 }, travelers: 1 });
+  assert.deepEqual(many[0].remove.map((r) => r.name), ['Château', 'Musée']);
+  assert.equal(many[0].margin, 18);
+  // Sous le budget : rien à proposer.
+  assert.equal(savingSuggestions({ expenses: [], items, places, envelopes: { activites: 200 }, travelers: 1 }).length, 0);
+  assert.deepEqual(costByDay([{ id: 'd1' }, { id: 'd2' }], items, places, 2), [84, 100]);
+});
