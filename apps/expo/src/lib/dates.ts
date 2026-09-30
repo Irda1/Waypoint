@@ -51,3 +51,20 @@ export function tripStatus(startsOn: string | null, endsOn: string | null, today
   if (today > end) return { kind: 'past' };
   return { kind: 'ongoing', day: diffDays(startsOn, today) + 1, total: diffDays(startsOn, end) + 1 };
 }
+
+/**
+ * Contrôle la date d'un jour ajouté à la main : elle doit rester dans les dates du voyage quand il en a.
+ * Renvoie un message d'erreur, ou null si la date convient.
+ */
+export function checkNewDay(date: string, start: string | null, end: string | null): string | null {
+  if (start && date < start) return `Cette date est avant le début du voyage (${shortDate(start)}).`;
+  if (end && date > end) return `Cette date est après la fin du voyage (${shortDate(end)}).`;
+  return null;
+}
+
+/** Date proposée par défaut pour un nouveau jour : le lendemain du dernier jour, sinon le début du voyage (dans les bornes du voyage). */
+export function suggestNewDay(days: string[], start: string | null, end: string | null): string {
+  const last = [...days].sort().at(-1);
+  const next = last ? addDays(last, 1) : start ?? '';
+  return next && checkNewDay(next, start, end) === null ? next : '';
+}
