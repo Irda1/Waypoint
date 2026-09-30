@@ -7,10 +7,10 @@ import { formatDay, isTime } from '../../lib/format';
 import { formatTime, scheduleDay } from '../../domain/planning.ts';
 import { organizeTimes } from '../../domain/itinerary.ts';
 import { applyTimes } from '../../data/itinerary';
-import { paymentState } from '../../domain/budget.ts';
+import { amountDue, paymentState, posteForCategory } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
 import { swapWithNeighbor } from '../../domain/reorder.ts';
-import { addItem, applyItemMoves, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
+import { addExpense, addItem, applyItemMoves, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
 import { deriveAltPlan } from '../../domain/altplan.ts';
 import { DEFAULT_DEPART, DEFAULT_RETURN, dayHours, hoursIssues, liveStatus } from '../../domain/dayhours.ts';
 import { todayIso } from '../../lib/dates.ts';
@@ -21,6 +21,7 @@ import { formatMoney } from '../../lib/format';
 import type { Point } from '../../domain/routes.ts';
 import { PlacePicker } from './PlacePicker';
 import { PlaceSheet } from './PlaceSheet';
+import { useAuth } from '../../auth/AuthProvider';
 import { formatDuration } from '../../lib/search';
 import type { CityOption } from '../../data/places';
 import type { Day } from '../../data/useTrip';
@@ -54,6 +55,7 @@ interface Props {
 export function DayCard({ tripId, tripTitle, destinations, day, number, items, places, expenses, travelers, forecast, lodging, currency = 'EUR', dailyActivityBudget = null, onChanged, openAdd = false, onOpenedAdd }: Props) {
   const { colors, mode } = useTheme();
   const categories = useCategories();
+  const { session } = useAuth();
   const [plan, setPlan] = useState<'A' | 'B' | 'C'>('A');
   const [adding, setAdding] = useState<null | 'place' | 'free'>(null);
   useEffect(() => { if (openAdd) { setAdding('place'); onOpenedAdd?.(); } }, [openAdd]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -341,6 +343,12 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
           <PlaceSheet visible tripId={tripId} placeId={s.place?.id ?? null} name={s.place?.name ?? s.item.title ?? 'Étape'} category={categories.byCode.get(category)?.name_fr ?? 'Étape'}
             dot={categoryColors[mode][categories.rootOf(category)] ?? colors.text3} place={s.place ?? null} currency={currency} travelers={travelers}
             closedToday={s.issues.some((i) => i.type === 'closed_day')}
+            due={amountDue(s.item, s.place, expenses, travelers)}
+            onPay={session ? async () => {
+              const err = await addExpense({ tripId, label: s.place?.name ?? s.item.title ?? 'Étape', poste: posteForCategory(categories.rootOf(category)), amount: amountDue(s.item, s.place, expenses, travelers), currency, paidBy: session.user.id, itemId: s.item.id });
+              if (!err) onChanged();
+              return err;
+            } : undefined}
             onRemove={async () => { setError(await deleteItem(s.item.id)); onChanged(); }} onClose={() => setSheetId(null)} />
         );
       })()}

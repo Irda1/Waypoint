@@ -100,6 +100,14 @@ export function paymentState(item: Pick<TripItem, 'id' | 'place_id'>, place: Pic
   return paid > 0 ? 'partial' : 'unpaid';
 }
 
+/** Reste à payer pour une étape : prix × voyageurs moins ce qui est déjà payé (jamais négatif), en unités de la monnaie. */
+export function amountDue(item: Pick<TripItem, 'id' | 'place_id'>, place: Pick<Place, 'price_amount'> | undefined,
+  expenses: Pick<Expense, 'amount' | 'item_id'>[], travelers: number): number {
+  const price = toCents((place?.price_amount ?? 0) * Math.max(1, travelers));
+  const paid = expenses.filter((e) => e.item_id === item.id).reduce((s, e) => s + toCents(e.amount), 0);
+  return Math.max(0, price - paid) / 100;
+}
+
 /** Gastronomie et soirées comptent dans « Repas » ; le reste dans « Activités » (règle de la maquette). */
 export const posteForCategory = (category: string | null | undefined): Poste =>
   category === 'gastronomie' || category === 'nocturne' || category === 'restaurant' || category === 'cafe'

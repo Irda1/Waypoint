@@ -160,3 +160,12 @@ test('part par personne : montant du groupe divisé par le nombre de voyageurs',
   assert.equal(share(300, 3), 100);
   assert.equal(share(300, 0), 300);
 });
+
+test('reste à payer d\'une étape : prix × voyageurs moins les paiements déjà faits', async () => {
+  const { amountDue } = await import('./budget.ts');
+  const item = { id: 'i1', place_id: 1 };
+  assert.equal(amountDue(item, { price_amount: 20 }, [], 3), 60);
+  assert.equal(amountDue(item, { price_amount: 20 }, [{ amount: 25, item_id: 'i1' }, { amount: 99, item_id: 'autre' }], 3), 35);
+  assert.equal(amountDue(item, { price_amount: 20 }, [{ amount: 80, item_id: 'i1' }], 3), 0);
+  assert.equal(amountDue(item, undefined, [], 3), 0);
+});
