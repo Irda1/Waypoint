@@ -71,7 +71,7 @@ export function PlacePicker({ tripId, dayId, tripTitle, destinations, defaultCit
     if (cityId == null || !ready) { setHits(null); return; }
     const ticket = ++run.current;
     const id = setTimeout(async () => {
-      const res = await searchPlaces({ cityId, text, categories: root ? categories.familyOf(root) : null });
+      const res = await searchPlaces({ cityId, text, categories: root ? categories.familyOf(root) : null, kind: root === 'pratique' ? 'service' : 'activity' });
       if (ticket !== run.current) return;
       setHits(res.places);
       setError(res.error);
@@ -139,6 +139,7 @@ export function PlacePicker({ tripId, dayId, tripTitle, destinations, defaultCit
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
             <Chip label="Tout" selected={root === null} onPress={() => setRoot(null)} />
             {categories.activityRoots.map((c) => <Chip key={c.code} label={c.name_fr} selected={root === c.code} onPress={() => setRoot(root === c.code ? null : c.code)} />)}
+            {categories.byCode.has('pratique') ? <Chip label="Pratique" selected={root === 'pratique'} onPress={() => setRoot(root === 'pratique' ? null : 'pratique')} /> : null}
           </ScrollView>
 
           {hits === null ? <Text variant="muted">Recherche…</Text> : hits.length === 0 ? (

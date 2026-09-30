@@ -27,6 +27,8 @@ const STATUS = { connecting: 'Connexion en direct…', live: 'Synchronisé en di
 // Textes posés sur la photo : toujours clairs, quel que soit le mode du téléphone.
 const ON_PHOTO = '#F4EFE6';
 const ON_PHOTO_SOFT = 'rgba(245, 245, 242, 0.82)';
+// Sable clair pour les petits titres posés sur photo (l'accent du thème clair est trop sombre ici).
+const ON_PHOTO_ACCENT = '#FFD08A';
 
 export default function TripScreen() {
   const guard = useRequireAuth();
@@ -98,7 +100,7 @@ export default function TripScreen() {
               </View>
             </View>
             <View style={styles.coverText}>
-              <RNText style={[styles.eyebrow, { color: colors.accent2 }]}>
+              <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>
                 {destNames ? `${destNames} · ` : ''}{data.days.length} jour{data.days.length > 1 ? 's' : ''} · {active.length} voyageur{active.length > 1 ? 's' : ''}
               </RNText>
               <RNText style={styles.poster} accessibilityRole="header">{trip.title}</RNText>

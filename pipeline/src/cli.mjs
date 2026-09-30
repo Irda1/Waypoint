@@ -6,6 +6,7 @@
 //   node src/cli.mjs places    --city 12 | --name Lisbonne [--radius 6000] [--dry-run]
 //   node src/cli.mjs images    [--max 20]
 //   node src/cli.mjs queue     [--max 3]      (traite les villes demandées par l'app)
+//   node src/cli.mjs rates                    (taux de change du jour, BCE)
 //
 // --dry-run : lit et trie, n'écrit rien en base.
 import { parseArgs } from 'node:util';
@@ -16,6 +17,7 @@ import { citiesPass } from './passes/cities.mjs';
 import { placesPass } from './passes/places.mjs';
 import { imagesPass } from './passes/images.mjs';
 import { queuePass } from './passes/queue.mjs';
+import { ratesPass } from './passes/rates.mjs';
 
 const { values: flags, positionals } = parseArgs({
   allowPositionals: true,
@@ -37,8 +39,8 @@ const cfg = loadConfig();
 const log = (...a) => console.log(...a);
 
 async function main() {
-  if (!['countries', 'cities', 'places', 'images', 'queue'].includes(command)) {
-    console.error('Commande : countries | cities | places | images | queue (voir l\'en-tête de src/cli.mjs)');
+  if (!['countries', 'cities', 'places', 'images', 'queue', 'rates'].includes(command)) {
+    console.error('Commande : countries | cities | places | images | queue | rates (voir l\'en-tête de src/cli.mjs)');
     process.exit(2);
   }
   // En simulation, on peut travailler sans base uniquement avec des fichiers locaux
@@ -69,6 +71,8 @@ async function main() {
       return imagesPass({ sb, cfg, max: Number(flags.max || 20), log });
     case 'queue':
       return queuePass({ sb, cfg, max: Number(flags.max || 3), log });
+    case 'rates':
+      return ratesPass({ sb, cfg, log });
     default:
   }
 }
