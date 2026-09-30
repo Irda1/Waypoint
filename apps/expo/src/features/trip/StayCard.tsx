@@ -8,22 +8,30 @@ import { addStay, removeStay, setStayNights } from '../../data/stays';
 import { searchPlaces } from '../../data/places';
 import type { PlaceHit } from '../../data/places';
 import type { TripData } from '../../data/useTrip';
+import { addExpense } from '../../data/trips';
+import { parseAmount, formatMoney } from '../../lib/format';
 import { shortDate } from '../../lib/dates.ts';
 
 /** Hébergements du voyage : on choisit un lieu de la base (hôtels, auberges…) et il est rattaché aux jours de sa ville. */
-export function StayCard({ data, onChanged }: { data: TripData; onChanged: () => void }) {
+export function StayCard({ data, userId, onChanged }: { data: TripData; userId: string | null; onChanged: () => void }) {
   const { colors } = useTheme();
   const [choosing, setChoosing] = useState(false);
   const [cityId, setCityId] = useState<number | null>(null);
   const [text, setText] = useState('');
   const [hits, setHits] = useState<PlaceHit[] | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
+  const [paying, setPaying] = useState<string | null>(null);
+  const [amount, setAmount] = useState('');
   const [busy, setBusy] = useState<number | string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const cities = data.destinations;
   const city = cities.find((c) => c.city_id === cityId) ?? cities[0];
   const nights = nightsByStay(data.days);
+  const paid = (id: string): string | null => {
+    const total = data.expenses.filter((e) => e.stay_id === id).reduce((n, e) => n + Number(e.amount), 0);
+    return total > 0 ? `payé ${formatMoney(total, data.trip.currency)}` : null;
+  };
 
   useEffect(() => {
     if (!choosing || !city || city.collection_status !== 'ready') { setHits(null); return; }
@@ -53,6 +61,16 @@ export function StayCard({ data, onChanged }: { data: TripData; onChanged: () =>
     onChanged();
   }
 
+  async function pay(stay: { id: string; name: string }) {
+    const value = parseAmount(amount);
+    if (value == null || !userId) { setError('Montant invalide (ex. 240).'); return; }
+    setBusy(stay.id);
+    const err = await addExpense({ tripId: data.trip.id, label: `Hébergement : ${stay.name}`, poste: 'hebergement', amount: value, currency: data.trip.currency, paidBy: userId, stayId: stay.id });
+    setBusy(null);
+    setError(err);
+    if (!err) { setPaying(null); setAmount(''); onChanged(); }
+  }
+
   async function remove(id: string) {
     setBusy(id);
     setError(await removeStay(id));
@@ -71,8 +89,11 @@ export function StayCard({ data, onChanged }: { data: TripData; onChanged: () =>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}>
             <View style={{ flex: 1, gap: 2 }}>
               <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{s.name}</Text>
-              <Text variant="muted">{[s.address, nights.get(s.id) ? `${nights.get(s.id)} nuit${nights.get(s.id)! > 1 ? 's' : ''}` : 'aucune nuit rattachée'].filter(Boolean).join(' · ')}</Text>
+              <Text variant="muted">{[s.address, paid(s.id), nights.get(s.id) ? `${nights.get(s.id)} nuit${nights.get(s.id)! > 1 ? 's' : ''}` : 'aucune nuit rattachée'].filter(Boolean).join(' · ')}</Text>
             </View>
+            <Pressable accessibilityRole="button" accessibilityLabel={`Payer ${s.name}`} onPress={() => { setPaying(paying === s.id ? null : s.id); setError(null); }} style={{ minHeight: 44, justifyContent: 'center' }}>
+              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.accent }}>{paying === s.id ? 'Annuler' : 'Payer'}</RNText>
+            </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel={`Modifier les nuits de ${s.name}`} onPress={() => setEditing(editing === s.id ? null : s.id)} style={{ minHeight: 44, justifyContent: 'center' }}>
               <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.accent }}>{editing === s.id ? 'Fermer' : 'Nuits'}</RNText>
             </Pressable>
@@ -80,6 +101,12 @@ export function StayCard({ data, onChanged }: { data: TripData; onChanged: () =>
               <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text2 }}>Retirer</RNText>
             </Pressable>
           </View>
+          {paying === s.id ? (
+            <>
+              <Field label={`Montant payé (${data.trip.currency})`} value={amount} onChangeText={setAmount} placeholder="240" keyboardType="decimal-pad" />
+              <Button label="Enregistrer le paiement" onPress={() => pay(s)} loading={busy === s.id} />
+            </>
+          ) : null}
           {editing === s.id ? (
             <>
               <Text variant="muted">Touche les nuits passées ici. Une nuit déjà prise par un autre hébergement lui est retirée.</Text>
