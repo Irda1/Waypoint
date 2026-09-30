@@ -81,7 +81,7 @@ export function useTrip(tripId: string) {
       destinations: toDestinations(dest.data),
       stays: (stays.data ?? []) as Stay[],
     };
-    known.current = new Set([next.trip.id, ...next.days.map((d) => d.id), ...next.items.map((i) => i.id), ...next.expenses.map((e) => e.id), ...next.members.map((m) => m.user_id)]);
+    known.current = new Set([next.trip.id, ...next.days.map((d) => d.id), ...next.items.map((i) => i.id), ...next.expenses.map((e) => e.id), ...next.members.map((m) => m.user_id), ...next.stays.map((x) => x.id)]);
     setData(next);
     setError(null);
     setLoading(false);
