@@ -169,3 +169,4 @@ Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` rempli
 - **v1.10.5** : « Journée en cours » (étape actuelle, temps restant, prochaine étape, Passé / En cours / À venir), horaires du jour (départ du logement, retour souhaité, par défaut 09:30 / 23:30, colonnes déjà présentes dans trip_days), alerte « retour tardif » et « départ trop tôt », ouverture du jour d'aujourd'hui dans l'onglet Jour. Aucune migration.
 - **v1.10.6** : favoris (cœur sur la fiche lieu et sur la carte, filtre « Favoris » de la carte), table `saved_places` déjà présente, aucune migration.
 - **v1.10.7** : plans de repli créés depuis le plan A (plan B « journée allégée » : repas gardés, visites les plus lourdes retirées ; plan C « à l'abri » : sans nature ni sport). Aucune migration.
+- **v1.10.8** : accueil : carrousel « Envie de… » (Lisbonne, Porto, Alfama, photos déjà dans l'appli) qui ouvre l'assistant de création. Aucune migration.
