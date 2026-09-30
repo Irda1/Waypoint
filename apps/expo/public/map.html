@@ -44,7 +44,7 @@
   }
   map.on('move', drawRoutes); map.on('resize', drawRoutes);
   function mark(id) { selected = id; markers.forEach(function (m) { m.el.classList.toggle('sel', m.id === id); }); }
-  window.__setPoints = function (points, fit, sel) {
+  window.__setPoints = function (points, fit, sel, focus) {
     markers.forEach(function (m) { m.marker.remove(); }); markers = [];
     points.forEach(function (p) {
       var el = document.createElement('div');
@@ -64,10 +64,13 @@
       points.forEach(function (p) { b.extend([p.lng, p.lat]); });
       map.fitBounds(b, { padding: 60, maxZoom: 15, duration: 400 });
     }
+    // Recherche : on centre la carte sur le lieu choisi.
+    var f = focus ? points.filter(function (p) { return p.id === focus; })[0] : null;
+    if (f) map.flyTo({ center: [f.lng, f.lat], zoom: Math.max(map.getZoom(), 14), duration: 500 });
   };
   function onMessage(e) {
     try { var m = typeof e.data === 'string' ? JSON.parse(e.data) : e.data;
-      if (m && m.type === 'points') window.__setPoints(m.points, m.fit, m.selected);
+      if (m && m.type === 'points') window.__setPoints(m.points, m.fit, m.selected, m.focus);
       if (m && m.type === 'selected') mark(m.id);
     } catch (err) {}
   }
