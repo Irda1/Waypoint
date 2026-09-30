@@ -23,6 +23,7 @@ const { values: flags, positionals } = parseArgs({
   allowPositionals: true,
   options: {
     'dry-run': { type: 'boolean', default: false },
+    redo: { type: 'boolean', default: false },
     file: { type: 'string' },
     'admin1-file': { type: 'string' },
     country: { type: 'string' },
