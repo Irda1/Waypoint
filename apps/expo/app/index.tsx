@@ -23,10 +23,10 @@ const ON_PHOTO_SOFT = 'rgba(245, 245, 242, 0.82)';
 const ON_PHOTO_ACCENT = '#FFD08A';
 
 // Idées de destinations (photos d'ambiance déjà dans l'appli) ; d'autres villes suivront avec leurs photos.
-const IDEAS: { key: 'lisbonne' | 'porto' | 'alfama'; name: string; hint: string }[] = [
-  { key: 'lisbonne', name: 'Lisbonne', hint: 'Tramways et collines' },
-  { key: 'porto', name: 'Porto', hint: 'Fleuve et azulejos' },
-  { key: 'alfama', name: 'Alfama', hint: 'Ruelles et fado' },
+const IDEAS: { key: 'lisbonne' | 'porto' | 'alfama'; name: string; city: string; hint: string }[] = [
+  { key: 'lisbonne', name: 'Lisbonne', city: 'Lisbonne', hint: 'Tramways et collines' },
+  { key: 'porto', name: 'Porto', city: 'Porto', hint: 'Fleuve et azulejos' },
+  { key: 'alfama', name: 'Alfama', city: 'Lisbonne', hint: 'Ruelles et fado' },
 ];
 
 export default function Home() {
@@ -82,7 +82,7 @@ export default function Home() {
           <Text variant="label">Envie de…</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
             {IDEAS.map((c) => (
-              <Pressable key={c.key} accessibilityRole="button" accessibilityLabel={`Partir à ${c.name}`} onPress={() => router.push('/new-trip')}
+              <Pressable key={c.key} accessibilityRole="button" accessibilityLabel={`Partir à ${c.name}`} onPress={() => router.push({ pathname: '/new-trip', params: { country: 'PT', city: c.city } })}
                 style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}>
                 <ImageBackground source={photos[c.key]} resizeMode="cover" style={styles.idea} imageStyle={{ borderRadius: radius.card }}>
                   <View style={styles.tripVeil} pointerEvents="none" />

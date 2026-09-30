@@ -13,7 +13,7 @@ import type { StepProps } from './parts';
 
 type Row = CityOption & { featured_rank: number | null };
 
-export function StepCities({ state, update }: StepProps<WizardState>) {
+export function StepCities({ state, update, preferCity }: StepProps<WizardState> & { preferCity?: string | null }) {
   const { colors } = useTheme();
   const [query, setQuery] = useState('');
   const [list, setList] = useState<Row[] | null>(null);
@@ -29,6 +29,16 @@ export function StepCities({ state, update }: StepProps<WizardState>) {
     }, query ? 250 : 0);
     return () => { alive = false; clearTimeout(id); };
   }, [country, query]);
+
+  // Ville venue d'une idée « Envie de… » : cochée d'office une seule fois.
+  const [prefDone, setPrefDone] = useState(false);
+  useEffect(() => {
+    if (prefDone || !preferCity || !list || state.cities.length) return;
+    setPrefDone(true);
+    const hit = list.find((c) => c.name.toLowerCase() === preferCity.toLowerCase());
+    if (hit) toggle(hit);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [list]);
 
   const chosen = new Map(state.cities.map((c, i) => [c.id, i]));
 
