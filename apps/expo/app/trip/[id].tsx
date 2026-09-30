@@ -21,6 +21,7 @@ import { AddExpenseCard } from '../../src/features/trip/AddExpenseCard';
 import { formatDay, isIsoDate } from '../../src/lib/format';
 import { photoKeyFor } from '../../src/lib/photoKey';
 import { checkNewDay, suggestNewDay, todayIso } from '../../src/lib/dates.ts';
+import { cityRuns } from '../../src/domain/dayruns.ts';
 import { pickSource } from '../../src/data/cityCover';
 import { photos } from '../../src/theme/photos';
 import { FloatingNav } from '../../src/features/nav/FloatingNav';
@@ -125,6 +126,14 @@ export default function TripScreen() {
     else setTab(key as typeof tab);
   }
 
+  // Jour choisi : sa ville, sa photo, et les séries de jours par ville pour la bande du haut.
+  const selIdx = Math.min(dayIndex, Math.max(data.days.length - 1, 0));
+  const selDay = data.days[selIdx];
+  const cityOfDay = (d: { city_id: number | null }) => d.city_id ?? data.destinations[0]?.city_id ?? null;
+  const nameOfCity = (id: number | null) => data.destinations.find((x) => x.city_id === id)?.name ?? '';
+  const selCity = selDay ? nameOfCity(cityOfDay(selDay)) : '';
+  const dayPick = pickSource(photos[photoKeyFor(`${selCity} ${trip.title}`)], data.destinations.find((x) => x.city_id === (selDay ? cityOfDay(selDay) : null))?.cover, data.capitalCover);
+  const runs = cityRuns(data.days.map(cityOfDay));
   const activitiesLine = data.budgetLines.find((l) => l.poste === 'activites');
   const dailyActivityBudget = activitiesLine && data.days.length ? Number(activitiesLine.amount) / data.days.length : null;
   return (
@@ -152,6 +161,16 @@ export default function TripScreen() {
                   <RNText style={{ fontFamily: fonts.sans, fontSize: 10, color: ON_PHOTO_SOFT }}>{heroPick.cover.credit}</RNText>
                 ) : null}
               </View>
+            </SafeAreaView>
+          </ImageBackground>
+        ) : tab === 'jour' && data.days.length > 0 ? (
+          <ImageBackground source={dayPick.source} resizeMode="cover" style={styles.dayHero}>
+            <View style={styles.veil} pointerEvents="none" />
+            <SafeAreaView edges={['top']} style={styles.dayHeroInner}>
+              <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>Jour {selIdx + 1} sur {data.days.length} · {formatDay(selDay.day_date)}</RNText>
+              <RNText style={styles.poster} accessibilityRole="header">{selCity || trip.title}</RNText>
+              <RNText style={styles.lead}>{selCity ? trip.title : dates}</RNText>
+              {dayPick.cover?.credit ? <RNText style={{ fontFamily: fonts.sans, fontSize: 10, color: ON_PHOTO_SOFT }}>{dayPick.cover.credit}</RNText> : null}
             </SafeAreaView>
           </ImageBackground>
         ) : (
@@ -216,17 +235,33 @@ export default function TripScreen() {
         <View style={styles.page}>
           {data.days.length === 0 ? <Card><Text variant="muted">Aucun jour pour l'instant. Ajoute le premier ci-dessous.</Text></Card> : (
             <>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }} accessibilityRole="tablist">
-                {data.days.map((d, i) => {
-                  const on = i === Math.min(dayIndex, data.days.length - 1);
-                  return (
-                    <Pressable key={d.id} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={`Jour ${i + 1}, ${formatDay(d.day_date)}`} onPress={() => setChosenDay(i)}
-                      style={[styles.bubble, { backgroundColor: on ? colors.accent : colors.surface2 }]}>
-                      <RNText style={[styles.bubbleNum, { color: on ? colors.onAccent : colors.text }]}>{i + 1}</RNText>
-                      <RNText style={[styles.bubbleDay, { color: on ? colors.onAccent : colors.text3 }]}>{weekdayShort(d.day_date)}</RNText>
-                    </Pressable>
-                  );
-                })}
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist">
+                <View style={{ gap: 6 }}>
+                  <View style={{ flexDirection: 'row', gap: space.sm }}>
+                    {runs.map((r) => {
+                      const here = selIdx >= r.start && selIdx < r.start + r.count;
+                      return (
+                        <View key={r.start} style={{ width: r.count * 56 + (r.count - 1) * 8, gap: 4 }}>
+                          {r.start > 0 ? <View style={{ position: 'absolute', left: -5, top: 0, width: 2, height: 30, borderRadius: 1, backgroundColor: colors.line }} /> : null}
+                          <RNText numberOfLines={1} style={[styles.runLabel, { color: here ? colors.accent : colors.text3 }]}>{nameOfCity(r.cityId) || 'Ville à choisir'}{r.count > 1 ? ` · ${r.count} j` : ''}</RNText>
+                          <View style={{ height: 3, borderRadius: 2, backgroundColor: here ? colors.accent : colors.surface2 }} />
+                        </View>
+                      );
+                    })}
+                  </View>
+                  <View style={{ flexDirection: 'row', gap: space.sm }}>
+                    {data.days.map((d, i) => {
+                      const on = i === selIdx;
+                      return (
+                        <Pressable key={d.id} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={`Jour ${i + 1}, ${formatDay(d.day_date)}`} onPress={() => setChosenDay(i)}
+                          style={[styles.bubble, { backgroundColor: on ? colors.accent : colors.surface2 }]}>
+                          <RNText style={[styles.bubbleNum, { color: on ? colors.onAccent : colors.text }]}>{i + 1}</RNText>
+                          <RNText style={[styles.bubbleDay, { color: on ? colors.onAccent : colors.text3 }]}>{weekdayShort(d.day_date)}</RNText>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+                </View>
               </ScrollView>
               {(() => {
                 const i = Math.min(dayIndex, data.days.length - 1);
@@ -299,6 +334,9 @@ const styles = StyleSheet.create({
   poster: { fontFamily: fonts.serif, fontSize: 46, lineHeight: 50, color: ON_PHOTO },
   lead: { fontFamily: fonts.sans, fontSize: 16, lineHeight: 23, color: ON_PHOTO_SOFT },
   page: { width: '100%', maxWidth: 880, alignSelf: 'center', padding: space.lg, paddingTop: space.xl, gap: space.lg },
+  dayHero: { minHeight: 230, width: '100%' },
+  dayHeroInner: { justifyContent: 'flex-end', gap: 4, paddingHorizontal: space.lg, paddingTop: space.xl, paddingBottom: space.lg, minHeight: 230, width: '100%', maxWidth: 880, alignSelf: 'center' },
+  runLabel: { fontFamily: fonts.sansBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 },
   slimHead: { width: '100%', maxWidth: 880, alignSelf: 'center', paddingHorizontal: space.lg, paddingTop: space.lg, gap: 4 },
   slimTitle: { fontFamily: fonts.serif, fontSize: 30, lineHeight: 34 },
   dayTile: { width: 124, height: 128, borderRadius: radius.card, padding: 12, justifyContent: 'space-between', backgroundColor: '#101315', overflow: 'hidden' },
