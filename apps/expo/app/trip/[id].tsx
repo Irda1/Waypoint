@@ -14,6 +14,7 @@ import { DayCard } from '../../src/features/trip/DayCard';
 import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
 import { ProgramCard } from '../../src/features/trip/ProgramCard';
+import { MemoCard } from '../../src/features/trip/MemoCard';
 import { StayCard } from '../../src/features/trip/StayCard';
 import { FriendsCard } from '../../src/features/trip/FriendsCard';
 import { BudgetCard } from '../../src/features/trip/BudgetCard';
@@ -223,6 +224,7 @@ export default function TripScreen() {
             <Button label={editingDest ? 'Terminer' : destinationOptions.length ? 'Modifier les destinations' : 'Choisir une destination'} variant="ghost" onPress={() => setEditingDest((v) => !v)} />
           </Card>
 
+          <MemoCard tripId={trip.id} memo={trip.memo ?? ''} onChanged={reload} />
           <StayCard data={data} onChanged={reload} />
 
           <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
