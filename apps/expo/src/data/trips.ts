@@ -3,7 +3,7 @@
 // d'aucun contrôle de droits côté appli.
 import { supabase } from '../lib/supabase';
 import { POSTES } from '../domain/types.ts';
-import type { Poste } from '../domain/types.ts';
+import type { Poste, TripItem } from '../domain/types.ts';
 import { addDays } from '../lib/dates.ts';
 import { autoTitle, budgetTotal, cityPerDay, dayCount, splitBudget } from '../domain/wizard.ts';
 import type { WizardState } from '../domain/wizard.ts';
@@ -78,6 +78,17 @@ export async function addExpense(args: { tripId: string; label: string; poste: P
 export async function setItemTime(itemId: string, time: string | null): Promise<string | null> {
   const { error } = await supabase.from('trip_items').update({ start_time: time }).eq('id', itemId);
   return msg(error);
+}
+
+/** Copie des étapes du plan A dans un plan de repli (B ou C) d'un même jour. Renvoie un message d'erreur, ou null. */
+export async function copyItemsToPlan(args: { tripId: string; dayId: string; plan: 'B' | 'C'; items: TripItem[] }): Promise<string | null> {
+  if (args.items.length === 0) return null;
+  const rows = args.items.map((i) => ({
+    trip_id: args.tripId, day_id: args.dayId, plan: args.plan, place_id: i.place_id, title: i.title, category_code: i.category_code,
+    start_time: i.start_time, duration_min: i.duration_min, position: i.position,
+  }));
+  const { error } = await supabase.from('trip_items').insert(rows);
+  return error?.message ?? null;
 }
 
 /** Heures de départ et de retour du logement pour un jour ; `null` = valeur par défaut. */
