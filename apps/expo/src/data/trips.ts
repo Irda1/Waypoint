@@ -176,3 +176,9 @@ export async function createTripFromWizard(s: WizardState): Promise<{ id: string
   if (r3.error) return fail('le budget n\'a pas pu être réparti', r3.error);
   return { id, error: null };
 }
+
+/** Enregistre le mémo du voyage (notes libres partagées entre les voyageurs). */
+export async function setTripMemo(tripId: string, memo: string): Promise<string | null> {
+  const { error } = await supabase.from('trips').update({ memo: memo.trim() }).eq('id', tripId);
+  return msg(error);
+}
