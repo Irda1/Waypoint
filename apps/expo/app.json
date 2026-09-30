@@ -7,9 +7,26 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
-    "plugins": ["expo-router"],
-    "android": { "package": "com.waypoint.app" },
-    "ios": { "bundleIdentifier": "com.waypoint.app", "supportsTablet": true },
-    "web": { "bundler": "metro", "output": "single" }
+    "plugins": [
+      "expo-router"
+    ],
+    "android": {
+      "package": "com.waypoint.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#C4506A"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.waypoint.app",
+      "supportsTablet": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "single",
+      "favicon": "./assets/favicon.png"
+    },
+    "icon": "./assets/icon.png",
+    "backgroundColor": "#07090B"
   }
 }
