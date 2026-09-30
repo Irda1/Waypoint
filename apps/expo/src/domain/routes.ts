@@ -49,6 +49,11 @@ export function googleDirectionsUrl(from: Point, to: Point, mode: Mode): string 
   return `https://www.google.com/maps/dir/?api=1&origin=${pointParam(from)}&destination=${pointParam(to)}&travelmode=${GOOGLE_MODE[mode]}`;
 }
 
+/** Ouvre le lieu dans Google Maps (recherche par nom autour des coordonnées). */
+export function googlePlaceUrl(name: string, at: LatLng): string {
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(name)}%20${at.lat},${at.lng}`;
+}
+
 // ---- Itinéraires réels (OSRM) ----------------------------------------------
 export type OsrmProfile = 'foot' | 'bike' | 'car';
 export const PROFILE_OF: Record<Exclude<Mode, 'transit'>, OsrmProfile> = { walk: 'foot', bike: 'bike', car: 'car' };

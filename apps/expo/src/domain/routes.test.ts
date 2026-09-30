@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { estimateOptions, fastest, formatKm, googleDirectionsUrl, osrmUrl, parseOsrm, travelOptions } from './routes.ts';
+import { estimateOptions, fastest, formatKm, googleDirectionsUrl, googlePlaceUrl, osrmUrl, parseOsrm, travelOptions } from './routes.ts';
 
 const sao = { lat: 38.7139, lng: -9.1333 };
 const se = { lat: 38.7223, lng: -9.1393 };
@@ -58,4 +58,9 @@ test('réponse OSRM : durée arrondie au-dessus, réponses invalides refusées',
 test('distance lisible', () => {
   assert.equal(formatKm(0.62), '600 m');
   assert.equal(formatKm(1.94), '1,9 km');
+});
+
+test('lien Google Maps d\'un lieu : nom et coordonnées encodés', () => {
+  assert.equal(googlePlaceUrl('Tour de Belém', { lat: 38.6916, lng: -9.216 }),
+    'https://www.google.com/maps/search/?api=1&query=Tour%20de%20Bel%C3%A9m%2038.6916,-9.216');
 });

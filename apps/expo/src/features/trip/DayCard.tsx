@@ -16,6 +16,8 @@ import { dayTips } from '../../domain/advice.ts';
 import { formatMoney } from '../../lib/format';
 import type { Point } from '../../domain/routes.ts';
 import { PlacePicker } from './PlacePicker';
+import { PlaceSheet } from './PlaceSheet';
+import { formatDuration } from '../../lib/search';
 import type { CityOption } from '../../data/places';
 import type { Day } from '../../data/useTrip';
 import { describeCode, tempRange, weatherForDay } from '../../domain/weather.ts';
@@ -52,6 +54,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
   const [error, setError] = useState<string | null>(null);
   const [editing, setEditing] = useState<string | null>(null);
   const [editTime, setEditTime] = useState('');
+  const [sheetId, setSheetId] = useState<string | null>(null);
 
   const schedule = scheduleDay({ date: day.day_date, plan, items: items.filter((i) => i.day_id === day.id), places });
   const lastPosition = schedule.reduce((max, s) => Math.max(max, s.item.position), 0);
@@ -112,6 +115,15 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
       </View>
 
       {schedule.length === 0 ? <Text variant="muted">Rien de prévu dans ce plan.</Text> : null}
+      {schedule.filter((s) => s.issues.some((i) => i.type === 'closed_day')).map((s) => (
+        <View key={`closed-${s.item.id}`} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 48, paddingHorizontal: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }}>
+          <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.warm }} />
+          <Text variant="body" style={{ flex: 1, fontFamily: fonts.sansSemi }}>{s.place?.name ?? s.item.title ?? 'Étape'} est fermé ce jour-là</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Voir la fiche" onPress={() => setSheetId(s.item.id)} style={{ minHeight: 44, justifyContent: 'center' }}>
+            <RNText style={{ fontFamily: fonts.sansBold, fontSize: 15, color: colors.accent }}>Voir</RNText>
+          </Pressable>
+        </View>
+      ))}
       {tips.length ? (
         <View style={{ gap: space.xs, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }} accessibilityLabel="Conseils pour cette journée">
           <Text variant="label">Conseils</Text>
@@ -139,13 +151,22 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                   <Text variant="mono" style={{ color: s.startMin != null ? colors.text2 : colors.accent, fontSize: 14, paddingTop: 1 }}>
                     {s.startMin != null ? formatTime(s.startMin) : '--:--'}
                   </Text>
+                  {s.endMin != null ? <Text variant="mono" style={{ color: colors.text3, fontSize: 12.5 }}>{formatTime(s.endMin)}</Text> : null}
                 </Pressable>
                 <View style={{ alignItems: 'center', width: 16 }}>
                   <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dot, marginTop: 5 }} />
                   {!isLast ? <View style={{ flex: 1, width: 1, backgroundColor: colors.lineStrong, marginTop: 4 }} /> : null}
                 </View>
                 <View style={{ flex: 1, paddingBottom: space.md, gap: 2 }}>
-                  <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{name}</Text>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Ouvrir la fiche de ${name}`} onPress={() => setSheetId(s.item.id)}>
+                    <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{name}</Text>
+                  </Pressable>
+                  {(() => {
+                    const dur = s.startMin != null && s.endMin != null ? s.endMin - s.startMin : s.item.duration_min ?? s.place?.visit_duration_min ?? null;
+                    const price = s.place?.price_amount;
+                    const meta = [dur ? formatDuration(dur) : null, price != null ? (price === 0 ? 'Gratuit' : formatMoney(price * travelers, currency)) : null].filter(Boolean).join(' · ');
+                    return meta ? <Text variant="muted">{meta}</Text> : null;
+                  })()}
                   {s.issues.map((issue) => (
                     <Text key={issue.type} variant="muted" style={{ color: colors.warm }}>
                       {issue.type === 'closed_day' ? 'Fermé ce jour-là' : issue.type === 'overlap' ? `Chevauche l'étape précédente de ${issue.minutes} min (trajet compris)` : 'Heure à choisir'}
@@ -206,6 +227,17 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
           <Button label="+ Étape libre" variant="ghost" onPress={() => setAdding('free')} />
         </>
       )}
+      {(() => {
+        const s = schedule.find((x) => x.item.id === sheetId);
+        if (!s) return null;
+        const category = s.place?.category_code ?? s.item.category_code ?? '';
+        return (
+          <PlaceSheet visible name={s.place?.name ?? s.item.title ?? 'Étape'} category={categories.byCode.get(category)?.name_fr ?? 'Étape'}
+            dot={categoryColors[mode][categories.rootOf(category)] ?? colors.text3} place={s.place ?? null} currency={currency} travelers={travelers}
+            closedToday={s.issues.some((i) => i.type === 'closed_day')}
+            onRemove={async () => { setError(await deleteItem(s.item.id)); onChanged(); }} onClose={() => setSheetId(null)} />
+        );
+      })()}
     </Card>
   );
 }
