@@ -23,6 +23,10 @@ on:
         description: "File / images : nombre maximum de tâches"
         required: false
         default: "3"
+      redo:
+        description: "Images : refaire les photos des capitales et villes phares"
+        type: boolean
+        default: false
       dry_run:
         description: "Simulation : lit et trie, n'écrit rien"
         type: boolean
@@ -68,6 +72,7 @@ jobs:
           COUNTRY: ${{ inputs.country }}
           CITY: ${{ inputs.city }}
           MAX: ${{ inputs.max || '3' }}
+          REDO: ${{ inputs.redo && 'true' || 'false' }}
           DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
         run: |
           set -euo pipefail
@@ -80,7 +85,7 @@ jobs:
             cities)  [ -n "$COUNTRY" ] && args+=(--country "$COUNTRY") ;;
             places)  [ -n "$CITY" ] || { echo "::error::La passe places demande l'identifiant de la ville (champ city)."; exit 1; }
                      args+=(--city "$CITY") ;;
-            images)  args+=(--max "$MAX"); [ -n "$COUNTRY" ] && args+=(--country "$COUNTRY") ;;
+            images)  args+=(--max "$MAX"); [ -n "$COUNTRY" ] && args+=(--country "$COUNTRY"); [ "$REDO" = "true" ] && args+=(--redo) ;;
             queue)   args+=(--max "$MAX") ;;
           esac
           [ "$DRY_RUN" = "true" ] && args+=(--dry-run)

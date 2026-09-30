@@ -6,7 +6,7 @@
 // membre pour les ajouts et modifications ; (2) les suppressions ne portent que la clé
 // primaire (identité de réplique par défaut), donc un filtre les ferait disparaître.
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { toCover } from './cityCover';
+import { capitalCovers, COVER_FIELDS, toCover } from './cityCover';
 import type { CityCover } from './cityCover';
 import { supabase } from '../lib/supabase';
 import type { Expense, Place, TripItem } from '../domain/types.ts';
@@ -27,6 +27,8 @@ export interface TripData {
   expenses: (Expense & { label: string; currency: string })[];
   budgetLines: BudgetLine[];
   destinations: Destination[];
+  /** Photo de la capitale du pays du voyage. */
+  capitalCover: CityCover | null;
   stays: Stay[];
   /** Remboursements déjà reçus ; `null` tant que la migration 1100 n'est pas installée. */
   payments: { id: string; from_user: string; to_user: string; amount: number }[] | null;
@@ -54,13 +56,13 @@ export function useTrip(tripId: string) {
 
   const load = useCallback(async () => {
     const [trip, members, days, items, expenses, budget, dest, stays] = await Promise.all([
-      supabase.from('trips').select('id,title,starts_on,ends_on,currency,travelers,styles,budget_total,memo,deleted_at,version').eq('id', tripId).maybeSingle(),
+      supabase.from('trips').select('id,title,starts_on,ends_on,currency,country_code,travelers,styles,budget_total,memo,deleted_at,version').eq('id', tripId).maybeSingle(),
       supabase.from('trip_members').select('user_id,color,left_at,profiles(display_name,avatar_url)').eq('trip_id', tripId),
       supabase.from('trip_days').select('id,day_date,city_id,stay_id,depart_time,return_time').eq('trip_id', tripId).order('day_date'),
       supabase.from('trip_items').select('*').eq('trip_id', tripId),
       supabase.from('expenses').select('id,poste,amount,paid_by,item_id,stay_id,label,currency').eq('trip_id', tripId).order('spent_on'),
       supabase.from('trip_budget_lines').select('poste,amount').eq('trip_id', tripId),
-      supabase.from('trip_destinations').select('city_id,position,nights,cities(name,name_fr,lat,lng,country_code,collection_status,cover_media:media!cities_cover_media_id_fkey(url_large,url_medium,attribution))').eq('trip_id', tripId).order('position'),
+      supabase.from('trip_destinations').select(`city_id,position,nights,cities(name,name_fr,lat,lng,country_code,collection_status,${COVER_FIELDS})`).eq('trip_id', tripId).order('position'),
       supabase.from('trip_stays').select('id,name,address,lat,lng').eq('trip_id', tripId),
     ]);
     const failure = [trip, members, days, items, expenses, budget, dest, stays].find((r) => r.error)?.error;
@@ -76,6 +78,8 @@ export function useTrip(tripId: string) {
     }
     // Table ajoutée par la migration 1100 : son absence ne doit jamais empêcher d'ouvrir le voyage.
     const pay = await supabase.from('settlement_payments').select('id,from_user,to_user,amount').eq('trip_id', tripId).order('created_at');
+    const cc = (trip.data as { country_code?: string | null }).country_code;
+    const capital = cc ? (await capitalCovers([cc])).get(cc) ?? null : null;
     const next: TripData = {
       trip: trip.data as Trip,
       members: (members.data ?? []) as unknown as Member[],
@@ -85,6 +89,7 @@ export function useTrip(tripId: string) {
       expenses: (expenses.data ?? []) as TripData['expenses'],
       budgetLines: (budget.data ?? []) as BudgetLine[],
       destinations: toDestinations(dest.data),
+      capitalCover: capital,
       stays: (stays.data ?? []) as Stay[],
       payments: pay.error ? null : ((pay.data ?? []) as { id: string; from_user: string; to_user: string; amount: number }[]).map((x) => ({ ...x, amount: Number(x.amount) })),
     };
