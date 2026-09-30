@@ -107,3 +107,16 @@ export async function listCountryCities(country: string, query = ''): Promise<{ 
   const rows = (data ?? []) as (CityRow & { featured_rank: number | null })[];
   return { cities: rows.map((r) => ({ ...toOption(r), featured_rank: r.featured_rank })), error: error?.message ?? null };
 }
+
+export interface CityPoint { id: number; name: string; lat: number; lng: number; /** Importance : 0 = la plus importante (ville phare, capitale, puis population). */ rank: number }
+
+/** Villes d'un pays avec coordonnées, pour la carte de l'étape Villes (jusqu'à 400, classées par importance). */
+export async function listCountryCityPoints(country: string): Promise<{ points: CityPoint[]; error: string | null }> {
+  const { data, error } = await supabase.from('cities').select('id,name,name_fr,lat,lng,population,featured_rank,is_capital')
+    .eq('country_code', country).order('population', { ascending: false, nullsFirst: false }).limit(400);
+  type R = { id: number; name: string; name_fr: string | null; lat: number; lng: number; population: number | null; featured_rank: number | null; is_capital: boolean };
+  const rows = (data ?? []) as R[];
+  const score = (r: R) => (r.featured_rank != null ? r.featured_rank : 1000) * 1e10 - (r.is_capital ? 5e9 : 0) - (r.population ?? 0);
+  const points = [...rows].sort((a, b) => score(a) - score(b)).map((r, i) => ({ id: r.id, name: r.name_fr ?? r.name, lat: r.lat, lng: r.lng, rank: i }));
+  return { points, error: error?.message ?? null };
+}
