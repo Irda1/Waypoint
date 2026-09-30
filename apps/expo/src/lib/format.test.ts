@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { formatDay, isIsoDate, isTime, parseAmount } from './format.ts';
+import { formatDay, formatMoney, isIsoDate, isTime, parseAmount } from './format.ts';
 
 test('saisies : montants avec virgule ou point, refus des valeurs invalides', () => {
   assert.equal(parseAmount('12,5'), 12.5);
@@ -19,4 +19,12 @@ test('saisies : dates et heures', () => {
 
 test('jour lisible, sans décalage de fuseau', () => {
   assert.match(formatDay('2026-10-13'), /mardi 13 octobre/);
+});
+
+test('montants : toujours en nombres entiers, sans décimales', () => {
+  const norm = (s: string) => s.replace(/[\u202f\u00a0]/g, ' ');
+  assert.equal(norm(formatMoney(0, 'EUR')), '0 €');
+  assert.equal(norm(formatMoney(400, 'EUR')), '400 €');
+  assert.equal(norm(formatMoney(12.5, 'EUR')), '13 €');
+  assert.equal(norm(formatMoney(2525, 'EUR')), '2 525 €');
 });

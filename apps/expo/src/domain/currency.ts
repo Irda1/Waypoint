@@ -27,5 +27,5 @@ export function convert(amount: number, from: string, to: string, table: RateTab
 
 /** Montant estimé, toujours précédé de « ≈ » (taux du jour, pas un taux bancaire). */
 export function formatApprox(amount: number, currency: string, locale = 'fr-FR'): string {
-  return `≈ ${new Intl.NumberFormat(locale, { style: 'currency', currency, maximumFractionDigits: amount < 100 ? 2 : 0 }).format(amount)}`;
+  return `≈ ${new Intl.NumberFormat(locale, { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount)}`;
 }

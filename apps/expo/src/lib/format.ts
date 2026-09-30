@@ -1,8 +1,8 @@
 export function formatMoney(amount: number, currency = 'EUR'): string {
   try {
-    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency, maximumFractionDigits: 2 }).format(amount);
+    return new Intl.NumberFormat('fr-FR', { style: 'currency', currency, minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount);
   } catch {
-    return `${amount.toFixed(2)} ${currency}`;
+    return `${Math.round(amount)} ${currency}`;
   }
 }
 
