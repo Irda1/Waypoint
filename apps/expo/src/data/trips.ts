@@ -2,6 +2,7 @@
 // lisible ou null. La sécurité est assurée par la base (RLS) : ces appels n'ont besoin
 // d'aucun contrôle de droits côté appli.
 import { supabase } from '../lib/supabase';
+import { loadOffline, saveOffline } from './offline';
 import { dayCities } from '../domain/destinations.ts';
 import { capitalCovers, COVER_FIELDS, toCover } from './cityCover';
 import type { CityCover } from './cityCover';
@@ -31,7 +32,7 @@ export interface TripSummary {
   cover: CityCover | null;
 }
 
-export async function listTrips(): Promise<{ trips: TripSummary[]; error: string | null }> {
+export async function listTrips(): Promise<{ trips: TripSummary[]; error: string | null; savedAt?: number | null }> {
   const { data, error } = await supabase
     .from('trips')
     .select('id,title,starts_on,ends_on,currency,country_code')
@@ -49,7 +50,14 @@ export async function listTrips(): Promise<{ trips: TripSummary[]; error: string
     }
   }
   const capitals = await capitalCovers(rows.map((t) => t.country_code ?? ''));
-  return { trips: rows.map((t) => ({ ...t, cover: (t.country_code ? capitals.get(t.country_code) : null) ?? covers.get(t.id) ?? null })), error: msg(error) };
+  if (error) {
+    const copy = await loadOffline<TripSummary[]>('trips');
+    if (copy) return { trips: copy.data, error: null, savedAt: copy.savedAt };
+    return { trips: [], error: msg(error) };
+  }
+  const trips = rows.map((t) => ({ ...t, cover: (t.country_code ? capitals.get(t.country_code) : null) ?? covers.get(t.id) ?? null }));
+  void saveOffline('trips', trips);
+  return { trips, error: null, savedAt: null };
 }
 
 /** Crée le voyage puis ses destinations. Si seules les destinations échouent, l'id est rendu avec un message. */
