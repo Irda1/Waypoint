@@ -21,8 +21,23 @@ import { formatDay, isIsoDate } from '../../src/lib/format';
 import { photoKeyFor } from '../../src/lib/photoKey';
 import { checkNewDay, suggestNewDay } from '../../src/lib/dates.ts';
 import { photos } from '../../src/theme/photos';
+import { FloatingNav } from '../../src/features/nav/FloatingNav';
+import type { NavTab } from '../../src/features/nav/FloatingNav';
 import { fonts, radius, space } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/useTheme';
+
+const TABS: NavTab[] = [
+  { key: 'accueil', label: 'Accueil', icon: '🏠' },
+  { key: 'voyage', label: 'Voyage', icon: '🧳' },
+  { key: 'jour', label: 'Jour', icon: '☀️' },
+  { key: 'carte', label: 'Carte', icon: '🗺️' },
+  { key: 'budget', label: 'Budget', icon: '💶' },
+  { key: 'amis', label: 'Amis', icon: '👥' },
+];
+
+function weekdayShort(iso: string): string {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '');
+}
 
 const STATUS = { connecting: 'Connexion en direct…', live: 'Synchronisé en direct', offline: 'Hors ligne : reprise à la reconnexion' } as const;
 
@@ -43,6 +58,8 @@ export default function TripScreen() {
   const { session } = useAuth();
   const { colors } = useTheme();
   const { data, error, loading, status, reload } = useTrip(String(id));
+  const [tab, setTab] = useState<'voyage' | 'jour' | 'budget' | 'amis'>('voyage');
+  const [dayIndex, setDayIndex] = useState(0);
   const [newDay, setNewDay] = useState('');
   const [addingDay, setAddingDay] = useState(false);
   const [dayError, setDayError] = useState<string | null>(null);
@@ -94,51 +111,66 @@ export default function TripScreen() {
     if (!err) { setNewDay(''); setAddingDay(false); void reload(); }
   }
 
+  function onNav(key: string) {
+    if (key === 'accueil') router.replace('/');
+    else if (key === 'carte') router.push({ pathname: '/map/[id]', params: { id: trip.id } });
+    else setTab(key as typeof tab);
+  }
+
   const activitiesLine = data.budgetLines.find((l) => l.poste === 'activites');
   const dailyActivityBudget = activitiesLine && data.days.length ? Number(activitiesLine.amount) / data.days.length : null;
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }} keyboardShouldPersistTaps="handled">
-        <ImageBackground source={photos[photoKeyFor(`${trip.title} ${destNames}`)]} resizeMode="cover" style={styles.cover}>
-          <View style={styles.veil} pointerEvents="none" />
-          <SafeAreaView edges={['top']} style={styles.coverInner}>
-            <View style={styles.coverBar}>
-              <Pressable accessibilityRole="button" accessibilityLabel="Retour à mes voyages" onPress={() => router.replace('/')} style={styles.glass}>
-                <RNText style={styles.glassLabel}>← Mes voyages</RNText>
-              </Pressable>
-              <View style={styles.glass} accessibilityLiveRegion="polite">
-                <RNText style={styles.glassLabel}>{STATUS[status]}</RNText>
+      <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        {tab === 'voyage' ? (
+          <ImageBackground source={photos[photoKeyFor(`${trip.title} ${destNames}`)]} resizeMode="cover" style={styles.cover}>
+            <View style={styles.veil} pointerEvents="none" />
+            <SafeAreaView edges={['top']} style={styles.coverInner}>
+              <View style={styles.coverBar}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Retour à mes voyages" onPress={() => router.replace('/')} style={styles.glass}>
+                  <RNText style={styles.glassLabel}>← Mes voyages</RNText>
+                </Pressable>
+                <View style={styles.glass} accessibilityLiveRegion="polite">
+                  <RNText style={styles.glassLabel}>{STATUS[status]}</RNText>
+                </View>
               </View>
-            </View>
-            <View style={styles.coverText}>
-              <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>
-                {destNames ? `${destNames} · ` : ''}{data.days.length} jour{data.days.length > 1 ? 's' : ''} · {active.length} voyageur{active.length > 1 ? 's' : ''}
-              </RNText>
-              <RNText style={styles.poster} accessibilityRole="header">{trip.title}</RNText>
-              <RNText style={styles.lead}>{dates}</RNText>
-            </View>
+              <View style={styles.coverText}>
+                <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>
+                  {destNames ? `${destNames} · ` : ''}{data.days.length} jour{data.days.length > 1 ? 's' : ''} · {active.length} voyageur{active.length > 1 ? 's' : ''}
+                </RNText>
+                <RNText style={styles.poster} accessibilityRole="header">{trip.title}</RNText>
+                <RNText style={styles.lead}>{dates}</RNText>
+              </View>
+            </SafeAreaView>
+          </ImageBackground>
+        ) : (
+          <SafeAreaView edges={['top']} style={styles.slimHead}>
+            <RNText style={[styles.eyebrow, { color: colors.accent }]}>{dates}</RNText>
+            <RNText style={[styles.slimTitle, { color: colors.text }]} accessibilityRole="header">{trip.title}</RNText>
           </SafeAreaView>
-        </ImageBackground>
+        )}
 
+        {tab === 'voyage' ? (
         <View style={styles.page}>
-          <Card>
-            <Text variant="label">Voyageurs</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
-              {active.map((m) => {
-                const name = m.profiles?.display_name ?? 'Voyageur';
-                return (
-                  <View key={m.user_id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-                    <View style={[styles.avatar, { backgroundColor: m.color }]}>
-                      <RNText style={styles.avatarLetter}>{name.charAt(0).toUpperCase()}</RNText>
-                    </View>
-                    <Text variant="body">{name}{m.user_id === session?.user.id ? ' (toi)' : ''}</Text>
-                  </View>
-                );
-              })}
+          {data.days.length > 0 ? (
+            <View style={{ gap: space.sm }}>
+              <Text variant="label">Les journées · {data.days.length} jour{data.days.length > 1 ? 's' : ''}</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+                {data.days.map((d, i) => {
+                  const city = data.destinations.find((x) => x.city_id === d.city_id)?.name ?? destinationOptions[0]?.name ?? '';
+                  return (
+                    <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={`Ouvrir le jour ${i + 1}`} onPress={() => { setDayIndex(i); setTab('jour'); }}>
+                      <ImageBackground source={photos[photoKeyFor(`${city} ${trip.title}`)]} resizeMode="cover" style={styles.dayTile} imageStyle={{ borderRadius: radius.card }}>
+                        <View style={styles.tileVeil} pointerEvents="none" />
+                        <RNText style={styles.tileNumber}>{d.day_date.slice(8, 10).replace(/^0/, '')}</RNText>
+                        <RNText style={styles.tileCity} numberOfLines={2}>{city || weekdayShort(d.day_date)}</RNText>
+                      </ImageBackground>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
             </View>
-            <ErrorNote message={inviteError} />
-            <Button label="Inviter un ami" variant="ghost" onPress={invite} />
-          </Card>
+          ) : null}
 
           <Card>
             <Text variant="label">Destinations</Text>
@@ -161,19 +193,35 @@ export default function TripScreen() {
 
           <StayCard data={data} onChanged={reload} />
 
-          <Button label="Voir la carte" onPress={() => router.push({ pathname: '/map/[id]', params: { id: trip.id } })} />
-
           <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
 
           <ProgramCard data={data} onApplied={reload} />
+        </View>
+        ) : null}
 
-          <Text variant="label">Au programme</Text>
-          {data.days.length === 0 ? <Card><Text variant="muted">Aucun jour pour l'instant. Ajoute le premier ci-dessous.</Text></Card> : null}
-          <Columns>
-            {data.days.map((d, index) => (
-              <DayCard key={d.id} tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={index + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} />
-            ))}
-          </Columns>
+        {tab === 'jour' ? (
+        <View style={styles.page}>
+          {data.days.length === 0 ? <Card><Text variant="muted">Aucun jour pour l'instant. Ajoute le premier ci-dessous.</Text></Card> : (
+            <>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }} accessibilityRole="tablist">
+                {data.days.map((d, i) => {
+                  const on = i === Math.min(dayIndex, data.days.length - 1);
+                  return (
+                    <Pressable key={d.id} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={`Jour ${i + 1}, ${formatDay(d.day_date)}`} onPress={() => setDayIndex(i)}
+                      style={[styles.bubble, { backgroundColor: on ? colors.accent : colors.surface2 }]}>
+                      <RNText style={[styles.bubbleNum, { color: on ? colors.onAccent : colors.text }]}>{i + 1}</RNText>
+                      <RNText style={[styles.bubbleDay, { color: on ? colors.onAccent : colors.text3 }]}>{weekdayShort(d.day_date)}</RNText>
+                    </Pressable>
+                  );
+                })}
+              </ScrollView>
+              {(() => {
+                const i = Math.min(dayIndex, data.days.length - 1);
+                const d = data.days[i];
+                return <DayCard key={d.id} tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={i + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} />;
+              })()}
+            </>
+          )}
 
           {addingDay ? (
             <Card>
@@ -186,11 +234,41 @@ export default function TripScreen() {
           ) : (
             <Button label="+ Ajouter un jour" variant="ghost" onPress={() => { setNewDay(suggestNewDay(data.days.map((d) => d.day_date), trip.starts_on, trip.ends_on)); setAddingDay(true); }} />
           )}
+        </View>
+        ) : null}
 
+        {tab === 'budget' ? (
+        <View style={styles.page}>
           <BudgetCard data={data} />
           {session ? <AddExpenseCard tripId={trip.id} currency={trip.currency} userId={session.user.id} onChanged={reload} /> : null}
         </View>
+        ) : null}
+
+        {tab === 'amis' ? (
+        <View style={styles.page}>
+          <Card>
+            <Text variant="label">Voyageurs</Text>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
+              {active.map((m) => {
+                const name = m.profiles?.display_name ?? 'Voyageur';
+                return (
+                  <View key={m.user_id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                    <View style={[styles.avatar, { backgroundColor: m.color }]}>
+                      <RNText style={styles.avatarLetter}>{name.charAt(0).toUpperCase()}</RNText>
+                    </View>
+                    <Text variant="body">{name}{m.user_id === session?.user.id ? ' (toi)' : ''}</Text>
+                  </View>
+                );
+              })}
+            </View>
+            <ErrorNote message={inviteError} />
+            <Button label="Inviter un ami" variant="ghost" onPress={invite} />
+          </Card>
+
+        </View>
+        ) : null}
       </ScrollView>
+      <FloatingNav tabs={TABS} active={tab} onSelect={onNav} />
     </View>
   );
 }
@@ -207,6 +285,15 @@ const styles = StyleSheet.create({
   poster: { fontFamily: fonts.serif, fontSize: 46, lineHeight: 50, color: ON_PHOTO },
   lead: { fontFamily: fonts.sans, fontSize: 16, lineHeight: 23, color: ON_PHOTO_SOFT },
   page: { width: '100%', maxWidth: 880, alignSelf: 'center', padding: space.lg, paddingTop: space.xl, gap: space.lg },
+  slimHead: { width: '100%', maxWidth: 880, alignSelf: 'center', paddingHorizontal: space.lg, paddingTop: space.lg, gap: 4 },
+  slimTitle: { fontFamily: fonts.serif, fontSize: 30, lineHeight: 34 },
+  dayTile: { width: 124, height: 128, borderRadius: radius.card, padding: 12, justifyContent: 'space-between', backgroundColor: '#101315', overflow: 'hidden' },
+  tileVeil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.card, backgroundColor: 'rgba(7, 9, 11, 0.45)' },
+  tileNumber: { fontFamily: fonts.serif, fontSize: 34, lineHeight: 36, color: ON_PHOTO },
+  tileCity: { fontFamily: fonts.sansBold, fontSize: 15, lineHeight: 17, color: ON_PHOTO },
+  bubble: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
+  bubbleNum: { fontFamily: fonts.sansBold, fontSize: 18 },
+  bubbleDay: { fontFamily: fonts.sansBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
   avatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   avatarLetter: { fontFamily: fonts.sansBold, fontSize: 13, color: '#14100A' },
 });
