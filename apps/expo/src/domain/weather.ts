@@ -27,7 +27,7 @@ export function describeCode(code: number | null | undefined): { label: string; 
 export interface HourForecast { time: string; temp: number | null; feels: number | null; rainProb: number | null; code: number | null; wind: number | null; humidity: number | null }
 export interface DayForecast { date: string; code: number | null; min: number | null; max: number | null; rainProb: number | null }
 export interface CurrentWeather { temp: number | null; feels: number | null; code: number | null; wind: number | null; humidity: number | null; rain: number | null }
-export interface Forecast { current: CurrentWeather | null; days: DayForecast[]; hours: HourForecast[] }
+export interface Forecast { current: CurrentWeather | null; days: DayForecast[]; hours: HourForecast[]; /** Heure de récupération (ms), ajoutée par la couche données : sert à afficher la fraîcheur. */ fetchedAt?: number }
 
 const num = (v: unknown): number | null => (typeof v === 'number' && Number.isFinite(v) ? v : null);
 const arr = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);

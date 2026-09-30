@@ -60,7 +60,7 @@ export function WeatherCard({ destinations, forecasts, loading, error, start, en
         </>
       ) : null}
       {tripBeyond ? <Text variant="muted">Les prévisions couvrent 16 jours : celles de ton voyage apparaîtront à l'approche du départ.</Text> : null}
-      <Text variant="muted" style={{ fontSize: 12 }}>Prévisions (modèles météo, pas des mesures). Données : Open-Meteo.com, licence CC BY 4.0.</Text>
+      <Text variant="muted" style={{ fontSize: 12 }}>Prévisions (modèles météo, pas des mesures). Données : Open-Meteo.com, licence CC BY 4.0.{f?.fetchedAt ? ` Mis à jour à ${new Date(f.fetchedAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}.` : ''}</Text>
     </Card>
   );
 }

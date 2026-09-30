@@ -142,6 +142,8 @@ Un seul flux au départ, et rien à construire : l'application n'ouvre **jamais*
 
 - **v1.9.7** : taux de change. Migration 1000 (`exchange_rates`, lecture publique), passe `rates` du pipeline (Frankfurter / BCE, sans clé, ajoutée au workflow), `domain/currency.ts` (conversion via l'euro, jamais de taux inventé, « ≈ ») et `data/rates.ts`. La carte Budget affiche le total dépensé en monnaie locale du premier pays du voyage (« ≈ », taux BCE daté) quand elle diffère de la monnaie du voyage (v1.9.8). **Migration à exécuter seule dans le SQL Editor** (`supabase/migrations/20260929001000_exchange_rates.sql`), puis lancer la passe `rates`.
 
+- **v1.9.9** : météo : heure de mise à jour affichée sous les prévisions. Transports : trajets **à pied** réels (itinéraire piéton OSRM, `domain/routes.ts`, `data/routes.ts`) à la place de l'estimation, avec repli automatique sur « ≈ … · estimé » si le service ne répond pas. Serveur public `routing.openstreetmap.de` (sans clé, usage léger : une requête par seconde) ; changer `EXPO_PUBLIC_ROUTING_URL` avant une ouverture au public. La durée réelle est affichée mais ne modifie pas encore la détection de chevauchements. **Pas de transports en commun ni de trafic en temps réel** : aucune source gratuite fiable n'a été vérifiée (voir « Transports et trafic »). Aucune migration.
+
 Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` remplit la ville, la recherche et l'ajout à un jour fonctionnent, les durées estimées sont marquées « ≈ ».
 
 ## Prochaines étapes
@@ -150,3 +152,10 @@ Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` rempli
 2. ~~Recherche et ajout de lieux réels dans un jour~~ (fait : bouton « Ajouter un lieu », recherche par ville, nom et catégorie ; heure modifiable). Reste : filtre « Pratique », carte, recherche sans accents (Belem / Belém).
 3. Portage des écrans de la maquette (accueil, itinéraire, budget) avec le thème Crépuscule et les polices.
 4. Météo, puis transports, seulement après lieux et carte réels.
+
+## Transports et trafic : où on en est
+
+- **À pied** : fait (v1.9.9), itinéraire réel, service public à usage léger.
+- **Voiture** : le même serveur OSRM public existe en profil « driving » (testé : Lisbonne → Porto, 314 km, 3 h 26 hors circulation), mais il ne connaît **pas le trafic** ; à afficher comme « hors circulation ».
+- **Transports en commun** : toujours estimés (« ≈ … · estimé »). Une vraie source demande des horaires GTFS par ville ou un service à clé (Navitia, Transitland, Google, HERE…) : couverture, prix et licence de stockage sont à vérifier un par un avant de choisir. Non faits ici : aucun de ces services n'a été testé.
+- **Trafic en temps réel** : uniquement chez des services payants ou à clé ; ne jamais présenter comme temps réel une estimation.

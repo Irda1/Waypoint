@@ -11,6 +11,7 @@ import { paymentState } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
 import { addItem, deleteItem, setItemTime } from '../../data/trips';
 import { useCategories } from '../../data/categories';
+import { useWalkRoutes } from '../../data/routes';
 import { PlacePicker } from './PlacePicker';
 import type { CityOption } from '../../data/places';
 import type { Day } from '../../data/useTrip';
@@ -45,6 +46,10 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
   const [editTime, setEditTime] = useState('');
 
   const schedule = scheduleDay({ date: day.day_date, plan, items: items.filter((i) => i.day_id === day.id), places });
+  // Trajets à pied : durée réelle (itinéraire piéton) quand le service répond, estimation sinon.
+  const walkLegs = schedule.flatMap((s, i) => (s.travelFromPrevious?.mode === 'walk' && schedule[i - 1]?.place && s.place
+    ? [{ key: s.item.id, from: schedule[i - 1].place!, to: s.place }] : []));
+  const walks = useWalkRoutes(walkLegs);
   const lastPosition = schedule.reduce((max, s) => Math.max(max, s.item.position), 0);
 
   async function add() {
@@ -101,7 +106,9 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
             <View key={s.item.id}>
               {s.travelFromPrevious ? (
                 <Text variant="muted" style={{ paddingLeft: 52 + space.md + 16, paddingBottom: space.xs }}>
-                  ≈ {s.travelFromPrevious.minutes} min {s.travelFromPrevious.mode === 'walk' ? 'à pied' : 'en transports'} · estimé
+                  {walks.get(s.item.id)
+                    ? `${walks.get(s.item.id)!.minutes} min à pied · ${walks.get(s.item.id)!.km.toString().replace('.', ',')} km (itinéraire piéton)`
+                    : `≈ ${s.travelFromPrevious.minutes} min ${s.travelFromPrevious.mode === 'walk' ? 'à pied' : 'en transports'} · estimé`}
                 </Text>
               ) : null}
               <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: space.md, minHeight: 56 }}>
