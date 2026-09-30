@@ -191,3 +191,4 @@ Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` rempli
 - v1.10.27 : jour, glisser-déposer des étapes (web ; boutons Monter/Descendre conservés), les heures restent sur leurs créneaux. Aucune migration.
 - v1.10.28 : hébergement saisi à la main (nom, adresse) et modifiable ; dépense avec « Payé par » et « Activité liée ». Aucune migration.
 - v1.10.29 : voyage, carte Destinations refaite : nuits recalculées à l'ajout, au retrait et au déplacement d'une ville, jours rattachés à leur ville, détail des nuits, ordre modifiable (flèches, glisser sur le web), liste de 5 villes du pays avec « Afficher plus » et recherche. Aucune migration.
+- v1.10.30 : jour, une étape lâchée sur une autre les échange (web ; boutons Monter/Descendre gardés seulement sur mobile), icône colorée de la catégorie à la place de la pastille. Aucune migration.

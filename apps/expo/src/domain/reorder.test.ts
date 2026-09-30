@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { moveToIndex, swapWithNeighbor } from './reorder.ts';
+import { moveToIndex, swapItems, swapWithNeighbor } from './reorder.ts';
 
 const it = (id: string, start_time: string | null, position: number) => ({ id, start_time, position });
 
@@ -49,4 +49,14 @@ test('glisser-déposer : rangs identiques, renumérotés', () => {
     { id: 'b', start_time: null, position: 1 },
     { id: 'a', start_time: null, position: 2 },
   ]);
+});
+
+test('échanger deux étapes éloignées : elles s\'échangent heure et rang', () => {
+  const list = [it('a', '09:00', 1), it('b', '11:00', 2), it('c', '14:00', 3)];
+  assert.deepEqual(swapItems(list, 0, 2), [
+    { id: 'a', start_time: '14:00', position: 3 },
+    { id: 'c', start_time: '09:00', position: 1 },
+  ]);
+  assert.deepEqual(swapItems(list, 1, 1), []);
+  assert.deepEqual(swapItems(list, 0, 9), []);
 });
