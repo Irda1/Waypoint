@@ -2,6 +2,8 @@
 // lisible ou null. La sécurité est assurée par la base (RLS) : ces appels n'ont besoin
 // d'aucun contrôle de droits côté appli.
 import { supabase } from '../lib/supabase';
+import { toCover } from './cityCover';
+import type { CityCover } from './cityCover';
 import { POSTES } from '../domain/types.ts';
 import type { Poste, TripItem } from '../domain/types.ts';
 import { addDays } from '../lib/dates.ts';
@@ -22,6 +24,8 @@ export interface TripSummary {
   starts_on: string | null;
   ends_on: string | null;
   currency: string;
+  /** Photo (Pexels) de la première ville, si la collecte l'a trouvée. */
+  cover: CityCover | null;
 }
 
 export async function listTrips(): Promise<{ trips: TripSummary[]; error: string | null }> {
@@ -30,7 +34,18 @@ export async function listTrips(): Promise<{ trips: TripSummary[]; error: string
     .select('id,title,starts_on,ends_on,currency')
     .is('deleted_at', null)
     .order('starts_on', { ascending: false, nullsFirst: true });
-  return { trips: (data ?? []) as TripSummary[], error: msg(error) };
+  const rows = (data ?? []) as Omit<TripSummary, 'cover'>[];
+  const covers = new Map<string, CityCover>();
+  if (rows.length) {
+    const { data: dest } = await supabase.from('trip_destinations')
+      .select('trip_id,position,cities(cover_media:media!cities_cover_media_id_fkey(url_large,url_medium,attribution))')
+      .in('trip_id', rows.map((t) => t.id)).order('position');
+    for (const d of (dest ?? []) as unknown as { trip_id: string; cities: { cover_media: Parameters<typeof toCover>[0] } | null }[]) {
+      const c = toCover(d.cities?.cover_media ?? null);
+      if (c && !covers.has(d.trip_id)) covers.set(d.trip_id, c);
+    }
+  }
+  return { trips: rows.map((t) => ({ ...t, cover: covers.get(t.id) ?? null })), error: msg(error) };
 }
 
 /** Crée le voyage puis ses destinations. Si seules les destinations échouent, l'id est rendu avec un message. */
