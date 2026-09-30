@@ -4,6 +4,8 @@ import { Card, Text } from '../../ui';
 import { radius, space } from '../../theme/tokens';
 import { useTheme } from '../../theme/useTheme';
 import { formatMoney } from '../../lib/format';
+import { useLocalMoney } from '../../data/rates';
+import { convert, formatApprox } from '../../domain/currency.ts';
 import { budgetSummary, computeBalances, settlements } from '../../domain/budget.ts';
 import { POSTES } from '../../domain/types.ts';
 import type { Poste } from '../../domain/types.ts';
@@ -22,11 +24,16 @@ export function BudgetCard({ data }: { data: TripData }) {
   const balances = computeBalances(expenses, active.map((m) => m.user_id));
   const transfers = settlements(balances);
   const total = expenses.reduce((s, e) => s + Number(e.amount), 0);
+  const { rates, local } = useLocalMoney(data.destinations[0]?.country_code ?? null);
+  const localTotal = local && local !== trip.currency ? convert(total, trip.currency, local, rates) : null;
 
   return (
     <Card>
       <Text variant="heading">Budget</Text>
       <Text variant="muted">Dépensé : <Text variant="mono">{formatMoney(total, trip.currency)}</Text></Text>
+      {localTotal !== null && local && total > 0 ? (
+        <Text variant="muted">En monnaie locale : <Text variant="mono">{formatApprox(localTotal, local)}</Text> (taux BCE du {(rates.date ?? '').split('-').reverse().join('/')})</Text>
+      ) : null}
       {POSTES.map((p) => {
         const s = summary[p];
         if (!s.paid && !s.forecast && !s.envelope) return null;
