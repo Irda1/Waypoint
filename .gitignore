@@ -24,3 +24,6 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+
+# Projet Android de l'appli Expo, généré par la CI
+/apps/expo/android/
