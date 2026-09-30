@@ -8,6 +8,7 @@ import { citiesPass } from '../src/passes/cities.mjs';
 import { placesPass } from '../src/passes/places.mjs';
 import { imagesPass, photoToMedia } from '../src/passes/images.mjs';
 import { queuePass } from '../src/passes/queue.mjs';
+import { parseRates, ratesPass } from '../src/passes/rates.mjs';
 import { Throttle } from '../src/lib/http.mjs';
 import { startFakeSupabase, silent } from './helpers.mjs';
 
@@ -228,4 +229,29 @@ test('images Pexels : crédit du photographe, lien, cover de la ville, arrêt su
 
 test('images : sans clé Pexels, message clair', async () => {
   await assert.rejects(() => imagesPass({ sb: {}, cfg: { ...cfg, pexelsKey: '' }, log: silent }), /PEXELS_API_KEY/);
+});
+
+const RATES = { amount: 1, base: 'EUR', date: '2026-09-29', rates: { USD: 1.1355, JPY: 178.41, GBP: 0.86, CHF: 0.94, CAD: 1.55, AUD: 1.7, SEK: 11, NOK: 11.5, PLN: 4.3, CZK: 25 } };
+
+test('taux de change : analyse la réponse et refuse une réponse incomplète', () => {
+  const rows = parseRates(RATES);
+  assert.equal(rows.length, 10);
+  assert.deepEqual(rows[0], { base: 'EUR', quote: 'USD', rate: 1.1355, rate_date: '2026-09-29' });
+  assert.throws(() => parseRates({ ...RATES, base: 'USD' }), /inattendue/);
+  assert.throws(() => parseRates({ base: 'EUR', date: '2026-09-29', rates: { USD: 1.1 } }), /annulée/);
+  assert.throws(() => parseRates(null), /inattendue/);
+});
+
+test('passe taux : écrit par (base, quote) et journalise', async () => {
+  const fake = await startFakeSupabase();
+  try {
+    const sb = createSupabase({ url: fake.url, serviceKey: 'K' });
+    const fetchImpl = async (url) => { assert.match(String(url), /\/latest\?base=EUR$/); return new Response(JSON.stringify(RATES)); };
+    const stats = await ratesPass({ sb, cfg, fetchImpl, log: silent });
+    assert.equal(stats.written, 10);
+    const write = fake.calls.find((c) => c.method === 'POST' && c.path.endsWith('/exchange_rates'));
+    assert.equal(write.query.on_conflict, 'base,quote');
+    assert.equal(write.body.length, 10);
+    assert.equal(fake.calls.at(-1).body.status, 'done');
+  } finally { await fake.close(); }
 });

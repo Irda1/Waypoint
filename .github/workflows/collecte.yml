@@ -11,7 +11,7 @@ on:
       pass:
         description: "Passe à lancer"
         type: choice
-        options: [queue, countries, cities, places, images]
+        options: [queue, countries, cities, places, images, rates]
         default: queue
       country:
         description: "Villes : code pays ISO à charger (ex. PT). Vide = tous les pays"

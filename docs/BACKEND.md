@@ -106,7 +106,7 @@ Un seul flux au départ, et rien à construire : l'application n'ouvre **jamais*
 
 - **Prix payé d'un hébergement** : pas de colonne dans `trip_stays`. C'est une dépense liée (`expenses.stay_id`), comme dans la maquette, ce qui évite de compter deux fois le même paiement.
 - **Country Data API** non utilisée : ses droits de stockage en base n'ont pas été vérifiés. Les pays viennent de GeoNames (CC BY 4.0), les noms français et anglais de l'internationalisation de Node (`Intl.DisplayNames`), le drapeau est calculé.
-- **Tables ajoutées** au plan : `place_categories` (les catégories évoluent par simple ajout de ligne), `ingestion_queue` (collecte à la demande), `trip_budget_lines` (budget prévu par poste). `place_translations`, `weather_cache`, `exchange_rates`, `attachments`, `push_tokens` et `data_requests` restent pour plus tard.
+- **Tables ajoutées** au plan : `place_categories` (les catégories évoluent par simple ajout de ligne), `ingestion_queue` (collecte à la demande), `trip_budget_lines` (budget prévu par poste). `place_translations`, `weather_cache`, `attachments`, `push_tokens` et `data_requests` restent pour plus tard.
 - **Suppressions et temps réel** : Supabase ne contrôle pas les suppressions avec les règles de sécurité et ne les filtre pas par voyage. L'appli écoute donc sans filtre (la sécurité par ligne limite déjà les ajouts et modifications aux voyages dont on est membre) et ne recharge sur une suppression que si elle concerne une ligne qu'elle connaît. Les tables gardent l'identité de réplique par défaut (clé primaire seule) pour ne rien diffuser du contenu supprimé.
 - **Voyage supprimé** : corbeille (`deleted_at`) plutôt que suppression définitive depuis l'appli, puisqu'aucun membre n'a plus de droits que les autres.
 - **Membre qui quitte** : `left_at` plutôt qu'une suppression, pour que ses dépenses avancées restent à son nom dans les comptes.
@@ -139,6 +139,8 @@ Un seul flux au départ, et rien à construire : l'application n'ouvre **jamais*
 - **v1.9.5** : carte web : la page de carte est servie comme fichier public (`apps/expo/public/map.html`, généré depuis `domain/map.ts`, test de cohérence) au lieu d'un iframe « srcdoc » ; réglages passés dans l'adresse.
 
 - **v1.9.6** : accueil en cartes photo avec statut, correctifs de lisibilité (PR n°2) ; recherche de lieux sans accents (`accentTolerantTerm` : les lettres accentuables deviennent des jokers, sans migration ; cherche aussi un peu plus large) ; filtre « Pratique » (pharmacies, banques, laveries… : lieux de type `service`). Aucune migration.
+
+- **v1.9.7** : taux de change. Migration 1000 (`exchange_rates`, lecture publique), passe `rates` du pipeline (Frankfurter / BCE, sans clé, ajoutée au workflow), `domain/currency.ts` (conversion via l'euro, jamais de taux inventé, « ≈ ») et `data/rates.ts`. Pas encore branché dans les écrans. **Migration à exécuter seule dans le SQL Editor** (`supabase/migrations/20260929001000_exchange_rates.sql`), puis lancer la passe `rates`.
 
 Vérifié sur la vraie base (Lisbonne, 29/09/2026) : la collecte `places` remplit la ville, la recherche et l'ajout à un jour fonctionnent, les durées estimées sont marquées « ≈ ».
 

@@ -8,6 +8,7 @@ export function loadConfig(env = process.env) {
     pexelsKey: env.PEXELS_API_KEY || '',
     overpassUrl: env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter',
     geonamesBase: env.GEONAMES_BASE_URL || 'https://download.geonames.org/export/dump',
+    ratesBase: (env.RATES_BASE_URL || 'https://api.frankfurter.dev/v1').replace(/\/+$/, ''),
     // Pause minimale entre deux requêtes Overpass (le serveur public est partagé)
     overpassIntervalMs: Number(env.OVERPASS_INTERVAL_MS || 5000),
     // Pexels : 200 requêtes/heure => au plus une toutes les 18 s
