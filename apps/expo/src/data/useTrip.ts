@@ -5,6 +5,7 @@
 // trip_id côté abonnement : (1) la sécurité par ligne n'affiche que les voyages dont on est
 // membre pour les ajouts et modifications ; (2) les suppressions ne portent que la clé
 // primaire (identité de réplique par défaut), donc un filtre les ferait disparaître.
+import { withEstimatedPrice } from '../domain/priceEstimate';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { capitalCovers, COVER_FIELDS, toCover } from './cityCover';
 import type { CityCover } from './cityCover';
@@ -83,7 +84,7 @@ export function useTrip(tripId: string) {
     if (placeIds.length) {
       const { data: rows } = await supabase.from('places')
         .select('id,name,kind,category_code,lat,lng,price_amount,visit_duration_min,closed_days,opening_hours').in('id', placeIds);
-      for (const p of (rows ?? []) as Place[]) places.set(p.id, p);
+      for (const p of (rows ?? []) as Place[]) places.set(p.id, withEstimatedPrice(p));
     }
     // Table ajoutée par la migration 1100 : son absence ne doit jamais empêcher d'ouvrir le voyage.
     const pay = await supabase.from('settlement_payments').select('id,from_user,to_user,amount').eq('trip_id', tripId).order('created_at');
