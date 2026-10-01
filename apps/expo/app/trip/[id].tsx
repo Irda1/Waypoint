@@ -23,11 +23,13 @@ import { ChecklistCard } from '../../src/features/trip/ChecklistCard';
 import { BookingsCard } from '../../src/features/trip/BookingsCard';
 import { ExportCard } from '../../src/features/trip/ExportCard';
 import { UnplannedCard } from '../../src/features/trip/UnplannedCard';
+import { HoursCard } from '../../src/features/trip/HoursCard';
 import { MemoCard } from '../../src/features/trip/MemoCard';
 import { StayCard } from '../../src/features/trip/StayCard';
 import { FriendsCard } from '../../src/features/trip/FriendsCard';
 import { BudgetCard } from '../../src/features/trip/BudgetCard';
 import { AddExpenseCard } from '../../src/features/trip/AddExpenseCard';
+import { ToPayCard } from '../../src/features/trip/ToPayCard';
 import { formatDay, isIsoDate } from '../../src/lib/format';
 import { photoKeyFor } from '../../src/lib/photoKey';
 import { checkNewDay, suggestNewDay, todayIso } from '../../src/lib/dates.ts';
@@ -81,6 +83,8 @@ export default function TripScreen() {
   const [newDay, setNewDay] = useState('');
   const [addingDay, setAddingDay] = useState(false);
   const [dayError, setDayError] = useState<string | null>(null);
+  const [focusItem, setFocusItem] = useState<string | null>(null);
+  useEffect(() => { if (!focusItem) return; const id = setTimeout(() => setFocusItem(null), 6000); return () => clearTimeout(id); }, [focusItem]);
   const [inviteError, setInviteError] = useState<string | null>(null);
   const [inviteCode, setInviteCode] = useState<string | null>(null);
   const [inviteNote, setInviteNote] = useState<string | null>(null);
@@ -245,6 +249,7 @@ export default function TripScreen() {
 
           <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
 
+          <HoursCard data={data} onOpen={(i, itemId) => { setChosenDay(i); setFocusItem(itemId); setTab('jour'); }} />
           <ProgramCard data={data} onApplied={reload} />
           <UnplannedCard data={data} onChanged={reload} />
           <BookingsCard tripId={trip.id} />
@@ -288,7 +293,7 @@ export default function TripScreen() {
               {(() => {
                 const i = Math.min(dayIndex, data.days.length - 1);
                 const d = data.days[i];
-                return <DayCard key={d.id} tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={i + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} allDayIds={data.days.map((x) => x.id)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} openAdd={pendingAdd} onOpenedAdd={() => setPendingAdd(false)} />;
+                return <DayCard key={d.id} tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={i + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} allDayIds={data.days.map((x) => x.id)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} openAdd={pendingAdd} onOpenedAdd={() => setPendingAdd(false)} focusItemId={focusItem} />;
               })()}
             </>
           )}
@@ -311,6 +316,7 @@ export default function TripScreen() {
         {tab === 'budget' ? (
         <View style={styles.page}>
           <BudgetCard data={data} onChanged={reload} />
+          {session ? <ToPayCard data={data} userId={session.user.id} onChanged={reload} /> : null}
           {session ? <AddExpenseCard data={data} userId={session.user.id} onChanged={reload} /> : null}
         </View>
         ) : null}

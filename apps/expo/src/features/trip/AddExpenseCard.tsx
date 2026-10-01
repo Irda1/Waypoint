@@ -16,22 +16,12 @@ export function AddExpenseCard({ data, userId, onChanged }: { data: TripData; us
   const members = data.members.filter((m) => !m.left_at);
   const [payer, setPayer] = useState(userId);
   const [linked, setLinked] = useState<string | null>(null);
-  const travelers = Math.max(1, members.length);
-  const planned = data.items.filter((i) => i.plan === 'A').map((i) => ({ id: i.id, price: i.place_id != null ? data.places.get(i.place_id)?.price_amount ?? null : null, name: (i.place_id != null ? data.places.get(i.place_id)?.name : null) ?? i.title ?? 'Étape' }));
+  const planned = data.items.filter((i) => i.plan === 'A').map((i) => ({ id: i.id, name: (i.place_id != null ? data.places.get(i.place_id)?.name : null) ?? i.title ?? 'Étape' }));
   const [label, setLabel] = useState('');
   const [amount, setAmount] = useState('');
   const [poste, setPoste] = useState<Poste>('repas');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-
-  // Choisir une activité préremplit le libellé et le montant estimé (prix par personne × voyageurs) ; tout reste modifiable.
-  function link(p: { id: string; name: string; price: number | null } | null) {
-    setLinked(p?.id ?? null);
-    if (!p) return;
-    setLabel(p.name);
-    setPoste('activites');
-    if (p.price != null && p.price > 0) setAmount(String(Math.round(p.price * travelers * 100) / 100).replace('.', ','));
-  }
 
   async function submit() {
     const value = parseAmount(amount);
@@ -65,8 +55,8 @@ export function AddExpenseCard({ data, userId, onChanged }: { data: TripData; us
         <>
           <Text variant="label">Activité liée (facultatif : compte comme paiement de l'activité)</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
-            <Chip label="Aucune" selected={linked === null} onPress={() => link(null)} />
-            {planned.map((p) => <Chip key={p.id} label={p.name} selected={linked === p.id} onPress={() => link(p)} />)}
+            <Chip label="Aucune" selected={linked === null} onPress={() => setLinked(null)} />
+            {planned.map((p) => <Chip key={p.id} label={p.name} selected={linked === p.id} onPress={() => setLinked(p.id)} />)}
           </ScrollView>
         </>
       ) : null}
