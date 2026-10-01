@@ -10,9 +10,9 @@ import { organizeTimes } from '../../domain/itinerary.ts';
 import { applyTimes } from '../../data/itinerary';
 import { amountDue, paymentState, posteForCategory } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
-import { swapItems, swapWithNeighbor } from '../../domain/reorder.ts';
+import { swapItems } from '../../domain/reorder.ts';
 import { glyphFor } from '../../theme/categoryIcons';
-import { DragRow } from './DragRow';
+import { DragList } from './DragList';
 import { addExpense, addItem, applyItemMoves, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
 import { deriveAltPlan } from '../../domain/altplan.ts';
 import { DEFAULT_DEPART, DEFAULT_RETURN, dayHours, hoursIssues, liveStatus } from '../../domain/dayhours.ts';
@@ -55,9 +55,11 @@ interface Props {
   /** Le menu « + » demande d'ouvrir tout de suite la recherche de lieux. */
   openAdd?: boolean;
   onOpenedAdd?: () => void;
+  /** Activité à mettre en évidence (arrivée depuis le récap des horaires). */
+  focusItemId?: string | null;
 }
 
-export function DayCard({ tripId, tripTitle, destinations, day, number, items, places, expenses, travelers, forecast, lodging, allDayIds, currency = 'EUR', dailyActivityBudget = null, onChanged, openAdd = false, onOpenedAdd }: Props) {
+export function DayCard({ tripId, tripTitle, destinations, day, number, items, places, expenses, travelers, forecast, lodging, allDayIds, currency = 'EUR', dailyActivityBudget = null, onChanged, openAdd = false, onOpenedAdd, focusItemId = null }: Props) {
   const { colors, mode } = useTheme();
   const categories = useCategories();
   const { session } = useAuth();
@@ -146,13 +148,6 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
     onChanged();
   }
 
-  async function move(index: number, dir: -1 | 1) {
-    const moves = swapWithNeighbor(schedule.map((x) => ({ id: x.item.id, start_time: x.item.start_time, position: x.item.position })), index, dir);
-    if (!moves.length) return;
-    setError(await applyItemMoves(moves));
-    onChanged();
-  }
-
   async function dragMove(from: number, to: number) {
     const moves = swapItems(schedule.map((x) => ({ id: x.item.id, start_time: x.item.start_time, position: x.item.position })), from, to);
     if (!moves.length) return;
@@ -233,17 +228,19 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
         </View>
       ) : null}
       <View>
-        {schedule.map((s, index) => {
+        <DragList count={schedule.length} mode="swap" orderKey={schedule.map((x) => `${x.item.id}@${x.item.start_time ?? ''}@${x.item.position}`).join(',')} onMove={dragMove} renderRow={(index, handle) => {
+          const s = schedule[index];
           const state = paymentState(s.item, s.place, expenses, travelers);
           const category = s.place?.category_code ?? s.item.category_code ?? '';
           const dot = categoryColors[mode][categories.rootOf(category)] ?? colors.text3;
           const isLast = index === schedule.length - 1;
           const name = s.place?.name ?? s.item.title ?? 'Étape';
           return (
-            <DragRow key={s.item.id} index={index} onMove={dragMove}>
+            <View style={focusItemId === s.item.id ? { borderRadius: radius.field, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.accent, padding: space.xs } : undefined}>
               {index === 0 && lodging && s.place ? <LegRow from={lodging} to={s.place} fromName={lodging.name} toName={s.place.name} /> : null}
               {index > 0 && schedule[index - 1].place && s.place ? <LegRow from={schedule[index - 1].place!} to={s.place} fromName={schedule[index - 1].place!.name} toName={s.place.name} /> : null}
-              <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: space.md, minHeight: 56 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: space.sm, minHeight: 56 }}>
+                {schedule.length > 1 ? handle : null}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Modifier l'heure de ${name}`}
@@ -262,14 +259,16 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                   {!isLast ? <View style={{ flex: 1, width: 1, backgroundColor: colors.lineStrong, marginTop: 4 }} /> : null}
                 </View>
                 <View style={{ flex: 1, paddingBottom: space.md, gap: 2 }}>
-                  <Pressable accessibilityRole="button" accessibilityLabel={`Ouvrir la fiche de ${name}`} onPress={() => setSheetId(s.item.id)}>
-                    <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{name}</Text>
-                  </Pressable>
+                  <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm }}>
+                    <Pressable accessibilityRole="button" accessibilityLabel={`Ouvrir la fiche de ${name}`} onPress={() => setSheetId(s.item.id)} style={{ flexShrink: 1 }}>
+                      <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{name}</Text>
+                    </Pressable>
+                    {s.place?.price_amount != null ? <Text variant="muted" style={{ fontSize: 12.5 }}>{s.place.price_amount === 0 ? 'Gratuit' : `≈ ${formatMoney(s.place.price_amount * travelers, currency)}`}</Text> : null}
+                  </View>
                   {live ? <Text variant="muted" style={{ color: live.states[index] === 'current' ? colors.accent : colors.text3, fontFamily: fonts.sansSemi }}>{live.states[index] === 'past' ? 'Passé' : live.states[index] === 'current' ? 'En cours' : 'À venir'}</Text> : null}
                   {(() => {
                     const dur = s.startMin != null && s.endMin != null ? s.endMin - s.startMin : s.item.duration_min ?? s.place?.visit_duration_min ?? null;
-                    const price = s.place?.price_amount;
-                    const meta = [dur ? formatDuration(dur) : null, price != null ? (price === 0 ? 'Gratuit' : formatMoney(price * travelers, currency)) : null].filter(Boolean).join(' · ');
+                    const meta = dur ? formatDuration(dur) : '';
                     return meta ? <Text variant="muted">{meta}</Text> : null;
                   })()}
                   {s.issues.map((issue) => (
@@ -277,6 +276,12 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                       {issue.type === 'closed_day' ? 'Fermé ce jour-là' : issue.type === 'overlap' ? `Chevauche l'étape précédente de ${issue.minutes} min (trajet compris)` : 'Heure à choisir'}
                     </Text>
                   ))}
+                  {(() => {
+                    if (!s.place) return null;
+                    const res = checkOpening(s.place.opening_hours, s.place.closed_days, weekdayOf(day.day_date), s.startMin, s.endMin);
+                    if (res.status !== 'outside') return null;
+                    return <Text variant="muted" style={{ color: colors.warm }}>Ouvert {res.slots.map(([a, b]) => `${formatTime(a % 1440)}–${formatTime(b % 1440)}`).join(', ')} : ton créneau est en dehors</Text>;
+                  })()}
                   {editing === s.item.id ? (
                     <View style={{ gap: space.sm, paddingVertical: space.xs }}>
                       <Field label="Heure de début" value={editTime} onChangeText={setEditTime} placeholder="09:30 (vide pour effacer)" keyboardType="numbers-and-punctuation" />
@@ -296,23 +301,13 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                     >
                       <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>Retirer</RNText>
                     </Pressable>
-                    {Platform.OS !== 'web' && index > 0 ? (
-                      <Pressable accessibilityRole="button" accessibilityLabel={`Monter ${name}`} hitSlop={8} onPress={() => move(index, -1)} style={{ minHeight: 32, justifyContent: 'center' }}>
-                        <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>↑ Monter</RNText>
-                      </Pressable>
-                    ) : null}
-                    {Platform.OS !== 'web' && !isLast ? (
-                      <Pressable accessibilityRole="button" accessibilityLabel={`Descendre ${name}`} hitSlop={8} onPress={() => move(index, 1)} style={{ minHeight: 32, justifyContent: 'center' }}>
-                        <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>↓ Descendre</RNText>
-                      </Pressable>
-                    ) : null}
                   </View>
                 </View>
                 <PayBadge state={state} />
               </View>
-            </DragRow>
+            </View>
           );
-        })}
+        }} />
         {lodging && schedule.length > 0 && schedule[schedule.length - 1].place ? <LegRow from={schedule[schedule.length - 1].place!} to={lodging} fromName={schedule[schedule.length - 1].place!.name} toName={lodging.name} /> : null}
       </View>
 
