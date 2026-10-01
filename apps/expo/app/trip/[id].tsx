@@ -315,8 +315,7 @@ export default function TripScreen() {
 
         {tab === 'budget' ? (
         <View style={styles.page}>
-          <BudgetCard data={data} onChanged={reload} />
-          {session ? <ToPayCard data={data} userId={session.user.id} onChanged={reload} /> : null}
+          <BudgetCard data={data} onChanged={reload} activitiesPanel={session ? <ToPayCard data={data} userId={session.user.id} onChanged={reload} embedded /> : undefined} />
           {session ? <AddExpenseCard data={data} userId={session.user.id} onChanged={reload} /> : null}
         </View>
         ) : null}

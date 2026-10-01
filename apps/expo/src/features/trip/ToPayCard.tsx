@@ -10,7 +10,7 @@ import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
 
 /** Liste des activités du programme à payer ou réserver : un bouton « Payé » enregistre la dépense au montant estimé. */
-export function ToPayCard({ data, userId, onChanged }: { data: TripData; userId: string; onChanged: () => void }) {
+export function ToPayCard({ data, userId, onChanged, embedded }: { data: TripData; userId: string; onChanged: () => void; embedded?: boolean }) {
   const { colors } = useTheme();
   const categories = useCategories();
   const members = data.members.filter((m) => !m.left_at);
@@ -21,7 +21,9 @@ export function ToPayCard({ data, userId, onChanged }: { data: TripData; userId:
   const currency = data.trip.currency;
   const lines = activityLines({ days: data.days, items: data.items, places: data.places, expenses: data.expenses, travelers });
   const toPay = lines.filter((l) => l.due > 0);
-  if (toPay.length === 0) return null;
+  const done = lines.filter((l) => l.due <= 0);
+  const totalDue = toPay.reduce((n, l) => n + l.due, 0);
+  if (toPay.length === 0) return embedded ? <Text variant="muted">Aucune activité à payer ou réserver pour l'instant.</Text> : null;
 
   async function pay(itemId: string, name: string, amount: number) {
     const item = data.items.find((i) => i.id === itemId);
@@ -33,9 +35,11 @@ export function ToPayCard({ data, userId, onChanged }: { data: TripData; userId:
     if (!err) onChanged();
   }
 
+  const Wrap = embedded ? (({ children }: { children: React.ReactNode }) => <View style={{ gap: space.sm }}>{children}</View>) : Card;
   return (
-    <Card>
+    <Wrap>
       <Text variant="heading">Activités à payer / réserver</Text>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text variant="body">Reste à payer / réserver</Text><Text variant="mono" style={{ color: colors.warm }}>≈ {formatMoney(totalDue, currency)}</Text></View>
       <Text variant="muted">Prix d'entrée estimés pour {travelers > 1 ? `${travelers} voyageurs` : 'toi'}. « Payé » enregistre la dépense avec ce montant.</Text>
       {members.length > 1 ? (
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' }}>
@@ -56,7 +60,14 @@ export function ToPayCard({ data, userId, onChanged }: { data: TripData; userId:
           </Pressable>
         </View>
       ))}
+      {done.length ? <Text variant="label" style={{ marginTop: space.xs }}>Déjà payées</Text> : null}
+      {done.map((l) => (
+        <View key={l.itemId} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>
+          <Text variant="body" style={{ flex: 1 }}>✓ {l.name}<Text variant="muted"> · J{l.day}</Text></Text>
+          <Text variant="mono">{formatMoney(l.total, currency)}</Text>
+        </View>
+      ))}
       <ErrorNote message={error} />
-    </Card>
+    </Wrap>
   );
 }

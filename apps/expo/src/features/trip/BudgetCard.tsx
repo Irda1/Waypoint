@@ -8,14 +8,14 @@ import { formatMoney } from '../../lib/format';
 import { shortDate, todayIso, diffDays } from '../../lib/dates.ts';
 import { useLocalMoney } from '../../data/rates';
 import { convert, formatApprox } from '../../domain/currency.ts';
-import { activityLines, budgetSummary, posteDetail, savingSuggestions, share } from '../../domain/budget.ts';
+import { budgetSummary, posteDetail, savingSuggestions, share } from '../../domain/budget.ts';
 import { POSTES } from '../../domain/types.ts';
 import type { Poste } from '../../domain/types.ts';
 import type { TripData } from '../../data/useTrip';
 
 const NOMS: Record<Poste, string> = { hebergement: 'Hébergement', transports: 'Transports', repas: 'Repas', activites: 'Activités', shopping: 'Shopping' };
 
-export function BudgetCard({ data, onChanged }: { data: TripData; onChanged?: () => void }) {
+export function BudgetCard({ data, onChanged, activitiesPanel }: { data: TripData; onChanged?: () => void; activitiesPanel?: React.ReactNode }) {
   const { colors } = useTheme();
   const [open, setOpen] = useState<Poste | null>(null);
   const [editing, setEditing] = useState(false);
@@ -29,11 +29,6 @@ export function BudgetCard({ data, onChanged }: { data: TripData; onChanged?: ()
   const summary = budgetSummary({ expenses, items, places, envelopes, travelers: Math.max(1, active.length) });
   const travelers = Math.max(1, active.length);
   const savings = savingSuggestions({ expenses, items, places, envelopes, travelers });
-  const activities = activityLines({ days: data.days, items, places, expenses, travelers });
-  const toPay = activities.filter((a) => a.due > 0);
-  const donePaid = activities.filter((a) => a.due <= 0);
-  const activityTotal = activities.reduce((n, a) => n + a.total, 0);
-  const activityDue = toPay.reduce((n, a) => n + a.due, 0);
   const paidAll = POSTES.reduce((n, p) => n + summary[p].paid, 0);
   const forecastAll = POSTES.reduce((n, p) => n + summary[p].forecast, 0);
   const envelopeAll = POSTES.reduce((n, p) => n + summary[p].envelope, 0) || Number(trip.budget_total ?? 0);
@@ -120,13 +115,17 @@ export function BudgetCard({ data, onChanged }: { data: TripData; onChanged?: ()
             {over ? <Text variant="muted" style={{ color: colors.warm }}>Dépasse le budget prévu de {fm(spent - (s.envelope ?? 0))}</Text> : null}
             {open === p ? (
               <View style={{ gap: space.sm, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }}>
-                {posteDetail(p, { expenses, items, places, travelers }).map((l, i) => (
-                  <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>
-                    <Text variant="body" style={{ flex: 1 }}>{l.label}{l.kind === 'forecast' ? ' (prévu)' : ''}</Text>
-                    <Text variant="mono">{l.kind === 'forecast' ? '≈ ' : ''}{fm(l.amount)}</Text>
-                  </View>
-                ))}
-                {!posteDetail(p, { expenses, items, places, travelers }).length ? <Text variant="muted">Aucune dépense ni étape prévue pour ce poste.</Text> : null}
+                {p === 'activites' && activitiesPanel ? activitiesPanel : (
+                  <>
+                    {posteDetail(p, { expenses, items, places, travelers }).map((l, i) => (
+                      <View key={i} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>
+                        <Text variant="body" style={{ flex: 1 }}>{l.label}{l.kind === 'forecast' ? ' (prévu)' : ''}</Text>
+                        <Text variant="mono">{l.kind === 'forecast' ? '≈ ' : ''}{fm(l.amount)}</Text>
+                      </View>
+                    ))}
+                    {!posteDetail(p, { expenses, items, places, travelers }).length ? <Text variant="muted">Aucune dépense ni étape prévue pour ce poste.</Text> : null}
+                  </>
+                )}
                 {perPerson && div > 1 ? (
                   <Text variant="muted">Passe en « Groupe » pour modifier le budget de ce poste.</Text>
                 ) : editing ? (
@@ -163,29 +162,6 @@ export function BudgetCard({ data, onChanged }: { data: TripData; onChanged?: ()
             </View>
           ))}
           <Text variant="muted">Ou garde le programme : touche le poste ci-dessus pour augmenter son budget.</Text>
-        </View>
-      ) : null}
-
-      {activities.length > 0 ? (
-        <View style={{ gap: space.sm, marginTop: space.md }}>
-          <Text variant="label">Activités : coût estimé</Text>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text variant="body">Total des activités</Text><Text variant="mono">{fm(activityTotal)}</Text></View>
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}><Text variant="body">Reste à payer / réserver</Text><Text variant="mono" style={{ color: activityDue > 0 ? colors.warm : colors.accent }}>{fm(activityDue)}</Text></View>
-          {toPay.length ? <Text variant="label" style={{ marginTop: space.xs }}>À payer / réserver</Text> : null}
-          {toPay.map((a) => (
-            <View key={a.itemId} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>
-              <Text variant="body" style={{ flex: 1 }}>{a.name}<Text variant="muted"> · J{a.day}</Text></Text>
-              <Text variant="mono">{a.paid > 0 ? `reste ${fm(a.due)}` : fm(a.due)}</Text>
-            </View>
-          ))}
-          {donePaid.length ? <Text variant="label" style={{ marginTop: space.xs }}>Déjà payées</Text> : null}
-          {donePaid.map((a) => (
-            <View key={a.itemId} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>
-              <Text variant="body" style={{ flex: 1 }}>✓ {a.name}<Text variant="muted"> · J{a.day}</Text></Text>
-              <Text variant="mono">{fm(a.total)}</Text>
-            </View>
-          ))}
-          <Text variant="muted">Prix d'entrée estimés pour {div > 1 ? 'une personne' : travelers > 1 ? 'le groupe' : 'toi'}.</Text>
         </View>
       ) : null}
 
