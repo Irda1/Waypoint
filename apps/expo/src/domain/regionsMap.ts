@@ -1,4 +1,4 @@
-// Page de la carte « régions et villes » de l'étape Villes (MapLibre, sans fond de carte : pays noir, régions en contour turquoise).
+// Page de la carte « régions et villes » de l'étape Villes (MapLibre, pays en imagerie satellite réaliste (Sentinel-2 sans nuages, EOX, CC BY-NC 4.0), le reste assombri, régions en contour turquoise).
 // Même principe que la carte du voyage et le globe : une page autonome, dans un cadre (web) ou une WebView (mobile).
 // Réglages : ?country=PT&base=<racine des fichiers>&color=5FD3BC (web) ou window.__REGIONS__ (mobile).
 // Messages reçus : {type:'cities', cities:[{id,n,lat,lng,r}], selected:[{id,o}]} ; envoyés : {type:'ready'}, {type:'toggle', id}.
@@ -34,10 +34,10 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   document.documentElement.style.setProperty("--c", COLOR);
   if (!window.maplibregl) { msg.textContent = "Carte indisponible : connexion requise."; post({ type: "ready" }); return; }
 
-  var map = new maplibregl.Map({ container: "map", style: { version: 8, sources: {}, layers: [{ id: "bg", type: "background", paint: { "background-color": "#000" } }] },
+  var map = new maplibregl.Map({ container: "map", style: { version: 8, sources: { sat: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 13, attribution: "Sentinel-2 cloudless © EOX" } }, layers: [{ id: "bg", type: "background", paint: { "background-color": "#000" } }, { id: "sat", type: "raster", source: "sat", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }] },
     center: [0, 20], zoom: 1.5, attributionControl: false, dragRotate: false, pitchWithRotate: false, renderWorldCopies: false, maxZoom: 14 });
   map.touchZoomRotate.disableRotation();
-  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "top-right");
+  map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 
   var regions = [], regionMarkers = [], cities = [], selected = {}, selRegion = -1, z0 = 5, zSel = 5, ready = false, hoverId = null;
 
@@ -128,8 +128,12 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   function ensureLayers() {
     map.addSource("regions", { type: "geojson", data: { type: "FeatureCollection", features: regions } });
     var sel = ["boolean", ["feature-state", "sel"], false], hov = ["boolean", ["feature-state", "hover"], false];
-    map.addLayer({ id: "r-fill", type: "fill", source: "regions", paint: { "fill-color": ["case", sel, COLOR, hov, COLOR, "#05090D"], "fill-opacity": ["case", sel, 0.3, hov, 0.16, 1] } });
-    map.addLayer({ id: "r-line", type: "line", source: "regions", paint: { "line-color": ["case", sel, "#FFFFFF", COLOR], "line-width": ["case", sel, 2.4, 1.1], "line-opacity": 0.9 }, layout: { "line-join": "round" } });
+    // Tout ce qui n'est pas le pays est assombri : le pays seul reste en pleine lumière, avec son relief.
+    var holes = []; regions.forEach(function (r) { polysOf(r.geometry).forEach(function (p) { holes.push(p[0].slice().reverse()); }); });
+    map.addSource("outside", { type: "geojson", data: { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]]].concat(holes) } } });
+    map.addLayer({ id: "outside", type: "fill", source: "outside", paint: { "fill-color": "#000", "fill-opacity": 0.78 } });
+    map.addLayer({ id: "r-fill", type: "fill", source: "regions", paint: { "fill-color": ["case", sel, COLOR, hov, COLOR, "#000"], "fill-opacity": ["case", sel, 0.22, hov, 0.14, 0] } });
+    map.addLayer({ id: "r-line", type: "line", source: "regions", paint: { "line-color": ["case", sel, "#FFFFFF", "#FFFFFF"], "line-width": ["case", sel, 2.6, 0.9], "line-opacity": ["case", sel, 1, 0.55] }, layout: { "line-join": "round" } });
     map.on("click", "r-fill", function (e) { if (e.features && e.features.length) selectRegion(e.features[0].id); });
     map.on("mousemove", "r-fill", function (e) { var id = e.features && e.features[0] ? e.features[0].id : null; if (id === hoverId) return; setState(hoverId, "hover", false); hoverId = id; setState(id, "hover", true); map.getCanvas().style.cursor = "pointer"; });
     map.on("mouseleave", "r-fill", function () { setState(hoverId, "hover", false); hoverId = null; map.getCanvas().style.cursor = ""; });

@@ -11,6 +11,7 @@ import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
 import { Choice, RoundButton, StepTitle } from './parts';
 import type { StepProps } from './parts';
+import { ViewToggle } from './ViewToggle';
 
 type Row = CityOption & { featured_rank: number | null };
 
@@ -65,10 +66,11 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
 
   const { width, height } = useWindowDimensions();
   const wide = width >= 900;
-  const mapHeight = wide ? Math.max(520, Math.min(760, height - 260)) : 440;
+  const mapHeight = Math.max(460, Math.min(820, height - 220));
   const map = (
     <View style={{ height: mapHeight, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' }}>
       <RegionMap country={country} cities={points} selected={selected} onToggle={toggleById} />
+      <ViewToggle showing="visual" onPress={() => setShowList(true)} listLabel="Afficher la liste des villes" backLabel="Revenir à la carte" backIcon="🗺" />
     </View>
   );
   const route = (
@@ -104,23 +106,31 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
   const search = (
     <>
       <Field label="Rechercher une ville" value={query} onChangeText={setQuery} placeholder="Ex. Lisbonne, Porto…" autoCorrect={false} />
-      {query || showList ? (
-        <>
-          {!query ? <Button label="Masquer la liste des villes" variant="ghost" onPress={() => setShowList(false)} /> : null}
-          {list === null ? <Text variant="muted">Chargement des villes…</Text> : list.length === 0 ? (
-            <Text variant="muted">{query ? 'Aucune ville ne correspond.' : 'Aucune ville en base pour ce pays. Tu peux continuer sans, ou lancer la collecte des villes (voir le guide).'}</Text>
-          ) : list.map((c) => {
-            const index = chosen.get(c.id);
-            return (
-              <Choice key={c.id} title={c.name} detail={c.featured_rank != null ? 'Ville phare' : undefined} selected={index !== undefined} onPress={() => toggle(c)}
-                right={index !== undefined ? <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: colors.accent }}>{state.cities[index].nights} nuit{state.cities[index].nights > 1 ? 's' : ''}</RNText> : undefined} />
-            );
-          })}
-        </>
-      ) : (
-        <Button label="Afficher la liste des villes" variant="ghost" onPress={() => setShowList(true)} />
-      )}
+      {list === null ? <Text variant="muted">Chargement des villes…</Text> : list.length === 0 ? (
+        <Text variant="muted">{query ? 'Aucune ville ne correspond.' : 'Aucune ville en base pour ce pays. Tu peux continuer sans, ou lancer la collecte des villes (voir le guide).'}</Text>
+      ) : list.map((c) => {
+        const index = chosen.get(c.id);
+        return (
+          <Choice key={c.id} title={c.name} detail={c.featured_rank != null ? 'Ville phare' : undefined} selected={index !== undefined} onPress={() => toggle(c)}
+            right={index !== undefined ? <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: colors.accent }}>{state.cities[index].nights} nuit{state.cities[index].nights > 1 ? 's' : ''}</RNText> : undefined} />
+        );
+      })}
     </>
+  );
+
+  // La carte reste montée (cachée) quand on ouvre la liste : on retrouve la même vue en revenant.
+  const zone = (
+    <View>
+      <View style={{ display: showList ? 'none' : 'flex' }}>{map}</View>
+      {showList ? (
+        <View style={{ gap: space.md }}>
+          <View style={{ minHeight: 56, justifyContent: 'center' }}>
+            <ViewToggle showing="list" onPress={() => setShowList(false)} listLabel="Afficher la liste des villes" backLabel="Revenir à la carte" backIcon="🗺" />
+          </View>
+          {search}
+        </View>
+      ) : null}
+    </View>
   );
 
   return (
@@ -129,11 +139,11 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
         hint={`${nights} nuit${nights > 1 ? "s" : ""} à répartir. Touche une région sur la carte, puis les villes à visiter : les nuits se répartissent toutes seules.`} />
       {wide ? (
         <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'flex-start' }}>
-          <View style={{ flex: 7, minWidth: 0 }}>{map}</View>
-          <View style={{ flex: 3, minWidth: 260, gap: space.md }}>{route}{search}</View>
+          <View style={{ flex: 7, minWidth: 0 }}>{zone}</View>
+          <View style={{ flex: 3, minWidth: 260, gap: space.md }}>{route}</View>
         </View>
       ) : (
-        <>{route}{map}{search}</>
+        <>{zone}{route}</>
       )}
       <ErrorNote message={error} />
     </View>
