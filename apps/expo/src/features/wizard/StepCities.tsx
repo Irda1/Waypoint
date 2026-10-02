@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, Text as RNText, View, useWindowDimensions } from 'react-native';
 import { Button, ErrorNote, Field, Text } from '../../ui';
 import { RegionMap } from '../regions/RegionMap';
 import { listCountryCities, listCountryCityPoints } from '../../data/places';
+import { warmCity } from '../../data/cityCollection';
 import type { CityOption, CityPoint } from '../../data/places';
 import { Flag } from '../../ui/Flag';
 import { COUNTRY_NAME } from '../../domain/countries.ts';
@@ -52,6 +53,21 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
   }, [list]);
 
   const chosen = new Map(state.cities.map((c, i) => [c.id, i]));
+
+  // Préchauffage : les lieux d'une ville choisie commencent à se charger tout de suite (après 1,5 s sans changement),
+  // pendant que la personne répond aux étapes suivantes. Trois villes au plus, jamais deux fois la même.
+  const warmed = useRef<Set<number>>(new Set());
+  const cityKey = state.cities.map((c) => c.id).join(',');
+  useEffect(() => {
+    const id = setTimeout(() => {
+      for (const c of state.cities) {
+        if (warmed.current.size >= 3) break;
+        if (!warmed.current.has(c.id)) { warmed.current.add(c.id); warmCity(c.id); }
+      }
+    }, 1500);
+    return () => clearTimeout(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cityKey]);
 
   function toggle(c: Row) {
     const r = toggleCity(state.cities, { id: c.id, name: c.name }, nights);
