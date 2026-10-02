@@ -19,3 +19,12 @@ export function collectionProgress(statuses: CollectionStatus[]): CollectionProg
   const partial = statuses.filter((s) => s === 'collecting').length * 0.5;
   return { percent: Math.round(((ready + partial) / total) * 100), ready, total, failed, done: ready + failed === total };
 }
+
+/** Avancement quand chaque ville a sa propre fraction (0 à 1) : lecture par groupes, écriture, etc. */
+export function fractionProgress(fractions: number[], failed = 0): CollectionProgress {
+  const total = fractions.length;
+  if (!total) return { percent: 100, ready: 0, total: 0, failed: 0, done: true };
+  const ready = fractions.filter((f) => f >= 1).length;
+  const sum = fractions.reduce((a, f) => a + Math.min(1, Math.max(0, f)), 0);
+  return { percent: Math.round((sum / total) * 100), ready, total, failed, done: ready + failed >= total };
+}

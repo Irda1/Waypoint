@@ -298,6 +298,41 @@ select test.throws($$select public.request_city_collection(1)$$, '42501', 'anony
 select test.throws($$select * from public.trip_destinations$$, '42501', 'anonyme : destinations inaccessibles');
 
 -- ===========================================================================
+-- Collecte d'une ville depuis l'appli (migration 1600)
+-- ===========================================================================
+select test.as_user('cccccccc-0000-0000-0000-000000000003');
+select test.ok(public.begin_city_collection((select id from public.cities where name = 'Paris')) = 'go', 'appli : prend la main sur une ville vide');
+select test.ok((select collection_status from public.cities where name = 'Paris') = 'collecting', 'la ville passe à « collecting »');
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select test.ok(public.begin_city_collection((select id from public.cities where name = 'Paris')) = 'busy', 'une autre personne ne collecte pas la même ville en même temps');
+select test.throws($$select public.ingest_city_places((select id from public.cities where name = 'Paris'), '[]'::jsonb)$$, '42501', 'seule la personne qui a pris la main peut écrire');
+select test.as_user('cccccccc-0000-0000-0000-000000000003');
+select test.throws($$select public.ingest_city_places((select id from public.cities where name = 'Paris'), '{"a":1}'::jsonb)$$, '22023', 'liste invalide refusée');
+select public.ingest_city_places((select id from public.cities where name = 'Paris'), jsonb_build_array(
+  jsonb_build_object('kind','activity','category_code','restaurant','name','Chez Test','lat',48.86,'lng',2.35,'popularity',2,'osm_type','node','osm_id',910001,'closed_days','[1]'::jsonb,'visit_duration_min',75,'tags','{}'::jsonb),
+  jsonb_build_object('kind','activity','category_code','restaurant','name','Chez Test (doublon)','lat',48.86,'lng',2.35,'popularity',3,'osm_type','node','osm_id',910001),
+  jsonb_build_object('kind','activity','category_code','restaurant','name','Trop loin','lat',10.0,'lng',2.35,'osm_type','node','osm_id',910002),
+  jsonb_build_object('kind','activity','category_code','pharmacie','name','Mauvaise catégorie','lat',48.86,'lng',2.35,'osm_type','node','osm_id',910003),
+  jsonb_build_object('kind','service','category_code','pharmacie','name','Pharmacie du coin','lat',48.857,'lng',2.34,'osm_type','way','osm_id',910004)
+));
+select test.as_admin();
+select test.ok((select count(*) from public.places where osm_id in (910001, 910002, 910003, 910004)) = 2, 'seuls les lieux valides (proches, catégorie cohérente, sans doublon) sont écrits');
+select test.ok((select source from public.places where osm_id = 910001) = 'openstreetmap', 'la source est forcée à openstreetmap');
+select test.ok((select count(*) from public.place_sources where external_id in ('node/910001', 'way/910004')) = 2, 'la provenance est enregistrée');
+select test.ok((select collection_status from public.cities where name = 'Paris') = 'ready', 'la ville est prête après l''écriture');
+select test.ok((select status from public.ingestion_queue where city_id = (select id from public.cities where name = 'Paris')) = 'done', 'la tâche est terminée');
+select test.as_user('cccccccc-0000-0000-0000-000000000003');
+select test.ok(public.begin_city_collection((select id from public.cities where name = 'Paris')) = 'ready', 'ville déjà prête : rien à refaire');
+-- Rendre la main au robot
+select test.ok(public.begin_city_collection((select id from public.cities where name_fr = 'Tokyo')) = 'go', 'Tokyo : prise en main');
+select public.release_city_collection((select id from public.cities where name_fr = 'Tokyo'), 'Overpass injoignable');
+select test.as_admin();
+select test.ok((select collection_status from public.cities where name_fr = 'Tokyo') = 'queued', 'rendre la main : la ville repasse « en file » pour le robot');
+select test.as_anon();
+select test.throws($$select public.begin_city_collection(1)$$, '42501', 'anonyme : begin_city_collection refusé');
+select test.throws($$select public.ingest_city_places(1, '[]'::jsonb)$$, '42501', 'anonyme : ingest_city_places refusé');
+
+-- ===========================================================================
 -- Lien de partage en lecture seule
 -- ===========================================================================
 select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');

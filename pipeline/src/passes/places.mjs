@@ -7,16 +7,26 @@ import { startRun, finishRun } from '../lib/run.mjs';
 
 export async function fetchOverpass(cfg, query, { fetchImpl = fetch, throttle }) {
   await throttle?.wait();
-  const res = await fetchRetry(cfg.overpassUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `data=${encodeURIComponent(query)}`,
-  }, { fetchImpl, retries: 4, baseDelayMs: 10_000, timeoutMs: 180_000 });
-  const json = await res.json();
-  if (json.remark && /runtime error|timed out|out of memory/i.test(json.remark)) {
-    throw new Error(`Overpass : ${json.remark}`);
+  // Serveurs essayés l'un après l'autre : un serveur surchargé (504) ne fait plus perdre des minutes en attentes.
+  const urls = cfg.overpassUrls?.length ? cfg.overpassUrls : [cfg.overpassUrl];
+  let lastError;
+  for (const url of urls) {
+    try {
+      const res = await fetchRetry(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `data=${encodeURIComponent(query)}`,
+      }, { fetchImpl, retries: urls.length > 1 ? 1 : 4, baseDelayMs: urls.length > 1 ? 3_000 : 10_000, timeoutMs: 120_000 });
+      const json = await res.json();
+      if (json.remark && /runtime error|timed out|out of memory/i.test(json.remark)) {
+        throw new Error(`Overpass : ${json.remark}`);
+      }
+      return json.elements ?? [];
+    } catch (err) {
+      lastError = err;
+    }
   }
-  return json.elements ?? [];
+  throw lastError;
 }
 
 /** Collecte et écrit les lieux d'une ville. @returns statistiques */

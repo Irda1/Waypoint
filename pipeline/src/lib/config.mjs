@@ -7,6 +7,12 @@ export function loadConfig(env = process.env) {
     serviceKey: env.SUPABASE_SERVICE_ROLE_KEY || '',
     pexelsKey: env.PEXELS_API_KEY || '',
     overpassUrl: env.OVERPASS_URL || 'https://overpass-api.de/api/interpreter',
+    // Serveurs de secours (essayés dans l'ordre). OVERPASS_URL seul (tests, serveur privé) = un seul serveur.
+    overpassUrls: env.OVERPASS_URL ? [env.OVERPASS_URL] : [
+      'https://overpass-api.de/api/interpreter',
+      'https://overpass.private.coffee/api/interpreter',
+      'https://overpass.kumi.systems/api/interpreter',
+    ],
     geonamesBase: env.GEONAMES_BASE_URL || 'https://download.geonames.org/export/dump',
     ratesBase: (env.RATES_BASE_URL || 'https://api.frankfurter.dev/v1').replace(/\/+$/, ''),
     // Pause minimale entre deux requêtes Overpass (le serveur public est partagé)
