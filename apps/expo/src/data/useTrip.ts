@@ -48,17 +48,8 @@ function toDestinations(rows: unknown): Destination[] {
 
 const TABLES = ['trips', 'trip_members', 'trip_days', 'trip_items', 'trip_stays', 'expenses', 'trip_budget_lines', 'trip_destinations'] as const;
 
-export function useTrip(tripId: string) {
-  const [data, setData] = useState<TripData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [status, setStatus] = useState<LiveStatus>('connecting');
-  /** Non nul quand on affiche la copie gardée sur l'appareil (pas de réseau) : date de cette copie. */
-  const [savedAt, setSavedAt] = useState<number | null>(null);
-  const known = useRef<Set<string>>(new Set());
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const load = useCallback(async () => {
+/** Lit tout le voyage dans la base. `missing` : voyage introuvable ou plus membre ; `failure` : erreur réseau ou base. */
+export async function fetchTripData(tripId: string): Promise<{ next: TripData | null; failure: string | null; missing: boolean }> {
     const [trip, members, days, items, expenses, budget, dest, stays] = await Promise.all([
       supabase.from('trips').select('id,title,starts_on,ends_on,currency,country_code,travelers,styles,budget_total,memo,deleted_at,version').eq('id', tripId).maybeSingle(),
       supabase.from('trip_members').select('user_id,color,left_at,profiles(display_name,avatar_url)').eq('trip_id', tripId),
@@ -70,14 +61,8 @@ export function useTrip(tripId: string) {
       supabase.from('trip_stays').select('id,name,address,lat,lng').eq('trip_id', tripId),
     ]);
     const failure = [trip, members, days, items, expenses, budget, dest, stays].find((r) => r.error)?.error;
-    if (failure) {
-      // Sans réseau : on montre la dernière copie connue plutôt qu'une page d'erreur.
-      const copy = await loadOffline<TripData>(`trip.${tripId}`);
-      if (copy) { setData(copy.data); setSavedAt(copy.savedAt); setError(null); } else setError(failure.message);
-      setLoading(false);
-      return;
-    }
-    if (!trip.data) { setError('Voyage introuvable, ou tu n\'en es plus membre.'); setData(null); setLoading(false); return; }
+    if (failure) return { next: null, failure: failure.message, missing: false };
+    if (!trip.data) return { next: null, failure: null, missing: true };
 
     const placeIds = [...new Set((items.data ?? []).map((i) => i.place_id).filter((x): x is number => x != null))];
     const places = new Map<number, Place>();
@@ -103,6 +88,39 @@ export function useTrip(tripId: string) {
       stays: (stays.data ?? []) as Stay[],
       payments: pay.error ? null : ((pay.data ?? []) as { id: string; from_user: string; to_user: string; amount: number }[]).map((x) => ({ ...x, amount: Number(x.amount) })),
     };
+    return { next, failure: null, missing: false };
+}
+
+/** Garde sur l'appareil une copie complète de ces voyages (programme, lieux, budget…) pour les consulter sans réseau. */
+export async function prefetchTripsOffline(tripIds: string[]): Promise<void> {
+  for (const id of tripIds) {
+    try {
+      const { next } = await fetchTripData(id);
+      if (next) await saveOffline(`trip.${id}`, next);
+    } catch { /* hors ligne : on garde l'ancienne copie */ }
+  }
+}
+
+export function useTrip(tripId: string) {
+  const [data, setData] = useState<TripData | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [status, setStatus] = useState<LiveStatus>('connecting');
+  /** Non nul quand on affiche la copie gardée sur l'appareil (pas de réseau) : date de cette copie. */
+  const [savedAt, setSavedAt] = useState<number | null>(null);
+  const known = useRef<Set<string>>(new Set());
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const load = useCallback(async () => {
+    const { next, failure, missing } = await fetchTripData(tripId);
+    if (failure) {
+      // Sans réseau : on montre la dernière copie connue plutôt qu'une page d'erreur.
+      const copy = await loadOffline<TripData>(`trip.${tripId}`);
+      if (copy) { setData(copy.data); setSavedAt(copy.savedAt); setError(null); } else setError(failure);
+      setLoading(false);
+      return;
+    }
+    if (missing || !next) { setError('Voyage introuvable, ou tu n\'en es plus membre.'); setData(null); setLoading(false); return; }
     known.current = new Set([next.trip.id, ...next.days.map((d) => d.id), ...next.items.map((i) => i.id), ...next.expenses.map((e) => e.id), ...next.members.map((m) => m.user_id), ...next.stays.map((x) => x.id)]);
     setData(next);
     setSavedAt(null);

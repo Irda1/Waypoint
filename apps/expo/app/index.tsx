@@ -6,6 +6,7 @@ import { useRequireAuth } from '../src/auth/useRequireAuth';
 import { Button, Card, Columns, ErrorNote, Field, Text } from '../src/ui';
 import { savedLabel } from '../src/domain/offlineSnapshot.ts';
 import { listTrash, listTrips, restoreTrip } from '../src/data/trips';
+import { prefetchTripsOffline } from '../src/data/useTrip';
 import type { TripSummary, TrashedTrip } from '../src/data/trips';
 import { formatDay, tripStatusLabel } from '../src/lib/format';
 import { todayIso, tripStatus } from '../src/lib/dates';
@@ -48,7 +49,13 @@ export default function Home() {
     setTrips(res.trips);
     setError(res.error);
     setSavedAt(res.savedAt ?? null);
-    if (!res.savedAt) void listTrash().then((r) => setTrash(r.trips));
+    if (!res.savedAt) {
+      void listTrash().then((r) => setTrash(r.trips));
+      // Copies pour le hors-ligne : les voyages à venir ou en cours d'abord (8 au plus).
+      const t = todayIso();
+      const ids = res.trips.filter((x) => !x.ends_on || x.ends_on >= t).slice(0, 8).map((x) => x.id);
+      void prefetchTripsOffline(ids);
+    }
   }, []);
   useEffect(() => { if (!guard) void refresh(); }, [guard, refresh]);
 

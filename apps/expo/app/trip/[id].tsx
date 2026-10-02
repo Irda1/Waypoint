@@ -31,6 +31,8 @@ import { StayCard } from '../../src/features/trip/StayCard';
 import { FriendsCard } from '../../src/features/trip/FriendsCard';
 import { BudgetCard } from '../../src/features/trip/BudgetCard';
 import { AddExpenseCard } from '../../src/features/trip/AddExpenseCard';
+import { FlightsCard } from '../../src/features/trip/FlightsCard';
+import { ConverterCard } from '../../src/features/trip/ConverterCard';
 import { ToPayCard } from '../../src/features/trip/ToPayCard';
 import { formatDay, isIsoDate } from '../../src/lib/format';
 import { photoKeyFor } from '../../src/lib/photoKey';
@@ -260,6 +262,7 @@ export default function TripScreen() {
           <DestinationsCard data={data} onChanged={reload} />
 
           <MemoCard tripId={trip.id} memo={trip.memo ?? ''} onChanged={reload} startEditing={pendingMemo} onStarted={() => setPendingMemo(false)} />
+          <FlightsCard data={data} />
           <StayCard data={data} userId={session?.user.id ?? null} onChanged={reload} />
 
           <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
@@ -331,6 +334,7 @@ export default function TripScreen() {
         {tab === 'budget' ? (
         <View style={styles.page}>
           <BudgetCard data={data} onChanged={reload} activitiesPanel={session ? <ToPayCard data={data} userId={session.user.id} onChanged={reload} embedded /> : undefined} />
+          <ConverterCard data={data} />
           {session ? <AddExpenseCard data={data} userId={session.user.id} onChanged={reload} /> : null}
         </View>
         ) : null}
