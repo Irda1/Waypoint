@@ -56,6 +56,10 @@ function weekdayShort(iso: string): string {
   return new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '');
 }
 
+function monthShort(iso: string): string {
+  return new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '');
+}
+
 const STATUS = { connecting: 'Connexion en direct…', live: 'Synchronisé en direct', offline: 'Hors ligne : reprise à la reconnexion' } as const;
 
 // Textes posés sur la photo : toujours clairs, quel que soit le mode du téléphone.
@@ -282,8 +286,8 @@ export default function TripScreen() {
                       return (
                         <Pressable key={d.id} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={`Jour ${i + 1}, ${formatDay(d.day_date)}`} onPress={() => setChosenDay(i)}
                           style={[styles.bubble, { backgroundColor: on ? colors.accent : colors.surface2 }]}>
-                          <RNText style={[styles.bubbleNum, { color: on ? colors.onAccent : colors.text }]}>{i + 1}</RNText>
-                          <RNText style={[styles.bubbleDay, { color: on ? colors.onAccent : colors.text3 }]}>{weekdayShort(d.day_date)}</RNText>
+                          <RNText style={[styles.bubbleNum, { color: on ? colors.onAccent : colors.text }]}>{d.day_date.slice(8, 10).replace(/^0/, '')}</RNText>
+                          <RNText style={[styles.bubbleDay, { color: on ? colors.onAccent : colors.text3 }]}>{monthShort(d.day_date)}</RNText>
                         </Pressable>
                       );
                     })}
@@ -387,7 +391,7 @@ const styles = StyleSheet.create({
   tileCity: { fontFamily: fonts.sansBold, fontSize: 15, lineHeight: 17, color: ON_PHOTO },
   bubble: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
   bubbleNum: { fontFamily: fonts.sansBold, fontSize: 18 },
-  bubbleDay: { fontFamily: fonts.sansBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.5 },
+  bubbleDay: { fontFamily: fonts.sansBold, fontSize: 11 },
   avatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   avatarLetter: { fontFamily: fonts.sansBold, fontSize: 13, color: '#14100A' },
 });
