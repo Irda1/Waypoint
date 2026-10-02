@@ -14,8 +14,34 @@ import { cityCollectionStatuses, requestCityCollection } from './places';
 
 export type CollectOutcome = 'ready' | 'queued' | 'busy' | 'failed';
 
-/** Collecte une ville maintenant. `onFraction` reçoit un avancement de 0 à 1. */
-export async function collectCityNow(cityId: number, onFraction?: (f: number) => void): Promise<{ outcome: CollectOutcome; error: string | null }> {
+type Collected = { outcome: CollectOutcome; error: string | null };
+const inflight = new Map<number, { promise: Promise<Collected>; listeners: Set<(f: number) => void>; last: number }>();
+
+/**
+ * Collecte une ville maintenant. `onFraction` reçoit un avancement de 0 à 1.
+ * Une ville déjà en cours de collecte dans cette appli (par exemple préchauffée) n'est jamais collectée deux fois :
+ * on se branche sur la collecte en cours.
+ */
+export function collectCityNow(cityId: number, onFraction?: (f: number) => void): Promise<Collected> {
+  const running = inflight.get(cityId);
+  if (running) {
+    if (onFraction) { running.listeners.add(onFraction); onFraction(running.last); }
+    return running.promise;
+  }
+  const entry = { listeners: new Set<(f: number) => void>(), last: 0, promise: undefined as unknown as Promise<Collected> };
+  if (onFraction) entry.listeners.add(onFraction);
+  entry.promise = collectCityOnce(cityId, (f) => { entry.last = f; for (const l of entry.listeners) l(f); })
+    .finally(() => { inflight.delete(cityId); });
+  inflight.set(cityId, entry);
+  return entry.promise;
+}
+
+/** Préchauffage : lance le chargement d'une ville en arrière-plan, sans rien afficher (les erreurs sont ignorées). */
+export function warmCity(cityId: number): void {
+  void collectCityNow(cityId).catch(() => undefined);
+}
+
+async function collectCityOnce(cityId: number, onFraction?: (f: number) => void): Promise<Collected> {
   const begin = await supabase.rpc('begin_city_collection', { p_city: cityId });
   if (begin.error) {
     if (begin.error.code === '54000') return { outcome: 'failed', error: 'Trop de demandes aujourd\'hui : réessaie demain.' };
