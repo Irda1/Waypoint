@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, Text as RNText, View, useWindowDimensions } from 'react-native';
+import { Pressable, Text as RNText, View } from 'react-native';
 import { Field, Text } from '../../ui';
 import { Flag } from '../../ui/Flag';
 import { COUNTRIES, POPULAR, COUNTRY_NAME, searchCountries } from '../../domain/countries.ts';
@@ -16,7 +16,6 @@ export function StepCountry({ state, update }: StepProps<WizardState>) {
   const { colors } = useTheme();
   const [query, setQuery] = useState('');
   const [showList, setShowList] = useState(false); // false : la planète en grand ; true : la liste des pays à la place
-  const { height } = useWindowDimensions();
   const results = query.trim() ? searchCountries(query) : null;
 
   function pick(code: string) {
@@ -31,15 +30,12 @@ export function StepCountry({ state, update }: StepProps<WizardState>) {
       lead={<Flag code={code} width={32} />} />
   );
 
-  // Le cadre tient entre l'en-tête et le bouton « Continuer », sans défilement : titre + phrase, ligne « Pays choisi » et barre du bas.
-  const areaH = Math.max(300, Math.min(820, height - 300));
-
   const chosenLine = state.country ? (
-    <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}><Flag code={state.country} width={26} /><Text variant="body">Pays choisi : {COUNTRY_NAME[state.country] ?? state.country}</Text></View>
+    <View style={{ alignItems: 'center', gap: 4 }}><Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{COUNTRY_NAME[state.country] ?? state.country}</Text><Flag code={state.country} width={30} /></View>
   ) : null;
 
   return (
-    <View style={{ gap: space.md }}>
+    <View style={{ gap: space.md, flex: 1 }}>
       <StepTitle title="Où veux-tu aller ?" hint={showList ? 'Cherche ou choisis un pays dans la liste.' : 'Tourne la planète et touche un pays. Le bouton en haut à droite ouvre la liste.'} />
       {showList ? (
         <View style={{ gap: space.md }}>
@@ -69,7 +65,7 @@ export function StepCountry({ state, update }: StepProps<WizardState>) {
         </View>
       ) : (
         <>
-          <View style={{ height: areaH, borderRadius: radius.card, overflow: 'hidden', backgroundColor: '#000' }}>
+          <View style={{ flex: 1, minHeight: 280, borderRadius: radius.card, overflow: 'hidden', backgroundColor: '#000' }}>
             <Globe mode="pick" focus={state.country} onPick={(code) => { if (COUNTRY_NAME[code]) pick(code); }} />
             <ViewToggle showing="visual" onPress={() => setShowList(true)} listLabel="Afficher la liste des pays" backLabel="Revenir à la planète" backIcon="🌍" />
           </View>
