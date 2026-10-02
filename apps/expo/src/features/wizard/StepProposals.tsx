@@ -7,6 +7,9 @@ import { toggleExcluded, wizardPlan } from '../../domain/wizard.ts';
 import type { WizardState } from '../../domain/wizard.ts';
 import type { Candidate } from '../../domain/itinerary.ts';
 import { loadCandidates } from '../../data/itinerary';
+import { cityCollectionStatuses, requestCityCollection } from '../../data/places';
+import { collectionProgress } from '../../domain/collection.ts';
+import type { CollectionProgress } from '../../domain/collection.ts';
 import { useCategories } from '../../data/categories';
 import { useTheme } from '../../theme/useTheme';
 import { categoryColors, fonts, space } from '../../theme/tokens';
@@ -19,15 +22,37 @@ export function StepProposals({ state, update }: StepProps<WizardState>) {
   const categories = useCategories();
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<CollectionProgress | null>(null);
   const cityKey = state.cities.map((c) => c.id).join(',');
 
+  // Les lieux ne sont lus que pour les villes choisies : celles qui ne sont pas encore prêtes sont demandées à la collecte,
+  // puis on suit leur état (barre de progression) avant d'afficher les propositions.
   useEffect(() => {
     if (!state.cities.length || categories.byCode.size === 0) return;
     let alive = true;
-    void loadCandidates(state.cities.map((c) => c.id), categories.rootOf).then((r) => {
+    const ids = state.cities.map((c) => c.id);
+    setCandidates(null); setProgress(null);
+    void (async () => {
+      const asked = new Set<number>();
+      const started = Date.now();
+      for (;;) {
+        const st = await cityCollectionStatuses(ids);
+        if (!alive) return;
+        const list = ids.map((id) => st.statuses.get(id) ?? 'ready');
+        for (const id of ids) {
+          const s = st.statuses.get(id);
+          if ((s === 'empty' || s === 'failed') && !asked.has(id)) { asked.add(id); void requestCityCollection(id); }
+        }
+        const p = collectionProgress(list.map((s, i) => (asked.has(ids[i]) && (s === 'empty' || s === 'failed') ? 'queued' : s)));
+        setProgress(p);
+        if (p.done || st.error || Date.now() - started > 10 * 60_000) break;
+        await new Promise((r) => setTimeout(r, 4000));
+        if (!alive) return;
+      }
+      const r = await loadCandidates(ids, categories.rootOf);
       if (!alive) return;
       setCandidates(r.candidates); setError(r.error);
-    });
+    })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityKey, categories.byCode.size]);
@@ -51,7 +76,7 @@ export function StepProposals({ state, update }: StepProps<WizardState>) {
         <Chip label="Je le ferai moi-même" selected={!state.program} onPress={() => update({ ...state, program: false })} />
       </View>
       <ErrorNote message={error} />
-      {!state.program ? <Text variant="muted">Les jours seront créés vides, avec les villes et le budget choisis.</Text> : candidates === null ? <Text variant="muted">Recherche des meilleurs lieux…</Text> : (
+      {!state.program ? <Text variant="muted">Les jours seront créés vides, avec les villes et le budget choisis.</Text> : candidates === null ? <LoadBar progress={progress} /> : (
         <>
           {plan.every((p) => p.empty) ? <Text variant="muted">Aucun lieu disponible pour ces villes : les jours resteront vides et tu pourras les remplir ensuite.</Text> : null}
           {plan.map((d) => (
@@ -86,6 +111,21 @@ export function StepProposals({ state, update }: StepProps<WizardState>) {
           <Text variant="muted">Durées et prix : estimations d'après la catégorie du lieu. Les trajets sont estimés à vol d'oiseau.</Text>
         </>
       )}
+    </View>
+  );
+}
+
+function LoadBar({ progress }: { progress: CollectionProgress | null }) {
+  const { colors } = useTheme();
+  const pct = progress ? Math.max(4, progress.percent) : 4;
+  return (
+    <View style={{ gap: space.sm }} accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: progress?.percent ?? 0 }}>
+      <Text variant="body">Récupération des lieux de tes villes…</Text>
+      <View style={{ height: 10, borderRadius: 999, backgroundColor: colors.surface2, overflow: 'hidden' }}>
+        <View style={{ width: `${pct}%`, height: '100%', borderRadius: 999, backgroundColor: colors.accent }} />
+      </View>
+      <Text variant="muted">{progress ? `${progress.percent} % · ${progress.ready} ville${progress.ready > 1 ? 's' : ''} sur ${progress.total} prête${progress.ready > 1 ? 's' : ''}` : 'Connexion à la base…'}</Text>
+      {progress && progress.percent < 100 ? <Text variant="muted">Seules les villes choisies sont chargées. Une ville jamais demandée peut prendre un moment : tu peux continuer, le programme se remplira ensuite.</Text> : null}
     </View>
   );
 }

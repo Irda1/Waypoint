@@ -1,7 +1,7 @@
 // Page de la carte « régions et villes » de l'étape Villes (MapLibre, pays en imagerie satellite réaliste (Sentinel-2 sans nuages, EOX, CC BY-NC 4.0), le reste assombri, régions en contour turquoise).
 // Même principe que la carte du voyage et le globe : une page autonome, dans un cadre (web) ou une WebView (mobile).
 // Réglages : ?country=PT&base=<racine des fichiers>&color=5FD3BC (web) ou window.__REGIONS__ (mobile).
-// Messages reçus : {type:'cities', cities:[{id,n,lat,lng,r}], selected:[{id,o}]} ; envoyés : {type:'ready'}, {type:'toggle', id}.
+// Messages reçus : {type:'cities', cities:[{id,n,lat,lng,r,a}], selected:[{id,o}]} ; envoyés : {type:'ready'}, {type:'toggle', id}.
 // Visibilité des villes : les plus importantes (rang r) d'abord ; en choisissant une région, ses villes apparaissent, puis les autres au fil du zoom.
 
 export function regionsHtml(): string {
@@ -13,6 +13,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
 .city{display:flex;align-items:center;gap:5px;cursor:pointer;transform:translate(0,0);white-space:nowrap}
 .dot{width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.55);flex:none;display:flex;align-items:center;justify-content:center;font:700 11px system-ui,sans-serif;color:#04201a}
 .lab{color:#fff;font-size:12.5px;font-weight:600;text-shadow:0 1px 3px #000,0 0 8px #000}
+.city.air .dot{width:18px;height:18px;border-width:1.5px}
 .city.on .dot{width:24px;height:24px;background:var(--c);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.6)}
 .city.on .lab{font-size:13.5px}
 .city.hide .lab{display:none}
@@ -22,6 +23,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
 .maplibregl-ctrl-group{background:rgba(0,0,0,.55)!important}.maplibregl-ctrl-group button{filter:invert(1)}
 </style></head><body><div id="map"></div><div id="back"></div><div id="msg"></div>
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/polygon-clipping@0.15.7/dist/polygon-clipping.umd.min.js"></script>
 <script>
 (function () {
   "use strict";
@@ -34,7 +36,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   document.documentElement.style.setProperty("--c", COLOR);
   if (!window.maplibregl) { msg.textContent = "Carte indisponible : connexion requise."; post({ type: "ready" }); return; }
 
-  var map = new maplibregl.Map({ container: "map", style: { version: 8, sources: { sat: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 13, attribution: "Sentinel-2 cloudless © EOX" } }, layers: [{ id: "bg", type: "background", paint: { "background-color": "#000" } }, { id: "sat", type: "raster", source: "sat", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }] },
+  var map = new maplibregl.Map({ container: "map", style: { version: 8, sources: { sat0: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 6 }, sat: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 13, attribution: "Sentinel-2 cloudless © EOX" } }, layers: [{ id: "bg", type: "background", paint: { "background-color": "#000" } }, { id: "sat0", type: "raster", source: "sat0", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }, { id: "sat", type: "raster", source: "sat", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }] },
     center: [0, 20], zoom: 1.5, attributionControl: false, dragRotate: false, pitchWithRotate: false, renderWorldCopies: false, maxZoom: 14 });
   map.touchZoomRotate.disableRotation();
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
@@ -42,6 +44,10 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   var regions = [], regionMarkers = [], cities = [], selected = {}, selRegion = -1, z0 = 5, zSel = 5, ready = false, hoverId = null;
 
   function ringIn(lon, lat, ring) { var c = false; for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) { var xi = ring[i][0], yi = ring[i][1], xj = ring[j][0], yj = ring[j][1]; if ((yi > lat) !== (yj > lat) && lon < (xj - xi) * (lat - yi) / (yj - yi) + xi) c = !c; } return c; }
+  // Les trous du masque doivent tourner à l'inverse du rectangle du monde : sinon ils ne sont pas découpés et la zone reste assombrie par morceaux.
+  function sgn(ring) { var a = 0; for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) a += (ring[j][0] - ring[i][0]) * (ring[j][1] + ring[i][1]); return a > 0 ? 1 : -1; }
+  var WORLD = [[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]];
+  function hole(ring) { return sgn(ring) === sgn(WORLD) ? ring.slice().reverse() : ring.slice(); }
   function polysOf(g) { return g.type === "Polygon" ? [g.coordinates] : g.type === "MultiPolygon" ? g.coordinates : []; }
   function inFeature(f, lon, lat) { var ps = polysOf(f.geometry); for (var k = 0; k < ps.length; k++) { var n = 0; for (var r = 0; r < ps[k].length; r++) if (ringIn(lon, lat, ps[k][r])) n++; if (n % 2 === 1) return true; } return false; }
   function bboxOf(f) { var b = [1e9, 1e9, -1e9, -1e9]; polysOf(f.geometry).forEach(function (p) { p[0].forEach(function (c) { if (c[0] < b[0]) b[0] = c[0]; if (c[1] < b[1]) b[1] = c[1]; if (c[0] > b[2]) b[2] = c[0]; if (c[1] > b[3]) b[3] = c[1]; }); }); return b; }
@@ -88,7 +94,8 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
       if (selRegion >= 0 && !on && c.reg !== selRegion && c.r >= 3) vis = false;
       if (!vis) { c.el.style.display = "none"; return; }
       c.el.style.display = "flex"; c.el.classList.toggle("on", on);
-      c.el.firstChild.textContent = on ? String(selected[c.id]) : "";
+      c.el.firstChild.textContent = on ? String(selected[c.id]) : c.a ? "\\u2708\\uFE0E" : "";
+      c.el.classList.toggle("air", !!c.a && !on);
       var p = map.project([c.lng, c.lat]), w = c.n.length * 7 + 22, box = [p.x - 6, p.y - 10, p.x - 6 + w, p.y + 10], hit = false;
       for (var i = 0; i < boxes.length; i++) { var b = boxes[i]; if (box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1]) { hit = true; break; } }
       c.el.classList.toggle("hide", hit && !on); if (!hit || on) boxes.push(box);
@@ -115,7 +122,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
 
   window.__setCities = function (cs, sel) {
     cities.forEach(function (c) { if (c.mk) c.mk.remove(); });
-    cities = (cs || []).map(function (c) { return { id: c.id, n: c.n, lat: c.lat, lng: c.lng, r: c.r }; });
+    cities = (cs || []).map(function (c) { return { id: c.id, n: c.n, lat: c.lat, lng: c.lng, r: c.r, a: !!c.a }; });
     assign(); build(); window.__setSelected(sel || []);
     if (!countryBox && cities.length) { countryBox = union(cities.map(function (c) { return [c.lng, c.lat, c.lng, c.lat]; })); z0 = zoomFor(countryBox); zSel = z0; fit(countryBox, 0); }
     render();
@@ -129,8 +136,17 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
     map.addSource("regions", { type: "geojson", data: { type: "FeatureCollection", features: regions } });
     var sel = ["boolean", ["feature-state", "sel"], false], hov = ["boolean", ["feature-state", "hover"], false];
     // Tout ce qui n'est pas le pays est assombri : le pays seul reste en pleine lumière, avec son relief.
-    var holes = []; regions.forEach(function (r) { polysOf(r.geometry).forEach(function (p) { holes.push(p[0].slice().reverse()); }); });
-    map.addSource("outside", { type: "geojson", data: { type: "Feature", geometry: { type: "Polygon", coordinates: [[[-180, -85], [180, -85], [180, 85], [-180, 85], [-180, -85]]].concat(holes) } } });
+    // Les régions voisines se chevauchent un peu : on fusionne d'abord leurs contours en un seul pays, sinon les trous se recouvrent et le masque reste par endroits.
+    var holes = [], parts = []; regions.forEach(function (r) { polysOf(r.geometry).forEach(function (p) { parts.push([p[0]]); }); });
+    var merged = parts;
+    if (window.polygonClipping && parts.length > 1) {
+      [2, 1].some(function (dec) {
+        var k = Math.pow(10, dec);
+        try { merged = window.polygonClipping.union.apply(null, parts.map(function (p) { return [p[0].map(function (c) { return [Math.round(c[0] * k) / k, Math.round(c[1] * k) / k]; })]; })); return true; } catch (err) { merged = parts; return false; }
+      });
+    }
+    merged.forEach(function (p) { holes.push(hole(p[0])); });
+    map.addSource("outside", { type: "geojson", data: { type: "Feature", geometry: { type: "Polygon", coordinates: [WORLD].concat(holes) } } });
     map.addLayer({ id: "outside", type: "fill", source: "outside", paint: { "fill-color": "#000", "fill-opacity": 0.78 } });
     map.addLayer({ id: "r-fill", type: "fill", source: "regions", paint: { "fill-color": ["case", sel, COLOR, hov, COLOR, "#000"], "fill-opacity": ["case", sel, 0.22, hov, 0.14, 0] } });
     map.addLayer({ id: "r-line", type: "line", source: "regions", paint: { "line-color": ["case", sel, "#FFFFFF", "#FFFFFF"], "line-width": ["case", sel, 2.6, 0.9], "line-opacity": ["case", sel, 1, 0.55] }, layout: { "line-join": "round" } });

@@ -4,6 +4,7 @@
 .pin{width:30px;height:30px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.45);color:#fff;font:700 13px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .dot{width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);cursor:pointer}
 .sel{outline:3px solid #FFB95A;outline-offset:2px}
+.maplibregl-ctrl-attrib{font-size:8px!important;line-height:1.2!important;opacity:.6;background:rgba(255,255,255,.35)!important}.maplibregl-ctrl-attrib-button{width:16px!important;height:16px!important}.maplibregl-ctrl-bottom-right .maplibregl-ctrl{margin:0 2px 2px 0!important}
 #diag{position:absolute;left:8px;bottom:22px;max-width:70%;padding:4px 8px;border-radius:8px;background:rgba(0,0,0,.65);color:#fff;font:12px system-ui,sans-serif;display:none}
 #fail{display:none;position:absolute;inset:0;align-items:center;justify-content:center;padding:24px;text-align:center;font:15px system-ui,sans-serif;color:#333}</style></head>
 <body><div id="map"></div><div id="diag"></div><div id="fail">La carte ne peut pas se charger (connexion ?). Les listes restent disponibles.</div>
@@ -20,7 +21,7 @@
   var CENTER = URLMODE ? [parseFloat(Q.get('lng')) || 0, parseFloat(Q.get('lat')) || 20] : [0, 20];
   var ZOOM = URLMODE ? (parseFloat(Q.get('zoom')) || 2) : 2;
   document.body.style.background = DARK ? '#0B0D10' : '#EDEAE3';
-  var map = new maplibregl.Map({ container: 'map', style: STYLE, center: CENTER, zoom: ZOOM, attributionControl: { compact: false } });
+  var map = new maplibregl.Map({ container: 'map', style: STYLE, center: CENTER, zoom: ZOOM, attributionControl: { compact: true } });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   var markers = [], selected = null, routes = [];
   // Traits reliant les étapes d'un même jour : un calque SVG recalculé à chaque mouvement, indépendant du fond de carte.

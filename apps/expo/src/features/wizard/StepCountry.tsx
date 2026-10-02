@@ -31,7 +31,8 @@ export function StepCountry({ state, update }: StepProps<WizardState>) {
       lead={<Flag code={code} width={32} />} />
   );
 
-  const areaH = Math.max(460, Math.min(820, height - 200));
+  // Le cadre tient entre l'en-tête et le bouton « Continuer », sans défilement : titre + phrase, ligne « Pays choisi » et barre du bas.
+  const areaH = Math.max(300, Math.min(820, height - 300));
 
   const chosenLine = state.country ? (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}><Flag code={state.country} width={26} /><Text variant="body">Pays choisi : {COUNTRY_NAME[state.country] ?? state.country}</Text></View>
@@ -42,9 +43,9 @@ export function StepCountry({ state, update }: StepProps<WizardState>) {
       <StepTitle title="Où veux-tu aller ?" hint={showList ? 'Cherche ou choisis un pays dans la liste.' : 'Tourne la planète et touche un pays. Le bouton en haut à droite ouvre la liste.'} />
       {showList ? (
         <View style={{ gap: space.md }}>
-          <View style={{ minHeight: 56, justifyContent: 'center' }}>
-            <ViewToggle showing="list" onPress={() => setShowList(false)} listLabel="Afficher la liste des pays" backLabel="Revenir à la planète" backIcon="🌍" />
-            <Field label="Rechercher un pays" value={query} onChangeText={setQuery} placeholder="Ex. Japon, Portugal…" autoCorrect={false} />
+          <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.sm }}>
+            <View style={{ flex: 1 }}><Field label="Rechercher un pays" value={query} onChangeText={setQuery} placeholder="Ex. Japon, Portugal…" autoCorrect={false} /></View>
+            <ViewToggle inline showing="list" onPress={() => setShowList(false)} listLabel="Afficher la liste des pays" backLabel="Revenir à la planète" backIcon="🌍" />
           </View>
           {chosenLine}
           {results ? (
