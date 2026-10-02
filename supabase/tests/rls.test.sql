@@ -298,6 +298,26 @@ select test.throws($$select public.request_city_collection(1)$$, '42501', 'anony
 select test.throws($$select * from public.trip_destinations$$, '42501', 'anonyme : destinations inaccessibles');
 
 -- ===========================================================================
+-- Lien de partage en lecture seule
+-- ===========================================================================
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+do $$ declare t text; begin
+  insert into public.trip_shares (trip_id) values ('11111111-1111-1111-1111-111111111111') returning token into t;
+  perform set_config('test.share', t, false);
+end $$;
+select test.as_user('eeeeeeee-0000-0000-0000-00000000000e');
+select test.throws($$insert into public.trip_shares (trip_id) values ('11111111-1111-1111-1111-111111111111')$$, '42501', 'un non-membre ne peut pas créer de lien de partage');
+select test.as_anon();
+select test.ok(public.shared_trip(current_setting('test.share')) is not null, 'anonyme : le lien de partage montre le programme');
+select test.ok(not (public.shared_trip(current_setting('test.share')) ? 'expenses') and not (public.shared_trip(current_setting('test.share')) ? 'members'), 'le lien de partage n''expose ni dépenses ni membres');
+select test.ok(public.shared_trip('inconnu') is null, 'un jeton inconnu ne donne rien');
+select test.throws($$select * from public.trip_shares$$, '42501', 'anonyme : table des liens inaccessible');
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+update public.trip_shares set revoked_at = now() where token = current_setting('test.share');
+select test.as_anon();
+select test.ok(public.shared_trip(current_setting('test.share')) is null, 'un lien révoqué ne donne plus rien');
+
+-- ===========================================================================
 -- Corbeille visible dans l'aperçu ; suppression définitive côté serveur
 -- ===========================================================================
 select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');

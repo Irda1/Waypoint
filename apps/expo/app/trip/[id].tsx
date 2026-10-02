@@ -31,6 +31,7 @@ import { StayCard } from '../../src/features/trip/StayCard';
 import { FriendsCard } from '../../src/features/trip/FriendsCard';
 import { BudgetCard } from '../../src/features/trip/BudgetCard';
 import { AddExpenseCard } from '../../src/features/trip/AddExpenseCard';
+import { ShareCard } from '../../src/features/trip/ShareCard';
 import { FlightsCard } from '../../src/features/trip/FlightsCard';
 import { ConverterCard } from '../../src/features/trip/ConverterCard';
 import { ToPayCard } from '../../src/features/trip/ToPayCard';
@@ -369,6 +370,8 @@ export default function TripScreen() {
             ) : null}
             <Button label={inviteCode ? 'Nouveau code' : 'Inviter un ami'} variant="ghost" onPress={invite} />
           </Card>
+
+          <ShareCard tripId={trip.id} title={trip.title} />
 
           <Card>
             <Text variant="label">Supprimer le voyage</Text>
