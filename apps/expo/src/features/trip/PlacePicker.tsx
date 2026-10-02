@@ -8,7 +8,8 @@ import { formatMoney } from '../../lib/format';
 import { formatDuration } from '../../lib/search';
 import { rankCities, titleWords } from '../../lib/cities';
 import { useCategories } from '../../data/categories';
-import { addPlaceItem, listCities, requestCityCollection, searchPlaces, setDayCity } from '../../data/places';
+import { addPlaceItem, listCities, searchPlaces, setDayCity } from '../../data/places';
+import { collectCityNow } from '../../data/cityCollection';
 import type { CityOption, PlaceHit } from '../../data/places';
 
 interface Props {
@@ -42,6 +43,7 @@ export function PlacePicker({ tripId, dayId, tripTitle, destinations, defaultCit
   const [notice, setNotice] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<number | null>(null);
   const [requesting, setRequesting] = useState(false);
+  const [percent, setPercent] = useState<number | null>(null);
   const run = useRef(0);
   const destKey = destinations.map((d) => d.id).join(',');
 
@@ -95,13 +97,17 @@ export function PlacePicker({ tripId, dayId, tripTitle, destinations, defaultCit
   async function collect() {
     if (!city) return;
     setRequesting(true);
-    const res = await requestCityCollection(city.id);
+    setPercent(0);
+    const res = await collectCityNow(city.id, (f) => setPercent(Math.round(f * 100)));
     setRequesting(false);
-    if (res.error) { setError(res.error); return; }
+    setPercent(null);
+    if (res.outcome === 'failed') { setError(res.error ?? 'Collecte impossible pour le moment.'); return; }
     setError(null);
-    const status = (res.status ?? 'queued') as CityOption['collection_status'];
+    const status: CityOption['collection_status'] = res.outcome === 'ready' ? 'ready' : res.outcome === 'busy' ? 'collecting' : 'queued';
     setCities((list) => (list ?? []).map((c) => (c.id === city.id ? { ...c, collection_status: status } : c)));
-    setNotice('Demande enregistrée. Les lieux apparaissent après le prochain passage de la collecte.');
+    setNotice(res.outcome === 'ready' ? `Les lieux de ${city.name} sont chargés.`
+      : res.outcome === 'busy' ? 'Quelqu\'un est déjà en train de charger cette ville : réessaie dans un instant.'
+      : 'Le chargement direct n\'a pas abouti : la demande est enregistrée, les lieux arriveront au prochain passage de la collecte.');
   }
 
   const anyEstimate = (hits ?? []).some((h) => h.duration_is_estimate || (h.price_amount != null && h.price_is_estimate));
@@ -125,12 +131,10 @@ export function PlacePicker({ tripId, dayId, tripTitle, destinations, defaultCit
         <View style={{ gap: space.sm }}>
           <Text variant="muted">
             {city.collection_status === 'queued' || city.collection_status === 'collecting'
-              ? `Les lieux de ${city.name} sont en cours de collecte. Reviens dans quelques heures.`
-              : `Les lieux de ${city.name} n'ont pas encore été collectés.`}
+              ? `Les lieux de ${city.name} sont en cours de collecte. Reviens dans un instant, ou relance le chargement.`
+              : `Les lieux de ${city.name} ne sont pas encore chargés. Cela prend quelques secondes.`}
           </Text>
-          {city.collection_status === 'empty' || city.collection_status === 'failed' ? (
-            <Button label={`Demander les lieux de ${city.name}`} onPress={collect} loading={requesting} />
-          ) : null}
+          <Button label={requesting && percent != null ? `Chargement… ${percent} %` : `Charger les lieux de ${city.name}`} onPress={collect} loading={requesting} />
         </View>
       ) : null}
 

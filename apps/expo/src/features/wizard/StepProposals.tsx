@@ -7,8 +7,7 @@ import { toggleExcluded, wizardPlan } from '../../domain/wizard.ts';
 import type { WizardState } from '../../domain/wizard.ts';
 import type { Candidate } from '../../domain/itinerary.ts';
 import { loadCandidates } from '../../data/itinerary';
-import { cityCollectionStatuses, requestCityCollection } from '../../data/places';
-import { collectionProgress } from '../../domain/collection.ts';
+import { ensureCitiesCollected } from '../../data/cityCollection';
 import type { CollectionProgress } from '../../domain/collection.ts';
 import { useCategories } from '../../data/categories';
 import { useTheme } from '../../theme/useTheme';
@@ -25,33 +24,19 @@ export function StepProposals({ state, update }: StepProps<WizardState>) {
   const [progress, setProgress] = useState<CollectionProgress | null>(null);
   const cityKey = state.cities.map((c) => c.id).join(',');
 
-  // Les lieux ne sont lus que pour les villes choisies : celles qui ne sont pas encore prêtes sont demandées à la collecte,
-  // puis on suit leur état (barre de progression) avant d'afficher les propositions.
+  // Les lieux ne sont lus que pour les villes choisies : celles qui ne sont pas prêtes sont collectées tout de suite
+  // depuis l'appli (pourcentage réel), ou confiées au robot si ça échoue, avant d'afficher les propositions.
   useEffect(() => {
     if (!state.cities.length || categories.byCode.size === 0) return;
     let alive = true;
     const ids = state.cities.map((c) => c.id);
     setCandidates(null); setProgress(null);
     void (async () => {
-      const asked = new Set<number>();
-      const started = Date.now();
-      for (;;) {
-        const st = await cityCollectionStatuses(ids);
-        if (!alive) return;
-        const list = ids.map((id) => st.statuses.get(id) ?? 'ready');
-        for (const id of ids) {
-          const s = st.statuses.get(id);
-          if ((s === 'empty' || s === 'failed') && !asked.has(id)) { asked.add(id); void requestCityCollection(id); }
-        }
-        const p = collectionProgress(list.map((s, i) => (asked.has(ids[i]) && (s === 'empty' || s === 'failed') ? 'queued' : s)));
-        setProgress(p);
-        if (p.done || st.error || Date.now() - started > 10 * 60_000) break;
-        await new Promise((r) => setTimeout(r, 4000));
-        if (!alive) return;
-      }
-      const r = await loadCandidates(ids, categories.rootOf);
+      const r = await ensureCitiesCollected(ids, (p) => { if (alive) setProgress(p); }, () => alive);
       if (!alive) return;
-      setCandidates(r.candidates); setError(r.error);
+      const loaded = await loadCandidates(ids, categories.rootOf);
+      if (!alive) return;
+      setCandidates(loaded.candidates); setError(loaded.error ?? r.error);
     })();
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -125,7 +110,7 @@ function LoadBar({ progress }: { progress: CollectionProgress | null }) {
         <View style={{ width: `${pct}%`, height: '100%', borderRadius: 999, backgroundColor: colors.accent }} />
       </View>
       <Text variant="muted">{progress ? `${progress.percent} % · ${progress.ready} ville${progress.ready > 1 ? 's' : ''} sur ${progress.total} prête${progress.ready > 1 ? 's' : ''}` : 'Connexion à la base…'}</Text>
-      {progress && progress.percent < 100 ? <Text variant="muted">Seules les villes choisies sont chargées. Une ville jamais demandée peut prendre un moment : tu peux continuer, le programme se remplira ensuite.</Text> : null}
+      {progress && progress.percent < 100 ? <Text variant="muted">Seules les villes choisies sont chargées, directement depuis OpenStreetMap : quelques secondes pour une ville, un peu plus pour une grande métropole.</Text> : null}
     </View>
   );
 }

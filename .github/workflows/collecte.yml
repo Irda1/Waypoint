@@ -32,8 +32,8 @@ on:
         type: boolean
         default: false
   schedule:
-    # Traite les villes demandées par l'app (file d'attente), toutes les 3 heures
-    - cron: "17 */3 * * *"
+    # Filet de sécurité : traite les villes que l'appli n'a pas pu collecter elle-même (file d'attente), toutes les 15 minutes
+    - cron: "*/15 * * * *"
 
 permissions:
   contents: read
