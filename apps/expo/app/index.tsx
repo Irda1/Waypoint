@@ -5,8 +5,8 @@ import { router } from 'expo-router';
 import { useRequireAuth } from '../src/auth/useRequireAuth';
 import { Button, Card, Columns, ErrorNote, Field, Text } from '../src/ui';
 import { savedLabel } from '../src/domain/offlineSnapshot.ts';
-import { listTrips } from '../src/data/trips';
-import type { TripSummary } from '../src/data/trips';
+import { listTrash, listTrips, restoreTrip } from '../src/data/trips';
+import type { TripSummary, TrashedTrip } from '../src/data/trips';
 import { formatDay, tripStatusLabel } from '../src/lib/format';
 import { todayIso, tripStatus } from '../src/lib/dates';
 import { Globe } from '../src/features/globe/Globe';
@@ -38,6 +38,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [joinCode, setJoinCode] = useState('');
+  const [trash, setTrash] = useState<TrashedTrip[]>([]);
+  const [showTrash, setShowTrash] = useState(false);
+  const [trashError, setTrashError] = useState<string | null>(null);
   const today = todayIso();
 
   const refresh = useCallback(async () => {
@@ -45,6 +48,7 @@ export default function Home() {
     setTrips(res.trips);
     setError(res.error);
     setSavedAt(res.savedAt ?? null);
+    if (!res.savedAt) void listTrash().then((r) => setTrash(r.trips));
   }, []);
   useEffect(() => { if (!guard) void refresh(); }, [guard, refresh]);
 
@@ -122,6 +126,25 @@ export default function Home() {
               ))}
             </Columns>
           )}
+
+          {trash.length > 0 ? (
+            <View style={{ gap: space.sm }}>
+              <Pressable accessibilityRole="button" accessibilityState={{ expanded: showTrash }} onPress={() => setShowTrash(!showTrash)}>
+                <Text variant="label">{showTrash ? '▾' : '▸'} Corbeille · {trash.length}</Text>
+              </Pressable>
+              {showTrash ? (
+                <Card>
+                  {trash.map((t) => (
+                    <View key={t.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48 }}>
+                      <Text variant="body" style={{ flex: 1 }}>{t.title}</Text>
+                      <Button label="Restaurer" variant="ghost" onPress={async () => { const err = await restoreTrip(t.id); setTrashError(err); if (!err) void refresh(); }} />
+                    </View>
+                  ))}
+                  <ErrorNote message={trashError} />
+                </Card>
+              ) : null}
+            </View>
+          ) : null}
 
           <Text variant="label">Rejoindre un voyage</Text>
           <Card>

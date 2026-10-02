@@ -15,8 +15,10 @@ import { DayCard } from '../../src/features/trip/DayCard';
 import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
 import { ProgramCard } from '../../src/features/trip/ProgramCard';
+import { activityLines } from '../../src/domain/budget.ts';
 import { buildReminders } from '../../src/domain/reminders.ts';
-import { syncTripReminders } from '../../src/lib/reminders';
+import { deleteTrip } from '../../src/data/trips';
+import { loadNotifPrefs, syncTripReminders } from '../../src/lib/reminders';
 import { savedLabel } from '../../src/domain/offlineSnapshot.ts';
 import { shareText } from '../../src/lib/share';
 import { ChecklistCard } from '../../src/features/trip/ChecklistCard';
@@ -82,6 +84,8 @@ export default function TripScreen() {
   const [tab, setTab] = useState<'voyage' | 'jour' | 'budget' | 'amis'>('voyage');
   const [chosenDay, setChosenDay] = useState<number | null>(null);
   const [plusOpen, setPlusOpen] = useState(false);
+  const [confirmTrash, setConfirmTrash] = useState(false);
+  const [trashError, setTrashError] = useState<string | null>(null);
   const [pendingAdd, setPendingAdd] = useState(false);
   const [pendingMemo, setPendingMemo] = useState(false);
   const [newDay, setNewDay] = useState('');
@@ -107,7 +111,14 @@ export default function TripScreen() {
   useEffect(() => {
     if (!data || savedAt) return;
     const placeName = (pid: number) => data.places.get(pid)?.name;
-    void syncTripReminders(data.trip.id, buildReminders({ tripTitle: data.trip.title, startsOn: data.trip.starts_on, days: data.days, items: data.items, placeName })).catch(() => {});
+    const travelers = Math.max(1, data.members.filter((m) => !m.left_at).length);
+    const dueByDay: Record<string, string[]> = {};
+    for (const l of activityLines({ days: data.days, items: data.items, places: data.places, expenses: data.expenses, travelers })) {
+      if (l.due <= 0) continue;
+      const day = data.days[l.day - 1];
+      if (day) (dueByDay[day.id] ??= []).push(l.name);
+    }
+    void loadNotifPrefs().then((prefs) => syncTripReminders(data.trip.id, buildReminders({ tripTitle: data.trip.title, startsOn: data.trip.starts_on, days: data.days, items: data.items, placeName, prefs, dueByDay }))).catch(() => {});
   }, [data, savedAt]);
 
   if (guard) return guard;
@@ -353,6 +364,18 @@ export default function TripScreen() {
               </View>
             ) : null}
             <Button label={inviteCode ? 'Nouveau code' : 'Inviter un ami'} variant="ghost" onPress={invite} />
+          </Card>
+
+          <Card>
+            <Text variant="label">Supprimer le voyage</Text>
+            {confirmTrash ? (
+              <View style={{ gap: space.sm }}>
+                <Text variant="body">« {trip.title} » ira dans la corbeille de l'accueil, pour tous les voyageurs. Tu pourras le restaurer.</Text>
+                <Button label="Oui, mettre à la corbeille" onPress={async () => { const err = await deleteTrip(trip.id); if (err) setTrashError(err); else router.replace('/'); }} />
+                <Button label="Annuler" variant="ghost" onPress={() => { setConfirmTrash(false); setTrashError(null); }} />
+                <ErrorNote message={trashError} />
+              </View>
+            ) : <Button label="Supprimer ce voyage" variant="ghost" onPress={() => setConfirmTrash(true)} />}
           </Card>
 
         </View>

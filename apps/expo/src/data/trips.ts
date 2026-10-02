@@ -248,3 +248,23 @@ export async function applyItemMoves(moves: { id: string; start_time: string | n
   }
   return null;
 }
+
+/** Met le voyage à la corbeille (restaurable) : il disparaît de l'accueil pour tous ses voyageurs. */
+export async function deleteTrip(tripId: string): Promise<string | null> {
+  const { error } = await supabase.from('trips').update({ deleted_at: new Date().toISOString() }).eq('id', tripId);
+  return msg(error);
+}
+
+export async function restoreTrip(tripId: string): Promise<string | null> {
+  const { error } = await supabase.from('trips').update({ deleted_at: null }).eq('id', tripId);
+  return msg(error);
+}
+
+export interface TrashedTrip { id: string; title: string; starts_on: string | null; ends_on: string | null; deleted_at: string }
+
+/** Voyages à la corbeille (ceux dont on est membre). */
+export async function listTrash(): Promise<{ trips: TrashedTrip[]; error: string | null }> {
+  const { data, error } = await supabase.from('trips').select('id,title,starts_on,ends_on,deleted_at')
+    .not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
+  return { trips: (data ?? []) as TrashedTrip[], error: msg(error) };
+}
