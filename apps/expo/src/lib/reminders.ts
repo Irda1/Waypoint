@@ -2,9 +2,11 @@
 import * as Notifications from 'expo-notifications';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
-import type { Reminder } from '../domain/reminders.ts';
+import { DEFAULT_PREFS } from '../domain/reminders.ts';
+import type { NotifPrefs, Reminder } from '../domain/reminders.ts';
 
 const PREF = 'waypoint.reminders';
+const PREFS = 'waypoint.reminders.prefs';
 
 export const remindersSupported = true;
 
@@ -50,4 +52,17 @@ export async function syncTripReminders(tripId: string, reminders: Reminder[]): 
 
 export async function clearAllReminders(): Promise<void> {
   try { await Notifications.cancelAllScheduledNotificationsAsync(); } catch { /* rien à annuler */ }
+}
+
+export async function loadNotifPrefs(): Promise<NotifPrefs> {
+  try {
+    const raw = await AsyncStorage.getItem(PREFS);
+    return raw ? { ...DEFAULT_PREFS, ...(JSON.parse(raw) as Partial<NotifPrefs>) } : DEFAULT_PREFS;
+  } catch { return DEFAULT_PREFS; }
+}
+
+/** Garde les choix de notifications et efface les rappels déjà programmés : ils sont recalculés à la prochaine ouverture d'un voyage. */
+export async function saveNotifPrefs(prefs: NotifPrefs): Promise<void> {
+  try { await AsyncStorage.setItem(PREFS, JSON.stringify(prefs)); } catch { /* choix non gardé */ }
+  await clearAllReminders();
 }

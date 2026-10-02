@@ -12,7 +12,9 @@ import { palette } from '../src/theme/tokens';
 import type { AccentName } from '../src/theme/tokens';
 import { fonts, space } from '../src/theme/tokens';
 import { useTheme } from '../src/theme/useTheme';
-import { remindersEnabled, remindersSupported, setRemindersEnabled } from '../src/lib/reminders';
+import { loadNotifPrefs, remindersEnabled, remindersSupported, saveNotifPrefs, setRemindersEnabled } from '../src/lib/reminders';
+import { DEFAULT_PREFS, MINUTES_CHOICES } from '../src/domain/reminders.ts';
+import type { NotifPrefs } from '../src/domain/reminders.ts';
 
 const MODE_LABELS: Record<ModePref, string> = { auto: 'Auto', nuit: 'Nuit', jour: 'Jour' };
 const ICON_LABELS: Record<IconStyle, string> = { couleur: 'Couleur', trait: 'Trait', plein: 'Plein' };
@@ -29,7 +31,9 @@ export default function Settings() {
   const [busy, setBusy] = useState(false);
   const [remind, setRemind] = useState(false);
   const [remindNote, setRemindNote] = useState<string | null>(null);
-  useEffect(() => { void remindersEnabled().then(setRemind); }, []);
+  const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_PREFS);
+  useEffect(() => { void remindersEnabled().then(setRemind); void loadNotifPrefs().then(setPrefs); }, []);
+  function changePrefs(next: NotifPrefs) { setPrefs(next); void saveNotifPrefs(next); setRemindNote('Choix enregistrés : les rappels se reprogramment à l\'ouverture de chaque voyage.'); }
   const { colors, mode } = useTheme();
   const pref = useAppearance();
   if (guard) return guard;
@@ -103,9 +107,22 @@ export default function Settings() {
 
       {remindersSupported ? (
         <Card>
-          <Text variant="label">Rappels</Text>
-          <Text variant="muted">Une notification la veille du départ (18 h) et une heure avant la première activité horaire de chaque jour.</Text>
-          <Button label={remind ? 'Rappels activés : désactiver' : 'Activer les rappels'} variant={remind ? 'ghost' : 'primary'} onPress={toggleReminders} />
+          <Text variant="label">Notifications</Text>
+          <Text variant="muted">Rappels programmés sur ton téléphone, sans serveur. Choisis ceux que tu veux.</Text>
+          <Button label={remind ? 'Notifications activées : désactiver' : 'Activer les notifications'} variant={remind ? 'ghost' : 'primary'} onPress={toggleReminders} />
+          {remind ? (
+            <View style={{ gap: space.sm }}>
+              <Chip label={prefs.eve ? '✓ La veille du départ (18 h)' : 'La veille du départ (18 h)'} selected={prefs.eve} onPress={() => changePrefs({ ...prefs, eve: !prefs.eve })} />
+              <Chip label={prefs.bookings ? '✓ Jour J : activités à réserver ou payer (8 h)' : 'Jour J : activités à réserver ou payer (8 h)'} selected={prefs.bookings} onPress={() => changePrefs({ ...prefs, bookings: !prefs.bookings })} />
+              <Chip label={prefs.next ? '✓ Prochaine activité dans X minutes' : 'Prochaine activité dans X minutes'} selected={prefs.next} onPress={() => changePrefs({ ...prefs, next: !prefs.next })} />
+              {prefs.next ? (
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' }}>
+                  <Text variant="label">Prévenir</Text>
+                  {MINUTES_CHOICES.map((m) => <Chip key={m} label={`${m} min avant`} selected={prefs.minutes === m} onPress={() => changePrefs({ ...prefs, minutes: m })} />)}
+                </View>
+              ) : null}
+            </View>
+          ) : null}
           {remindNote ? <Text variant="muted" accessibilityLiveRegion="polite">{remindNote}</Text> : null}
         </Card>
       ) : null}
