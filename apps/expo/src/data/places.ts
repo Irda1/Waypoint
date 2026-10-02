@@ -1,4 +1,5 @@
 // Recherche de lieux dans la base collectée (lecture publique, voir la migration 0500) et ajout à un jour.
+import { airportNear } from '../domain/airports.ts';
 import { supabase } from '../lib/supabase';
 import { accentTolerantTerm, likeTerm } from '../lib/search';
 import type { Place } from '../domain/types.ts';
@@ -108,7 +109,7 @@ export async function listCountryCities(country: string, query = ''): Promise<{ 
   return { cities: rows.map((r) => ({ ...toOption(r), featured_rank: r.featured_rank })), error: error?.message ?? null };
 }
 
-export interface CityPoint { id: number; name: string; lat: number; lng: number; /** Importance : 0 = la plus importante (ville phare, capitale, puis population). */ rank: number }
+export interface CityPoint { id: number; name: string; lat: number; lng: number; /** Importance : 0 = la plus importante (ville phare, capitale, puis population). */ rank: number; /** Desservie par un aéroport à vols réguliers (moins de 40 km). */ airport: boolean }
 
 /** Villes d'un pays avec coordonnées, pour la carte de l'étape Villes (jusqu'à 400, classées par importance). */
 export async function listCountryCityPoints(country: string): Promise<{ points: CityPoint[]; error: string | null }> {
@@ -117,6 +118,14 @@ export async function listCountryCityPoints(country: string): Promise<{ points: 
   type R = { id: number; name: string; name_fr: string | null; lat: number; lng: number; population: number | null; featured_rank: number | null; is_capital: boolean };
   const rows = (data ?? []) as R[];
   const score = (r: R) => (r.featured_rank != null ? r.featured_rank : 1000) * 1e10 - (r.is_capital ? 5e9 : 0) - (r.population ?? 0);
-  const points = [...rows].sort((a, b) => score(a) - score(b)).map((r, i) => ({ id: r.id, name: r.name_fr ?? r.name, lat: r.lat, lng: r.lng, rank: i }));
+  const points = [...rows].sort((a, b) => score(a) - score(b)).map((r, i) => ({ id: r.id, name: r.name_fr ?? r.name, lat: r.lat, lng: r.lng, rank: i, airport: airportNear(r.lat, r.lng) !== null }));
   return { points, error: error?.message ?? null };
+}
+
+/** État de collecte des lieux de chaque ville (lu dans la base). */
+export async function cityCollectionStatuses(cityIds: number[]): Promise<{ statuses: Map<number, CityOption['collection_status']>; error: string | null }> {
+  const { data, error } = await supabase.from('cities').select('id,collection_status').in('id', cityIds);
+  const statuses = new Map<number, CityOption['collection_status']>();
+  for (const r of (data ?? []) as { id: number; collection_status: CityOption['collection_status'] }[]) statuses.set(r.id, r.collection_status);
+  return { statuses, error: error?.message ?? null };
 }

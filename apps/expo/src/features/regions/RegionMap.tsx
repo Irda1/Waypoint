@@ -13,7 +13,7 @@ export function RegionMap({ country, cities, selected, onToggle }: RegionMapProp
   const [ready, setReady] = useState(false);
   const html = useMemo(() => regionsHtml(), []);
   const before = useMemo(() => `window.__REGIONS__=${JSON.stringify({ country, color: REGIONS_COLOR, base: REGIONS_BASE_NATIVE })}; true;`, [country]);
-  const points = useMemo(() => cities.map((c) => ({ id: c.id, n: c.name, lat: c.lat, lng: c.lng, r: c.rank })), [cities]);
+  const points = useMemo(() => cities.map((c) => ({ id: c.id, n: c.name, lat: c.lat, lng: c.lng, r: c.rank, a: c.airport ? 1 : 0 })), [cities]);
   const citiesKey = useRef<unknown>(null);
 
   useEffect(() => {

@@ -25,7 +25,7 @@ export function RegionMap({ country, cities, selected, onToggle }: RegionMapProp
   }, [src]);
 
   const send = useCallback((msg: unknown) => frame.current?.contentWindow?.postMessage(msg, '*'), []);
-  const points = useMemo(() => cities.map((c) => ({ id: c.id, n: c.name, lat: c.lat, lng: c.lng, r: c.rank })), [cities]);
+  const points = useMemo(() => cities.map((c) => ({ id: c.id, n: c.name, lat: c.lat, lng: c.lng, r: c.rank, a: c.airport ? 1 : 0 })), [cities]);
   const sel = useMemo(() => selected.map((s) => ({ id: s.id, o: s.order })), [selected]);
   const citiesKey = useRef<unknown>(null);
   useEffect(() => {
