@@ -129,3 +129,16 @@ export async function cityCollectionStatuses(cityIds: number[]): Promise<{ statu
   for (const r of (data ?? []) as { id: number; collection_status: CityOption['collection_status'] }[]) statuses.set(r.id, r.collection_status);
   return { statuses, error: error?.message ?? null };
 }
+
+export interface HomeCity { id: number; name: string; country_code: string; lat: number; lng: number }
+
+/** Villes dont le nom contient le texte, avec leurs coordonnées (choix de la ville de départ). */
+export async function searchHomeCities(text: string): Promise<HomeCity[]> {
+  const term = likeTerm(text);
+  if (term.length < 2) return [];
+  const { data } = await supabase.from('cities').select('id,name,name_fr,country_code,lat,lng')
+    .or(`name.ilike.%${term}%,name_fr.ilike.%${term}%,name_ascii.ilike.%${term}%`)
+    .order('population', { ascending: false, nullsFirst: false }).limit(8);
+  return ((data ?? []) as { id: number; name: string; name_fr: string | null; country_code: string; lat: number; lng: number }[])
+    .map((r) => ({ id: r.id, name: r.name_fr ?? r.name, country_code: r.country_code, lat: r.lat, lng: r.lng }));
+}
