@@ -1,9 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Text as RNText, View, useWindowDimensions } from 'react-native';
+import { ScrollView, Text as RNText, View, useWindowDimensions } from 'react-native';
 import { Button, ErrorNote, Field, Text } from '../../ui';
 import { RegionMap } from '../regions/RegionMap';
 import { listCountryCities, listCountryCityPoints } from '../../data/places';
 import type { CityOption, CityPoint } from '../../data/places';
+import { Flag } from '../../ui/Flag';
 import { COUNTRY_NAME } from '../../domain/countries.ts';
 import { changeNights, nightCount, toggleCity } from '../../domain/wizard.ts';
 import type { WizardState } from '../../domain/wizard.ts';
@@ -64,11 +65,10 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
     if (p) toggle({ id: p.id, name: p.name } as Row);
   }
 
-  const { width, height } = useWindowDimensions();
+  const { width } = useWindowDimensions();
   const wide = width >= 900;
-  const mapHeight = Math.max(460, Math.min(820, height - 220));
   const map = (
-    <View style={{ height: mapHeight, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' }}>
+    <View style={{ flex: 1, minHeight: 280, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' }}>
       <RegionMap country={country} cities={points} selected={selected} onToggle={toggleById} />
       <ViewToggle showing="visual" onPress={() => setShowList(true)} listLabel="Afficher la liste des villes" backLabel="Revenir à la carte" backIcon="🗺" />
     </View>
@@ -76,10 +76,11 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
   const route = (
     <>
       {state.cities.length > 0 ? (
-        <View style={{ gap: space.sm }}>
+        <View style={{ gap: space.xs }}>
           <Text variant="label">Ton parcours</Text>
+          <ScrollView horizontal={!wide} showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }} style={wide ? undefined : { flexGrow: 0 }}>
           {state.cities.map((c, i) => (
-            <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.md, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface }}>
+            <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.sm, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface }}>
               <View style={{ flex: 1 }}>
                 <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{i + 1}. {c.name}</Text>
               </View>
@@ -95,6 +96,7 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
               ) : null}
             </View>
           ))}
+          </ScrollView>
         </View>
       ) : (
         <Text variant="muted">Tu peux aussi continuer sans choisir : « Je choisirai sur place ».</Text>
@@ -120,8 +122,8 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
 
   // La carte reste montée (cachée) quand on ouvre la liste : on retrouve la même vue en revenant.
   const zone = (
-    <View>
-      <View style={{ display: showList ? 'none' : 'flex' }}>{map}</View>
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1, display: showList ? 'none' : 'flex' }}>{map}</View>
       {showList ? (
         <View style={{ gap: space.md }}>
           <View style={{ minHeight: 56, justifyContent: 'center' }}>
@@ -134,11 +136,12 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
   );
 
   return (
-    <View style={{ gap: space.md }}>
+    <View style={{ gap: space.sm, flex: 1 }}>
       <StepTitle title={`Quelles villes en ${COUNTRY_NAME[country] ?? 'ce pays'} ?`}
         hint={`${nights} nuit${nights > 1 ? "s" : ""} à répartir. Touche une région sur la carte, puis les villes à visiter : les nuits se répartissent toutes seules.`} />
+      {state.country ? <Flag code={state.country} width={30} /> : null}
       {wide ? (
-        <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'flex-start' }}>
+        <View style={{ flexDirection: 'row', gap: space.md, alignItems: 'stretch', flex: 1 }}>
           <View style={{ flex: 7, minWidth: 0 }}>{zone}</View>
           <View style={{ flex: 3, minWidth: 260, gap: space.md }}>{route}</View>
         </View>
