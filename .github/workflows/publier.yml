@@ -50,6 +50,8 @@ jobs:
         uses: actions/deploy-pages@v5
 
   android:
+    # Désactivé : l'APK de l'ancienne maquette prêtait à confusion avec la vraie appli (workflow « APK de l'appli »).
+    if: ${{ false }}
     name: APK Android
     runs-on: ubuntu-latest
     permissions:
