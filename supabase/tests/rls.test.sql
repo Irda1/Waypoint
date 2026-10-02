@@ -332,6 +332,18 @@ select test.as_anon();
 select test.throws($$select public.begin_city_collection(1)$$, '42501', 'anonyme : begin_city_collection refusé');
 select test.throws($$select public.ingest_city_places(1, '[]'::jsonb)$$, '42501', 'anonyme : ingest_city_places refusé');
 
+-- Reprise des collectes abandonnées (migration 1700)
+select test.as_user('cccccccc-0000-0000-0000-000000000003');
+select test.ok(public.begin_city_collection((select id from public.cities where name_fr = 'Tokyo')) = 'go', 'Tokyo : prise en main avant abandon');
+select test.as_admin();
+select test.ok((select count(*) from public.claim_collection_job('places')) = 0, 'une collecte toute récente n''est pas reprise');
+update public.cities set collection_status = 'collecting' where name_fr = 'Tokyo';
+update public.ingestion_queue set status = 'running', started_at = now() - interval '20 minutes' where city_id = (select id from public.cities where name_fr = 'Tokyo');
+select test.as_service();
+select test.ok((select count(*) from public.claim_collection_job('places')) = 1, 'le robot reprend une collecte abandonnée depuis plus de 10 minutes');
+select test.as_admin();
+select test.ok((select status from public.ingestion_queue where city_id = (select id from public.cities where name_fr = 'Tokyo')) = 'running', 'la tâche reprise est de nouveau « running »');
+
 -- ===========================================================================
 -- Lien de partage en lecture seule
 -- ===========================================================================
