@@ -268,3 +268,31 @@ export async function listTrash(): Promise<{ trips: TrashedTrip[]; error: string
     .not('deleted_at', 'is', null).order('deleted_at', { ascending: false });
   return { trips: (data ?? []) as TrashedTrip[], error: msg(error) };
 }
+
+/** Lien de partage actif du voyage (lecture seule), s'il y en a un. `missing` : migration 1500 pas encore installée. */
+export async function getShareToken(tripId: string): Promise<{ token: string | null; missing: boolean; error: string | null }> {
+  const { data, error } = await supabase.from('trip_shares').select('token').eq('trip_id', tripId).is('revoked_at', null).order('created_at', { ascending: false }).limit(1);
+  if (error) return { token: null, missing: error.code === 'PGRST205' || error.code === '42P01', error: msg(error) };
+  return { token: (data?.[0] as { token: string } | undefined)?.token ?? null, missing: false, error: null };
+}
+
+export async function createShare(tripId: string): Promise<{ token: string | null; error: string | null }> {
+  const { data, error } = await supabase.from('trip_shares').insert({ trip_id: tripId }).select('token').single();
+  return { token: (data as { token: string } | null)?.token ?? null, error: msg(error) };
+}
+
+export async function revokeShare(tripId: string): Promise<string | null> {
+  const { error } = await supabase.from('trip_shares').update({ revoked_at: new Date().toISOString() }).eq('trip_id', tripId).is('revoked_at', null);
+  return msg(error);
+}
+
+export interface SharedTrip {
+  title: string; starts_on: string | null; ends_on: string | null; destinations: string[];
+  days: { date: string; city: string | null; items: { time: string | null; name: string | null; category: string | null; note: string | null }[] }[];
+}
+
+/** Programme d'un voyage partagé : lisible sans compte, avec le jeton du lien. */
+export async function loadSharedTrip(token: string): Promise<{ trip: SharedTrip | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('shared_trip', { p_token: token });
+  return { trip: (data as SharedTrip | null) ?? null, error: msg(error) };
+}

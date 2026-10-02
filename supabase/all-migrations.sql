@@ -1258,3 +1258,164 @@ begin
     alter publication supabase_realtime add table public.settlement_payments;
   end if;
 end $$;
+
+-- ============================================================
+-- 20260929001200_delete_account.sql
+-- ============================================================
+-- Waypoint · migration 1200 : suppression de son propre compte
+--
+-- Bouton « Supprimer mon compte » des Paramètres (obligatoire pour les boutiques d'applications).
+-- Les voyages dont la personne est la seule voyageuse sont supprimés avec tout leur contenu ; dans les
+-- voyages partagés, ses dépenses restent (sans nom) et elle disparaît de la liste des voyageurs.
+--
+-- Migration incrémentale : à exécuter seule, sur une base qui a déjà les migrations 0100 à 1100.
+
+create or replace function public.delete_my_account()
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_uid uuid := auth.uid();
+begin
+  if v_uid is null then
+    raise exception 'Connexion requise' using errcode = '28000';
+  end if;
+
+  -- Voyages où personne d'autre n'est encore membre : supprimés (le reste suit en cascade).
+  delete from public.trips t
+  where exists (select 1 from public.trip_members m where m.trip_id = t.id and m.user_id = v_uid)
+    and not exists (select 1 from public.trip_members m where m.trip_id = t.id and m.user_id <> v_uid and m.left_at is null);
+
+  -- Le compte ; le profil et les appartenances partent en cascade, les auteurs passent à « inconnu ».
+  delete from auth.users where id = v_uid;
+end;
+$$;
+
+revoke all on function public.delete_my_account() from public, anon;
+grant execute on function public.delete_my_account() to authenticated;
+
+-- ============================================================
+-- 20260929001300_trip_bookings.sql
+-- ============================================================
+-- Waypoint · migration 1300 : réservations du voyage
+--
+-- Vols, trains, hébergements, billets d'activité : un titre, un numéro de confirmation, une date et une heure,
+-- un lien (billet en ligne, PDF hébergé ailleurs) et des notes. Visibles et modifiables par tous les voyageurs.
+--
+-- Migration incrémentale : à exécuter seule, sur une base qui a déjà les migrations 0100 à 1200.
+
+create table public.trip_bookings (
+  id          uuid primary key default gen_random_uuid(),
+  trip_id     uuid not null references public.trips (id) on delete cascade,
+  kind        text not null default 'autre' check (kind in ('vol', 'train', 'hebergement', 'activite', 'autre')),
+  title       text not null check (char_length(title) between 1 and 120),
+  reference   text check (char_length(reference) <= 80),
+  starts_on   date,
+  start_time  text check (start_time ~ '^[0-2][0-9]:[0-5][0-9]$'),
+  url         text check (char_length(url) <= 500),
+  notes       text check (char_length(notes) <= 1000),
+  created_by  uuid default auth.uid() references public.profiles (id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index trip_bookings_trip_idx on public.trip_bookings (trip_id, starts_on);
+
+alter table public.trip_bookings enable row level security;
+create policy "membres : lecture" on public.trip_bookings for select to authenticated using (public.is_trip_member(trip_id));
+create policy "membres : ajout" on public.trip_bookings for insert to authenticated with check (public.is_trip_member(trip_id));
+create policy "membres : modification" on public.trip_bookings for update to authenticated using (public.is_trip_member(trip_id)) with check (public.is_trip_member(trip_id));
+create policy "membres : suppression" on public.trip_bookings for delete to authenticated using (public.is_trip_member(trip_id));
+revoke truncate on public.trip_bookings from authenticated;
+revoke all on public.trip_bookings from anon;
+
+-- ============================================================
+-- 20260929001400_trip_checklist.sql
+-- ============================================================
+-- Waypoint · migration 1400 : liste « À ne pas oublier » du voyage
+--
+-- Bagages, papiers, démarches : des lignes à cocher, partagées entre les voyageurs du voyage.
+--
+-- Migration incrémentale : à exécuter seule, sur une base qui a déjà les migrations 0100 à 1300.
+
+create table public.trip_checklist (
+  id          uuid primary key default gen_random_uuid(),
+  trip_id     uuid not null references public.trips (id) on delete cascade,
+  label       text not null check (char_length(label) between 1 and 120),
+  done        boolean not null default false,
+  created_by  uuid default auth.uid() references public.profiles (id) on delete set null,
+  created_at  timestamptz not null default now()
+);
+create index trip_checklist_trip_idx on public.trip_checklist (trip_id, created_at);
+
+alter table public.trip_checklist enable row level security;
+create policy "membres : lecture" on public.trip_checklist for select to authenticated using (public.is_trip_member(trip_id));
+create policy "membres : ajout" on public.trip_checklist for insert to authenticated with check (public.is_trip_member(trip_id));
+create policy "membres : modification" on public.trip_checklist for update to authenticated using (public.is_trip_member(trip_id)) with check (public.is_trip_member(trip_id));
+create policy "membres : suppression" on public.trip_checklist for delete to authenticated using (public.is_trip_member(trip_id));
+revoke truncate on public.trip_checklist from authenticated;
+revoke all on public.trip_checklist from anon;
+
+-- ============================================================
+-- 20260929001500_trip_shares.sql
+-- ============================================================
+-- Waypoint · migration 1500 : lien de partage en lecture seule
+--
+-- Un membre crée un lien secret ; toute personne qui l'ouvre voit le programme (jours, étapes, villes)
+-- sans compte et sans rien pouvoir modifier. Ni budget, ni dépenses, ni membres ne sont exposés.
+--
+-- Migration incrémentale : à exécuter seule, sur une base qui a déjà les migrations 0100 à 1400.
+
+create table public.trip_shares (
+  token       text primary key default replace(gen_random_uuid()::text, '-', ''),
+  trip_id     uuid not null references public.trips (id) on delete cascade,
+  created_by  uuid default auth.uid() references public.profiles (id) on delete set null,
+  created_at  timestamptz not null default now(),
+  revoked_at  timestamptz
+);
+create index trip_shares_trip_idx on public.trip_shares (trip_id);
+
+alter table public.trip_shares enable row level security;
+create policy "membres : lecture" on public.trip_shares for select to authenticated using (public.is_trip_member(trip_id));
+create policy "membres : création" on public.trip_shares for insert to authenticated with check (public.is_trip_member(trip_id));
+create policy "membres : révocation" on public.trip_shares for update to authenticated using (public.is_trip_member(trip_id)) with check (public.is_trip_member(trip_id));
+revoke delete, truncate on public.trip_shares from authenticated;
+revoke all on public.trip_shares from anon;
+
+-- Lecture publique : uniquement via le jeton, et seulement le programme.
+create or replace function public.shared_trip(p_token text)
+returns jsonb
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select jsonb_build_object(
+    'title', t.title,
+    'starts_on', t.starts_on,
+    'ends_on', t.ends_on,
+    'destinations', coalesce((
+      select jsonb_agg(c.name order by d.position)
+      from public.trip_destinations d join public.cities c on c.id = d.city_id
+      where d.trip_id = t.id), '[]'::jsonb),
+    'days', coalesce((
+      select jsonb_agg(jsonb_build_object(
+        'date', td.day_date,
+        'city', (select c.name from public.cities c where c.id = td.city_id),
+        'items', coalesce((
+          select jsonb_agg(jsonb_build_object(
+            'time', i.start_time,
+            'name', coalesce(nullif(btrim(i.title), ''), p.name),
+            'category', coalesce(i.category_code, p.category_code),
+            'note', i.note
+          ) order by i.start_time nulls last, i.position)
+          from public.trip_items i left join public.places p on p.id = i.place_id
+          where i.day_id = td.id and i.plan = 'A'), '[]'::jsonb)
+      ) order by td.day_date)
+      from public.trip_days td where td.trip_id = t.id), '[]'::jsonb)
+  )
+  from public.trip_shares s join public.trips t on t.id = s.trip_id
+  where s.token = p_token and s.revoked_at is null and t.deleted_at is null;
+$$;
+revoke all on function public.shared_trip(text) from public;
+grant execute on function public.shared_trip(text) to anon, authenticated, service_role;
