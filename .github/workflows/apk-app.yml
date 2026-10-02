@@ -94,13 +94,20 @@ jobs:
             Vraie appli Waypoint (Expo), build ${{ github.run_number }}, commit ${{ github.sha }}.
             Installer : télécharge `waypoint-app.apk` depuis le téléphone, ouvre-le et autorise l'installation. Elle s'installe à côté de l'ancienne maquette.
 
+      # On recrée la release à chaque build : sinon elle garde sa date de création d'origine (elle reste tout en bas
+      # de la liste, parmi les anciennes) et son tag reste sur un ancien commit. Le lien fixe ne change pas.
+      - name: Remplacer l'ancienne release app-latest
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete app-latest --cleanup-tag --yes --repo "${{ github.repository }}" || true
+
       - name: Lien fixe vers le dernier APK de l'appli
         uses: softprops/action-gh-release@v3
         with:
           tag_name: app-latest
           target_commitish: ${{ github.sha }}
           name: Waypoint (appli) · dernière version
-          make_latest: false
+          make_latest: true
           files: waypoint-app.apk
           body: |
             Dernier APK de la vraie appli Waypoint (Expo) : build ${{ github.run_number }}, commit ${{ github.sha }}.
