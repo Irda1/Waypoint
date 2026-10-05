@@ -1,74 +1,73 @@
-# Waypoint · maquette
+# Waypoint
 
-Maquette interactive de **Waypoint**, l'application compagnon de voyage (version actuelle : 0.9.0 « Crépuscule »).
+**Le compagnon de voyage collaboratif** : prépare ton voyage à plusieurs, jour par jour, avec une carte, la météo et le partage des dépenses entre amis, même sans connexion.
 
-À chaque `push` sur `main`, GitHub Actions publie automatiquement :
+> Principe : **l'IA propose, l'utilisateur décide.** Les estimations sont toujours marquées « ≈ », jamais de faux « temps réel ».
 
-| Quoi | Où |
+| | |
 |---|---|
-| Version web (installable, fonctionne hors ligne) | `https://<pseudo>.github.io/<dépôt>/` |
-| Page d'installation (APK + web, QR code) | `https://<pseudo>.github.io/<dépôt>/installer.html` |
-| Dernier APK Android | `https://github.com/<pseudo>/<dépôt>/releases/latest/download/waypoint.apk` |
-| Historique des APK | onglet **Releases** du dépôt (une release `build-N` par publication) |
+| 🌐 **Version web** | https://irda1.github.io/Waypoint/ |
+| 📱 **APK Android** | [waypoint-app.apk](https://github.com/Irda1/Waypoint/releases/download/app-latest/waypoint-app.apk) (télécharge-le sur le téléphone, ouvre-le et autorise l'installation) |
+| 📚 **Documentation** | [`docs/`](docs/) |
 
-Description technique complète (langages, outils, sources de données à vérifier) : [`docs/DESCRIPTION-TECHNIQUE.md`](docs/DESCRIPTION-TECHNIQUE.md).
+## Ce que fait l'application
 
-## Organisation du dépôt
+- **Créer un voyage** avec un assistant : pays (planète 3D ou liste), dates, villes avec nuits réparties automatiquement, voyageurs, envies, budget, puis un programme jour par jour proposé.
+- **Programme** : étapes avec horaires, glisser-déposer, vérification des horaires d'ouverture, plans B et C, « Journée en cours », fiche de chaque lieu (description, entrée estimée, durée, trajet).
+- **Carte** : le programme numéroté par jour, des lieux à découvrir filtrables par catégorie, recherche, favoris, bouton « Élargir la zone » pour charger plus de lieux autour d'une ville.
+- **Budget** : total, payé et prévu, reste par jour, détail par poste, par groupe ou par personne, et **« Entre amis »** (qui doit quoi, relancer, marquer reçu).
+- **Voyager à plusieurs** : les membres sont égaux, on rejoint un voyage avec un code, une checklist « À ne pas oublier » est partagée, et un lien de partage en lecture seule existe.
+- **Pratique** : météo avec cache hors connexion, lecture des voyages hors connexion, rappels sur téléphone, export texte et `.ics`, thème Nuit / Jour / Auto.
 
-```
-web/                     Source de la maquette (ce qui est publié)
-  index.html             La maquette (un seul fichier, issue de l'artifact Claude)
-  installer.html         Page « Installer la maquette »
-  pwa.js                 Service worker (web) + couleur de la barre d'état (APK)
-  sw.js                  Cache hors ligne de la version web
-  manifest.webmanifest   Nom, icônes, couleurs de l'appli web installable
-  icons/                 Icônes web
-resources/android/res/   Icônes Android, écran de lancement (copiés dans le projet natif par la CI)
-scripts/
-  build-web.mjs          web/ → dist/ (version, n° de build, liens du dépôt, QR code)
-  serve.mjs              Serveur local pour tester dist/
-  generate-icons.mjs     Régénère les icônes à partir du logo
-capacitor.config.json    Configuration de l'APK (Capacitor 8)
-.github/workflows/publier.yml   Publication web + APK
-```
+## Comment c'est fait
 
-## Backend, collecte et application Expo (v1)
+| Brique | Rôle |
+|---|---|
+| `apps/expo/` | L'application (Expo SDK 57, expo-router, React Native Web) : Android, iOS et web avec le même code. La logique métier pure et testée est dans `src/domain/`. |
+| `supabase/` | La base de données (Postgres, sécurité par ligne, Realtime), les migrations et les tests de sécurité. |
+| `pipeline/` | La collecte des données de référence (pays, villes, lieux, photos), lancée par GitHub Actions. |
+| `.github/workflows/` | Publication du site web, de l'APK et collecte des données. |
+| `web/`, `scripts/` | L'ancienne maquette (voir plus bas). |
 
-En plus de la maquette, le dépôt contient les briques de l'application réelle : base **Supabase** (`supabase/`), **pipeline de collecte** de pays, villes, lieux et images (`pipeline/`) et application **Expo** universelle (`apps/expo/`). Mise en route pas à pas : [`docs/BACKEND.md`](docs/BACKEND.md).
+**Sources de données** : [OpenStreetMap](https://www.openstreetmap.org/copyright) (lieux, ODbL), [Geoapify](https://www.geoapify.com/) (chargement rapide des lieux), GeoNames, Pexels (photos de villes), Wikipédia (descriptions, CC BY-SA), Open-Meteo (météo), OpenFreeMap (fond de carte), Frankfurter / BCE (taux de change). Détails et licences : [`docs/DESCRIPTION-TECHNIQUE.md`](docs/DESCRIPTION-TECHNIQUE.md).
 
-```bash
-bash supabase/tests/run-local.sh        # schéma et sécurité, sur un PostgreSQL jetable
-node --test pipeline/test/*.test.mjs    # pipeline de collecte
-cd apps/expo && npm test                # logique métier de l'application
-```
+## Lancer le projet
 
-## Mettre à jour la maquette
-
-1. Remplace `web/index.html` par la nouvelle version (garder les lignes du `<head>` : manifest, icônes, `pwa.js` en bas de page).
-2. Monte la version dans `package.json` (`"version": "0.9.1"` par exemple).
-3. `git commit` puis `git push` : environ 5 minutes plus tard, le site et l'APK sont à jour.
-
-Sur le téléphone, le nouvel APK s'installe par-dessus l'ancien (même clé de signature, numéro de version croissant) : les voyages enregistrés sont conservés.
-
-## Tester en local
+Prérequis : Node.js 22 ou plus et un projet [Supabase](https://supabase.com) (mise en route pas à pas : [`docs/BACKEND.md`](docs/BACKEND.md)).
 
 ```bash
+cd apps/expo
+cp .env.example .env.local      # puis renseigne l'URL et la clé « anon » de Supabase
 npm install
-npm run build:web
-npm run serve          # http://localhost:5173
+npx expo start --web            # http://localhost:8081
 ```
 
-Pour ouvrir le projet Android dans Android Studio (facultatif) : `npm run android:add`, puis `npm run android:sync` et `npm run android:open`.
+Tests (depuis la racine du dépôt) :
 
-## Signature de l'APK
+```bash
+cd apps/expo && npm test && npm run typecheck   # logique métier et typage
+node --test pipeline/test/*.test.mjs            # collecte de données
+bash supabase/tests/run-local.sh                # schéma et sécurité, sur un PostgreSQL jetable
+```
 
-La CI signe l'APK avec la clé stockée dans le secret GitHub **`ANDROID_DEBUG_KEYSTORE`** (keystore encodé en base64). Sans ce secret, chaque build utiliserait une clé différente et il faudrait désinstaller l'appli avant chaque mise à jour. La clé n'est jamais versionnée (voir `.gitignore`).
+## Publication
 
-Cette clé sert uniquement à la maquette (`com.waypoint.maquette`). La future application Play Store aura son propre identifiant et sa propre clé de publication.
+À chaque push sur `main` :
 
-## Limites connues de la maquette
+- le **site web** est reconstruit et publié sur GitHub Pages (`web-app.yml`) ;
+- l'**APK** est construit et publié dans les Releases, avec un lien stable vers la dernière version (`apk-app.yml`) ;
+- la **collecte de données** tourne régulièrement (`collecte.yml`).
 
-- Données d'exemple : lieux, horaires, météo et trajets ne viennent d'aucune API réelle.
-- Les voyages créés sont stockés localement (navigateur ou APK), sans compte ni synchronisation.
-- Les polices (Fraunces, Plus Jakarta Sans, Geist Mono) viennent de Google Fonts : sans réseau, l'APK peut afficher la police système à la place.
-- L'APK est une build « debug » (non optimisée, non publiable sur le Play Store). C'est voulu pour une maquette.
+Les migrations de la base ne sont pas automatiques : elles se collent dans le SQL Editor de Supabase (voir [`docs/BACKEND.md`](docs/BACKEND.md)).
+
+## Travailler avec Claude Code
+
+Le dépôt contient sa configuration pour les sessions Claude Code : [`CLAUDE.md`](CLAUDE.md) (consignes du projet), un hook de démarrage qui installe les dépendances, et des skills dans `.claude/skills/` (migrations Supabase, build de l'APK, et le mode « ponytail » qui privilégie le plus petit changement qui marche).
+
+## Ancienne maquette (v0.9)
+
+Avant l'application, une maquette interactive en un seul fichier HTML (`web/index.html`) a servi de prototype, publiée en APK via Capacitor (`publier.yml`). Elle ne reçoit plus d'évolutions. Description : [`docs/DESCRIPTION-TECHNIQUE.md`](docs/DESCRIPTION-TECHNIQUE.md). Pour la tester : `npm install && npm run build:web && npm run serve` (http://localhost:5173).
+
+## État du projet
+
+Projet personnel en cours de développement. Non vérifié sur appareil à ce jour : rappels natifs, mode hors connexion, glisser-déposer mobile. Les transports en commun sont estimés (pas encore de source réelle). L'offre gratuite d'Open-Meteo est réservée à un usage non commercial : à changer avant une publication commerciale.
