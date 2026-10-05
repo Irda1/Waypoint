@@ -323,6 +323,15 @@ select test.ok((select collection_status from public.cities where name = 'Paris'
 select test.ok((select status from public.ingestion_queue where city_id = (select id from public.cities where name = 'Paris')) = 'done', 'la tâche est terminée');
 select test.as_user('cccccccc-0000-0000-0000-000000000003');
 select test.ok(public.begin_city_collection((select id from public.cities where name = 'Paris')) = 'ready', 'ville déjà prête : rien à refaire');
+-- Élargir la zone d'une ville prête (migration 1800)
+select test.ok(public.extend_city_collection((select id from public.cities where name = 'Paris')) = 'go', 'élargir : prend la main sur une ville prête');
+select test.ok((select collection_status from public.cities where name = 'Paris') = 'collecting', 'élargir : la ville repasse à « collecting »');
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select test.ok(public.extend_city_collection((select id from public.cities where name = 'Paris')) = 'busy', 'élargir : une seule personne à la fois');
+select test.as_user('cccccccc-0000-0000-0000-000000000003');
+select public.ingest_city_places((select id from public.cities where name = 'Paris'), '[]'::jsonb);
+select test.ok((select collection_status from public.cities where name = 'Paris') = 'ready', 'élargir : la ville est de nouveau prête après l''écriture');
+select test.ok(public.extend_city_collection((select id from public.cities where name_fr = 'Tokyo')) = 'busy', 'élargir : une ville pas prête n''est pas élargie');
 -- Rendre la main au robot
 select test.ok(public.begin_city_collection((select id from public.cities where name_fr = 'Tokyo')) = 'go', 'Tokyo : prise en main');
 select public.release_city_collection((select id from public.cities where name_fr = 'Tokyo'), 'Overpass injoignable');

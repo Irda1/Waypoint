@@ -120,7 +120,7 @@ test('collecte avec clé Geoapify : sans Overpass quand Geoapify répond, repli 
     fetchImpl: (_u, init) => ok(decodeURIComponent(init.body.slice(5)).includes('restaurant') ? [diner] : []),
   });
   assert.equal(urls.length, 4);
-  assert.match(urls[0], /filter=circle:135\.76,35\.01,\d+&.*limit=500&apiKey=K$/);
+  assert.match(urls[0], /filter=circle:135\.76,35\.01,\d+&.*limit=500&offset=0&apiKey=K$/);
   assert.deepEqual(r.rows.map((x) => x.name).sort(), ['Chez Lui', 'Musée']);
 });
 
@@ -131,4 +131,17 @@ test('collecte : Geoapify en erreur, tout retombe sur Overpass', async () => {
     fetchImpl: (_u, init) => ok(decodeURIComponent(init.body.slice(5)).includes('tourism') ? [museum] : []),
   });
   assert.deepEqual(r.rows.map((x) => x.name), ['Musée']);
+});
+
+test('élargir la zone : rayon multiplié (plafonné) et plusieurs pages Geoapify tant qu\'elles sont pleines', async () => {
+  const urls: string[] = [];
+  const full = Array.from({ length: 500 }, (_, i) => ({ properties: { name: `M${i}`, lat: 35.01, lon: 135.76, datasource: { raw: { osm_type: 'n', osm_id: i + 1, tourism: 'museum', name: `M${i}` } } } }));
+  await collectCityPlaces(city, {
+    mirrors: ['a'], retryDelayMs: 1, geoapifyKey: 'K', radiusScale: 100,
+    geoFetch: (u) => { urls.push(u); return Promise.resolve({ ok: true, status: 200, json: async () => ({ features: u.includes('categories=tourism') ? full : [] }) }); },
+    fetchImpl: () => ok([]),
+  });
+  assert.ok(urls.every((u) => u.includes('circle:135.76,35.01,30000')), 'rayon plafonné à 30 km');
+  assert.equal(urls.filter((u) => u.includes('categories=tourism')).length, 3, '3 pages pour les attractions');
+  assert.ok(urls.some((u) => u.includes('offset=1000')));
 });

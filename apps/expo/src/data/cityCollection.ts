@@ -74,6 +74,36 @@ async function collectCityOnce(cityId: number, onFraction?: (f: number) => void)
 }
 
 /**
+ * « Élargir la zone » : relit une ville déjà prête avec un rayon `scale` fois plus grand (migration 1800) et ajoute
+ * les nouveaux lieux. Si la lecture échoue, la ville est remise « prête » avec ses lieux d'avant : rien n'est perdu.
+ */
+export async function extendCityNow(cityId: number, scale: number, onFraction?: (f: number) => void): Promise<{ error: string | null }> {
+  const begin = await supabase.rpc('extend_city_collection', { p_city: cityId });
+  if (begin.error) {
+    if (begin.error.code === '54000') return { error: 'Trop de demandes aujourd\'hui : réessaie demain.' };
+    if (['42883', 'PGRST202'].includes(begin.error.code)) return { error: 'Mise à jour de la base requise (migration 1800) : demande à Adrien de la lancer.' };
+    return { error: begin.error.message };
+  }
+  if (begin.data !== 'go') return { error: 'Une collecte est déjà en cours pour cette ville.' };
+  onFraction?.(0.05);
+  try {
+    const { data: city, error } = await supabase.from('cities').select('id,lat,lng,population').eq('id', cityId).maybeSingle();
+    if (error || !city) throw new Error(error?.message ?? 'ville introuvable');
+    const { rows } = await collectCityPlaces(city as { id: number; lat: number; lng: number; population: number | null }, {
+      geoapifyKey: GEOAPIFY_KEY, radiusScale: scale,
+      onGroup: (done, total) => onFraction?.(0.05 + 0.85 * (done / total)),
+    });
+    const res = await supabase.rpc('ingest_city_places', { p_city: cityId, p_places: rows });
+    if (res.error) throw new Error(res.error.message);
+    onFraction?.(1);
+    return { error: null };
+  } catch (err) {
+    await supabase.rpc('ingest_city_places', { p_city: cityId, p_places: [] });   // remet la ville « prête »
+    return { error: err instanceof Error ? err.message : String(err) };
+  }
+}
+
+/**
  * Attend que toutes ces villes soient prêtes, en collectant en direct celles qui ne le sont pas (2 à la fois pour
  * ménager les serveurs OpenStreetMap). `onProgress` reçoit un pourcentage réel : lecture des groupes, écriture, etc.
  */

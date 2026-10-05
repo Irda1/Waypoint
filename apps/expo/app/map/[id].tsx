@@ -8,6 +8,7 @@ import { useTrip } from '../../src/data/useTrip';
 import { useCategories } from '../../src/data/categories';
 import { loadCandidates } from '../../src/data/itinerary';
 import { addPlaceItem } from '../../src/data/places';
+import { extendCityNow } from '../../src/data/cityCollection';
 import { useFavorites } from '../../src/data/favorites';
 import { PlaceSheet } from '../../src/features/trip/PlaceSheet';
 import { discoverPoints, legendDays, planPoints, searchPoints, visiblePoints } from '../../src/domain/map.ts';
@@ -39,6 +40,9 @@ export default function TripMap() {
   const [term, setTerm] = useState('');
   const [focus, setFocus] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const [zoneStep, setZoneStep] = useState(0);
+  const [widening, setWidening] = useState<number | null>(null);
   const [panel, setPanel] = useState<PanelPos>('bas');
   const [areaH, setAreaH] = useState(0);
   const [details, setDetails] = useState(false);
@@ -51,6 +55,22 @@ export default function TripMap() {
     void loadCandidates(cityIds, categories.rootOf).then((r) => { setLoaded(r.candidates); if (r.error) setProblem(r.error); });
   }, [discover, onlyFav, term, loaded, cityIds, categories]);
 
+  // « Élargir la zone » : rayon x2 puis x3,5 pour chaque ville du voyage, avec un pourcentage réel.
+  const ZONE_SCALES = [2, 3.5];
+  const widen = async () => {
+    const scale = ZONE_SCALES[zoneStep];
+    setWidening(0); setProblem(null);
+    const fractions = cityIds.map(() => 0);
+    const errors: string[] = [];
+    await Promise.all(cityIds.map(async (id, i) => {
+      const r = await extendCityNow(id, scale, (f) => { fractions[i] = f; setWidening(fractions.reduce((a, b) => a + b, 0) / fractions.length); });
+      if (r.error) errors.push(r.error);
+    }));
+    setWidening(null);
+    if (errors.length) setProblem(errors[0]);
+    if (errors.length < cityIds.length) { setZoneStep((n) => n + 1); setLoaded(null); }
+  };
+
   const plan = useMemo(() => (data ? planPoints({ days: data.days, items: data.items, places: data.places, rootOf: categories.rootOf }) : []), [data, categories]);
   const disc = useMemo(() => {
     if (!data || !loaded) return [];
@@ -62,6 +82,8 @@ export default function TripMap() {
   const found = useMemo(() => searchPoints([...plan, ...disc], term), [plan, disc, term]);
   const legend = useMemo(() => legendDays(points), [points]);
   const point: MapPoint | undefined = points.find((p) => p.id === selected);
+  // Bande du bas seulement quand il y a quelque chose à dire (le chargement est un badge sur la carte).
+  const message = notice ?? (points.length === 0 ? (discover ? (loaded === null ? null : 'Aucun lieu à afficher pour ce filtre.') : 'Rien au programme pour l\'instant. Active « Lieux à découvrir » pour voir des idées.') : null);
 
   if (guard) return guard;
   if (loading) return <Screen><Text variant="muted">Chargement de la carte…</Text></Screen>;
@@ -173,16 +195,30 @@ export default function TripMap() {
               </View>
             </View>
           ) : null}
-          <View style={{ flexDirection: 'row', gap: space.sm }}>
+          {infoOpen ? (
+            <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, padding: space.md, maxWidth: 280 }}>
+              <RNText style={{ fontFamily: fonts.sans, fontSize: 13, color: colors.text }}>Fond de carte : OpenFreeMap · © contributeurs d'OpenStreetMap. Lieux : Geoapify. Nécessite une connexion.</RNText>
+            </View>
+          ) : null}
+          <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'center' }}>
             <Pressable accessibilityRole="button" accessibilityLabel={legendOpen ? 'Masquer la légende' : 'Afficher la légende'} onPress={() => setLegendOpen((v) => !v)}
               style={{ minHeight: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
               <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text }}>Légende</RNText>
             </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Crédits de la carte" onPress={() => setInfoOpen((v) => !v)}
+              style={{ width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
+              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 16, color: colors.text }}>i</RNText>
+            </Pressable>
+            {discover && loaded === null ? (
+              <View accessibilityLiveRegion="polite" style={{ minHeight: 44, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
+                <RNText style={{ fontFamily: fonts.sans, fontSize: 13, color: colors.text2 }}>Chargement des lieux…</RNText>
+              </View>
+            ) : null}
           </View>
         </View>
       </View>
 
-      <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line }}>
+      {point || message || problem ? <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line }}>
         <View style={{ padding: space.lg, gap: space.sm, minHeight: 88 }}>
           {point ? (
             <>
@@ -196,15 +232,10 @@ export default function TripMap() {
               {point.placeId != null ? <Button label={favorites.ids.has(point.placeId) ? '♥ Dans mes favoris' : '♡ Ajouter aux favoris'} variant="ghost" onPress={() => { void favorites.toggle(point.placeId!); }} /> : null}
               {point.kind === 'disc' ? (dayId ? <Button label={`Ajouter au jour ${day}`} onPress={add} loading={busy} /> : <Text variant="muted">Choisis un jour en haut pour l'ajouter à ton programme.</Text>) : null}
             </>
-          ) : (
-            <Text variant="muted" accessibilityLiveRegion="polite">
-              {notice ?? (points.length ? `${points.length} repère${points.length > 1 ? 's' : ''} sur la carte. Touche-en un pour le détail.` : discover ? (loaded === null ? 'Chargement des lieux…' : 'Aucun lieu à afficher pour ce filtre.') : 'Rien au programme pour l\'instant. Active « Lieux à découvrir » pour voir des idées.')}
-            </Text>
-          )}
+          ) : <Text variant="muted" accessibilityLiveRegion="polite">{message}</Text>}
           <ErrorNote message={problem} />
-          <Text variant="muted" style={{ fontSize: 12 }}>Fond de carte : OpenFreeMap · © contributeurs d'OpenStreetMap. Nécessite une connexion.</Text>
         </View>
-      </SafeAreaView>
+      </SafeAreaView> : null}
       {details && point?.placeId != null ? (
         <PlaceSheet visible tripId={data.trip.id} placeId={point.placeId} name={point.label} category={category}
           dot={categoryColors[mode][point.root] ?? colors.text3} place={place ?? null} currency={data.trip.currency}
