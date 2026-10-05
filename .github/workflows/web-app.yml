@@ -1,0 +1,62 @@
+# Version web de la vraie appli Expo (apps/expo) sur GitHub Pages, à chaque push qui la modifie sur main.
+# Lien : https://irda1.github.io/Waypoint/   (réglage unique : Settings > Pages > Source = « GitHub Actions »)
+# Secrets requis : SUPABASE_URL et SUPABASE_ANON_KEY (les mêmes que pour l'APK).
+name: Site web de l'appli
+
+on:
+  push:
+    branches: [main]
+    paths: ['apps/expo/**', '.github/workflows/web-app.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment:
+      name: github-pages
+      url: ${{ steps.deploiement.outputs.page_url }}
+    env:
+      EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Dossier du site (GitHub Pages sert sous /<dépôt>)
+        working-directory: apps/expo
+        run: |
+          node -e "const f='app.json',j=JSON.parse(require('fs').readFileSync(f));j.expo.experiments={...j.expo.experiments,baseUrl:'/'+process.env.GITHUB_REPOSITORY.split('/')[1]};require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
+
+      - name: Installer les dépendances
+        working-directory: apps/expo
+        run: npm install --no-audit --no-fund
+
+      - name: Construire le site
+        working-directory: apps/expo
+        run: npx expo export --platform web
+
+      - name: Page de secours pour les adresses directes
+        run: cp apps/expo/dist/index.html apps/expo/dist/404.html
+
+      - uses: actions/configure-pages@v5
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/expo/dist
+
+      - name: Déployer
+        id: deploiement
+        uses: actions/deploy-pages@v5

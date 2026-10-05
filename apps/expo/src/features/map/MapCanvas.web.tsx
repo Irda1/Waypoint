@@ -1,3 +1,4 @@
+import { WEB_BASE } from '../../lib/webBase';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { MapCanvasProps } from './types';
 
@@ -7,7 +8,7 @@ export function MapCanvas({ points, selectedId, dark, start, fitKey, focusId, on
   const [ready, setReady] = useState(false);
   const lastFit = useRef<string | null>(null);
   // Page publique /map.html (dossier public/) : une vraie adresse, comme une page web ordinaire, plutôt qu'un contenu « srcdoc ».
-  const src = useMemo(() => `/map.html?dark=${dark ? 1 : 0}&lat=${start.lat}&lng=${start.lng}&zoom=${start.zoom}`, [dark]); // eslint-disable-line react-hooks/exhaustive-deps -- le départ ne compte qu'à la création
+  const src = useMemo(() => `${WEB_BASE}/map.html?dark=${dark ? 1 : 0}&lat=${start.lat}&lng=${start.lng}&zoom=${start.zoom}`, [dark]); // eslint-disable-line react-hooks/exhaustive-deps -- le départ ne compte qu'à la création
   const select = useRef(onSelect);
   select.current = onSelect;
 

@@ -1,3 +1,4 @@
+import { WEB_BASE } from '../../lib/webBase';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { REGIONS_COLOR } from './types';
 import type { RegionMapProps } from './types';
@@ -8,7 +9,7 @@ export function RegionMap({ country, cities, selected, onToggle }: RegionMapProp
   const [ready, setReady] = useState(false);
   const toggle = useRef(onToggle);
   toggle.current = onToggle;
-  const src = useMemo(() => `/regions.html?country=${country}&color=${REGIONS_COLOR}`, [country]);
+  const src = useMemo(() => `${WEB_BASE}/regions.html?country=${country}&color=${REGIONS_COLOR}&base=${encodeURIComponent(window.location.origin + WEB_BASE)}`, [country]);
 
   useEffect(() => {
     setReady(false);

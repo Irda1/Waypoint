@@ -1,3 +1,4 @@
+import { WEB_BASE } from '../../lib/webBase';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { GLOBE_COLOR } from './types';
 import type { GlobeProps } from './types';
@@ -26,7 +27,7 @@ export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick }: Globe
   }, []);
 
   return React.createElement('iframe', {
-    ref: frame, onLoad: send, src: `/globe.html?mode=${mode}&color=${color}`, title: 'Globe terrestre',
+    ref: frame, onLoad: send, src: `${WEB_BASE}/globe.html?mode=${mode}&color=${color}`, title: 'Globe terrestre',
     style: { border: 0, width: '100%', height: '100%', background: '#000', pointerEvents: mode === 'hero' ? 'none' : 'auto' },
   });
 }
