@@ -192,13 +192,16 @@ canvas{display:block;width:100%;height:100%}
   function onMsg(e) { try { var m = typeof e.data === "string" ? JSON.parse(e.data) : e.data; if (m && m.type === "focus") focus(m.code); } catch (err) {} }
   window.addEventListener("message", onMsg); document.addEventListener("message", onMsg);
   if (MODE === "pick") {
-    canvas.addEventListener("pointerdown", function (e) { drag = { x: e.clientX, y: e.clientY }; anim = null; moved = 0; canvas.setPointerCapture(e.pointerId); });
+    var ptrs = {}, multi = function () { return Object.keys(ptrs).length > 1; };
+    canvas.addEventListener("pointerdown", function (e) { ptrs[e.pointerId] = 1; anim = null; canvas.setPointerCapture(e.pointerId); if (multi()) { drag = null; moved = 99; } else { drag = { x: e.clientX, y: e.clientY }; moved = 0; } });
     canvas.addEventListener("pointermove", function (e) {
+      if (multi()) return;
       if (drag) { var dx = e.clientX - drag.x, dy = e.clientY - drag.y; moved += Math.abs(dx) + Math.abs(dy); drag = { x: e.clientX, y: e.clientY }; var k = 0.005 * (dist / 6); group.rotation.y += dx * k; group.rotation.x = Math.max(-1.2, Math.min(1.2, group.rotation.x + dy * k)); vx = dx * k; }
       else if (e.pointerType === "mouse") setHover(pick(e.clientX, e.clientY));
     });
+    canvas.addEventListener("pointercancel", function (e) { delete ptrs[e.pointerId]; drag = null; });
     canvas.addEventListener("pointerup", function (e) {
-      var wasTap = moved < 8; drag = null;
+      delete ptrs[e.pointerId]; var wasTap = moved < 8; drag = null;
       if (wasTap) { var i = pick(e.clientX, e.clientY); setHover(i); if (i >= 0 && feats[i].code) { sel = i; paint(); refresh(); post({ type: "pick", code: feats[i].code, name: feats[i].name }); } }
     });
     canvas.addEventListener("wheel", function (e) { e.preventDefault(); target = Math.max(2.7, Math.min(11, target + e.deltaY * 0.004)); }, { passive: false });
