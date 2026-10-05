@@ -28,6 +28,7 @@ jobs:
     env:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+      EXPO_PUBLIC_GEOAPIFY_KEY: ${{ secrets.GEOAPIFY_API_KEY }}
     steps:
       - uses: actions/checkout@v5
 

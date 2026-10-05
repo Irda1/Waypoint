@@ -1,4 +1,4 @@
-// Collecte des lieux d'une ville DEPUIS L'APPLI (OpenStreetMap via Overpass), en quelques secondes.
+// Collecte des lieux d'une ville DEPUIS L'APPLI (Geoapify Places si une clé est fournie, sinon OpenStreetMap via Overpass), en quelques secondes.
 //
 // Même tri que le pipeline (osm.ts est une copie exacte de pipeline/src/lib/osm.mjs), mais :
 //  - les 4 groupes de requêtes partent en même temps, chacun sur un serveur différent au départ ;
@@ -93,6 +93,44 @@ export function hedgedOverpass(query: string, opts: HedgeOptions = {}): Promise<
   });
 }
 
+/** Catégories Geoapify de chaque groupe (le tri fin reste celui d'osm.ts, sur les étiquettes OSM). */
+const GEOAPIFY_CATEGORIES: Record<string, string> = {
+  attractions: 'tourism,heritage,entertainment,leisure.park,beach,religion.place_of_worship',
+  food: 'catering',
+  services: 'healthcare.pharmacy,healthcare.hospital,service.financial,commercial.laundry',
+  stays_transit: 'accommodation,public_transport.train,public_transport.bus,airport',
+};
+const OSM_TYPES: Record<string, string> = { n: 'node', w: 'way', r: 'relation' };
+
+interface GeoapifyFeature { properties?: { name?: string; lat?: number; lon?: number; datasource?: { raw?: Record<string, unknown> } } }
+
+/** Un lieu Geoapify devient un « élément Overpass » (étiquettes OSM brutes) : le tri existant s'applique tel quel. */
+export function geoapifyToElement(f: GeoapifyFeature): OverpassElement | null {
+  const p = f.properties;
+  const raw = p?.datasource?.raw;
+  if (!p || !raw || !Number.isFinite(p.lat) || !Number.isFinite(p.lon)) return null;
+  const type = OSM_TYPES[String(raw.osm_type)] ?? String(raw.osm_type);
+  const id = Number(raw.osm_id);
+  if (!['node', 'way', 'relation'].includes(type) || !Number.isFinite(id)) return null;
+  const tags: Record<string, string> = {};
+  for (const [k, v] of Object.entries(raw)) if (typeof v === 'string' && k !== 'osm_type') tags[k] = v;
+  if (!tags.name && p.name) tags.name = p.name;
+  return { type, id, lat: p.lat, lon: p.lon, tags };
+}
+
+type GeoFetch = (url: string) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+
+/** Lit un groupe via Geoapify Places. ponytail: une seule page de 500 lieux les plus proches du centre, passer à `offset` si une métropole en manque. */
+export async function geoapifyElements(group: string, a: { lat: number; lng: number; radiusM: number; key: string; fetchImpl?: GeoFetch }): Promise<OverpassElement[]> {
+  const url = `https://api.geoapify.com/v2/places?categories=${GEOAPIFY_CATEGORIES[group]}&filter=circle:${a.lng},${a.lat},${Math.round(a.radiusM)}&bias=proximity:${a.lng},${a.lat}&limit=500&apiKey=${a.key}`;
+  const res = await (a.fetchImpl ?? (fetch as unknown as GeoFetch))(url);
+  if (!res.ok) throw new Error(`Geoapify HTTP ${res.status}`);
+  const json = (await res.json()) as { features?: GeoapifyFeature[] };
+  const out: OverpassElement[] = [];
+  for (const f of json.features ?? []) { const el = geoapifyToElement(f); if (el) out.push(el); }
+  return out;
+}
+
 const sleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export interface CollectResult { rows: Record<string, unknown>[]; failedGroups: string[]; read: number }
@@ -101,7 +139,7 @@ export interface CollectResult { rows: Record<string, unknown>[]; failedGroups: 
  * Lit les lieux d'une ville. Les 4 groupes partent ensemble ; un groupe en échec est retenté une fois.
  * Le groupe « attractions » est indispensable : sans lui la ville serait « prête » mais vide, donc on échoue.
  */
-export async function collectCityPlaces(city: CityInput, opts: HedgeOptions & { onGroup?: (done: number, total: number) => void; retryDelayMs?: number } = {}): Promise<CollectResult> {
+export async function collectCityPlaces(city: CityInput, opts: HedgeOptions & { onGroup?: (done: number, total: number) => void; retryDelayMs?: number; geoapifyKey?: string; geoFetch?: GeoFetch } = {}): Promise<CollectResult> {
   const groups = Object.keys(GROUPS);
   const radiusM = radiusForCity(city.population);
   const retrievedAt = new Date().toISOString();
@@ -113,6 +151,10 @@ export async function collectCityPlaces(city: CityInput, opts: HedgeOptions & { 
   await Promise.all(groups.map(async (group, i) => {
     const query = buildFastQuery(group, { lat: city.lat, lng: city.lng, radiusM });
     let elements: OverpassElement[] | null = null;
+    // Geoapify d'abord (rapide) ; erreur ou résultat vide : on retombe sur Overpass pour ce groupe.
+    if (opts.geoapifyKey) {
+      try { const g = await geoapifyElements(group, { lat: city.lat, lng: city.lng, radiusM, key: opts.geoapifyKey, fetchImpl: opts.geoFetch }); if (g.length) elements = g; } catch { /* repli Overpass */ }
+    }
     for (let attempt = 0; attempt < 2 && elements === null; attempt++) {
       try {
         elements = await hedgedOverpass(query, { ...opts, startAt: i + attempt });

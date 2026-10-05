@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { buildFastQuery, collectCityPlaces, hedgedOverpass, toPayload } from './cityCollect.ts';
+import { buildFastQuery, collectCityPlaces, geoapifyToElement, hedgedOverpass, toPayload } from './cityCollect.ts';
 import { buildOverpassQuery } from './osm.ts';
 
 test('osm.ts est une copie exacte de pipeline/src/lib/osm.mjs', () => {
@@ -103,4 +103,32 @@ test('collecte : un groupe secondaire en échec ne bloque pas, les attractions e
 
 test('charge utile : ne garde que les champs acceptés par la base', () => {
   assert.deepEqual(toPayload({ name: 'A', city_id: 3, status: 'active', phone: null, osm_id: 4 }), { name: 'A', osm_id: 4 });
+});
+
+const geoMuseum = { properties: { name: 'Musée', lat: 35.011, lon: 135.768, datasource: { raw: { osm_type: 'n', osm_id: 10, tourism: 'museum', name: 'Musée', wikidata: 'Q1' } } } };
+
+test('Geoapify : un lieu devient un élément OSM ; sans identifiant OSM il est ignoré', () => {
+  assert.deepEqual(geoapifyToElement(geoMuseum), museum);
+  assert.equal(geoapifyToElement({ properties: { lat: 1, lon: 2, datasource: { raw: { tourism: 'museum' } } } }), null);
+});
+
+test('collecte avec clé Geoapify : sans Overpass quand Geoapify répond, repli Overpass pour un groupe vide', async () => {
+  const urls: string[] = [];
+  const r = await collectCityPlaces(city, {
+    mirrors: ['a'], retryDelayMs: 1, geoapifyKey: 'K',
+    geoFetch: (u) => { urls.push(u); return Promise.resolve({ ok: true, status: 200, json: async () => ({ features: u.includes('categories=tourism') ? [geoMuseum] : [] }) }); },
+    fetchImpl: (_u, init) => ok(decodeURIComponent(init.body.slice(5)).includes('restaurant') ? [diner] : []),
+  });
+  assert.equal(urls.length, 4);
+  assert.match(urls[0], /filter=circle:135\.76,35\.01,\d+&.*limit=500&apiKey=K$/);
+  assert.deepEqual(r.rows.map((x) => x.name).sort(), ['Chez Lui', 'Musée']);
+});
+
+test('collecte : Geoapify en erreur, tout retombe sur Overpass', async () => {
+  const r = await collectCityPlaces(city, {
+    mirrors: ['a'], retryDelayMs: 1, geoapifyKey: 'K',
+    geoFetch: () => Promise.resolve({ ok: false, status: 429, json: async () => ({}) }),
+    fetchImpl: (_u, init) => ok(decodeURIComponent(init.body.slice(5)).includes('tourism') ? [museum] : []),
+  });
+  assert.deepEqual(r.rows.map((x) => x.name), ['Musée']);
 });

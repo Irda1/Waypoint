@@ -9,6 +9,7 @@
 import { collectCityPlaces } from '../domain/cityCollect.ts';
 import { fractionProgress } from '../domain/collection.ts';
 import type { CollectionProgress } from '../domain/collection.ts';
+import { GEOAPIFY_KEY } from '../lib/env';
 import { supabase } from '../lib/supabase';
 import { cityCollectionStatuses, requestCityCollection } from './places';
 
@@ -57,6 +58,7 @@ async function collectCityOnce(cityId: number, onFraction?: (f: number) => void)
     const { data: city, error } = await supabase.from('cities').select('id,lat,lng,population').eq('id', cityId).maybeSingle();
     if (error || !city) throw new Error(error?.message ?? 'ville introuvable');
     const { rows } = await collectCityPlaces(city as { id: number; lat: number; lng: number; population: number | null }, {
+      geoapifyKey: GEOAPIFY_KEY,
       onGroup: (done, total) => onFraction?.(0.05 + 0.85 * (done / total)),
     });
     const res = await supabase.rpc('ingest_city_places', { p_city: cityId, p_places: rows });
