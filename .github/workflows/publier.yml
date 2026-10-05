@@ -1,5 +1,5 @@
 # Publie la maquette Waypoint à chaque push sur main :
-#   1. version web → GitHub Pages (https://<pseudo>.github.io/<dépôt>/)
+#   1. (version web : maintenant dans web-app.yml)
 #   2. APK Android (Capacitor) → une Release GitHub « build-N » avec waypoint.apk
 # Lien stable vers le dernier APK : https://github.com/<pseudo>/<dépôt>/releases/latest/download/waypoint.apk
 name: Publier la maquette
@@ -13,42 +13,6 @@ permissions:
   contents: read
 
 jobs:
-  web:
-    name: Version web (GitHub Pages)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.deploiement.outputs.page_url }}
-    steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-
-      - name: Installer les dépendances
-        run: npm install --no-audit --no-fund
-
-      - name: Construire dist/
-        run: npm run build:web
-
-      - uses: actions/configure-pages@v5
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: dist
-
-      - name: Déployer sur GitHub Pages
-        id: deploiement
-        uses: actions/deploy-pages@v5
-
   android:
     # Désactivé : l'APK de l'ancienne maquette prêtait à confusion avec la vraie appli (workflow « APK de l'appli »).
     if: ${{ false }}
