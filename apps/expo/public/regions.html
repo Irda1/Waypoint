@@ -32,6 +32,9 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   var map = new maplibregl.Map({ container: "map", style: { version: 8, sources: { sat0: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 6 }, sat: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 13, attribution: "Sentinel-2 cloudless © EOX" } }, layers: [{ id: "bg", type: "background", paint: { "background-color": "#000" } }, { id: "sat0", type: "raster", source: "sat0", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }, { id: "sat", type: "raster", source: "sat", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }] },
     center: [0, 20], zoom: 1.5, attributionControl: false, dragRotate: false, pitchWithRotate: false, renderWorldCopies: false, maxZoom: 14 });
   map.touchZoomRotate.disableRotation();
+  // Pendant un zoom à deux doigts (et juste après), aucun toucher ne compte comme un choix.
+  var pinchUntil = 0, pinching = function () { return Date.now() < pinchUntil; };
+  ["touchstart", "touchend"].forEach(function (t) { document.addEventListener(t, function (e) { var n = e.touches.length; if (n > 1) pinchUntil = Infinity; else if (pinchUntil === Infinity && n === 0) pinchUntil = Date.now() + 350; }, true); });
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), "bottom-right");
 
   var regions = [], regionMarkers = [], cities = [], selected = {}, selRegion = -1, z0 = 5, zSel = 5, ready = false, hoverId = null;
@@ -72,7 +75,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
     cities.forEach(function (c) {
       if (c.el) { c.mk.remove(); }
       var el = document.createElement("div"); el.className = "city"; el.innerHTML = '<div class="dot"></div><div class="lab"></div>'; el.lastChild.textContent = c.n;
-      el.addEventListener("click", function (e) { e.stopPropagation(); post({ type: "toggle", id: c.id }); });
+      el.addEventListener("click", function (e) { e.stopPropagation(); if (pinching()) return; post({ type: "toggle", id: c.id }); });
       c.el = el; c.mk = new maplibregl.Marker({ element: el, anchor: "left", offset: [-6, 0] }).setLngLat([c.lng, c.lat]).addTo(map);
     });
   }
@@ -143,7 +146,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
     map.addLayer({ id: "outside", type: "fill", source: "outside", paint: { "fill-color": "#000", "fill-opacity": 0.78 } });
     map.addLayer({ id: "r-fill", type: "fill", source: "regions", paint: { "fill-color": ["case", sel, COLOR, hov, COLOR, "#000"], "fill-opacity": ["case", sel, 0.22, hov, 0.14, 0] } });
     map.addLayer({ id: "r-line", type: "line", source: "regions", paint: { "line-color": ["case", sel, "#FFFFFF", "#FFFFFF"], "line-width": ["case", sel, 2.6, 0.9], "line-opacity": ["case", sel, 1, 0.55] }, layout: { "line-join": "round" } });
-    map.on("click", "r-fill", function (e) { if (e.features && e.features.length) selectRegion(e.features[0].id); });
+    map.on("click", "r-fill", function (e) { if (!pinching() && e.features && e.features.length) selectRegion(e.features[0].id); });
     map.on("mousemove", "r-fill", function (e) { var id = e.features && e.features[0] ? e.features[0].id : null; if (id === hoverId) return; setState(hoverId, "hover", false); hoverId = id; setState(id, "hover", true); map.getCanvas().style.cursor = "pointer"; });
     map.on("mouseleave", "r-fill", function () { setState(hoverId, "hover", false); hoverId = null; map.getCanvas().style.cursor = ""; });
     regions.forEach(function (r) {
@@ -155,7 +158,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   }
 
   map.on("load", function () {
-    map.on("click", function (e) { if (!map.getLayer("r-fill") || !map.queryRenderedFeatures(e.point, { layers: ["r-fill"] }).length) { if (selRegion >= 0) selectRegion(selRegion); } });
+    map.on("click", function (e) { if (!pinching() && (!map.getLayer("r-fill") || !map.queryRenderedFeatures(e.point, { layers: ["r-fill"] }).length)) { if (selRegion >= 0) selectRegion(selRegion); } });
     fetch(BASE + "/regions/" + CC + ".json").then(function (r) { if (!r.ok) throw new Error("no"); return r.json(); }).then(function (fc) {
       regions = fc.features; regions.forEach(function (f, i) { f.id = i; f.bb = bboxOf(f); });
       countryBox = mainBox(regions) || union(regions.map(function (f) { return f.bb; })); z0 = zoomFor(countryBox); zSel = z0; fit(countryBox, 0);
