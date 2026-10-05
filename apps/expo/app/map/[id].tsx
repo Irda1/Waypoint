@@ -8,6 +8,7 @@ import { useTrip } from '../../src/data/useTrip';
 import { useCategories } from '../../src/data/categories';
 import { loadCandidates } from '../../src/data/itinerary';
 import { addPlaceItem } from '../../src/data/places';
+import { extendCityNow } from '../../src/data/cityCollection';
 import { useFavorites } from '../../src/data/favorites';
 import { PlaceSheet } from '../../src/features/trip/PlaceSheet';
 import { discoverPoints, legendDays, planPoints, searchPoints, visiblePoints } from '../../src/domain/map.ts';
@@ -40,6 +41,8 @@ export default function TripMap() {
   const [focus, setFocus] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  const [zoneStep, setZoneStep] = useState(0);
+  const [widening, setWidening] = useState<number | null>(null);
   const [panel, setPanel] = useState<PanelPos>('bas');
   const [areaH, setAreaH] = useState(0);
   const [details, setDetails] = useState(false);
@@ -51,6 +54,22 @@ export default function TripMap() {
     if (!(discover || onlyFav || term.trim().length >= 2) || loaded !== null || !cityIds.length) return;
     void loadCandidates(cityIds, categories.rootOf).then((r) => { setLoaded(r.candidates); if (r.error) setProblem(r.error); });
   }, [discover, onlyFav, term, loaded, cityIds, categories]);
+
+  // « Élargir la zone » : rayon x2 puis x3,5 pour chaque ville du voyage, avec un pourcentage réel.
+  const ZONE_SCALES = [2, 3.5];
+  const widen = async () => {
+    const scale = ZONE_SCALES[zoneStep];
+    setWidening(0); setProblem(null);
+    const fractions = cityIds.map(() => 0);
+    const errors: string[] = [];
+    await Promise.all(cityIds.map(async (id, i) => {
+      const r = await extendCityNow(id, scale, (f) => { fractions[i] = f; setWidening(fractions.reduce((a, b) => a + b, 0) / fractions.length); });
+      if (r.error) errors.push(r.error);
+    }));
+    setWidening(null);
+    if (errors.length) setProblem(errors[0]);
+    if (errors.length < cityIds.length) { setZoneStep((n) => n + 1); setLoaded(null); }
+  };
 
   const plan = useMemo(() => (data ? planPoints({ days: data.days, items: data.items, places: data.places, rootOf: categories.rootOf }) : []), [data, categories]);
   const disc = useMemo(() => {
