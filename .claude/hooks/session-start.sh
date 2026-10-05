@@ -3,4 +3,4 @@
 set -euo pipefail
 [ "${CLAUDE_CODE_REMOTE:-}" = "true" ] || exit 0
 cd "$CLAUDE_PROJECT_DIR/apps/expo"
-npm install --no-audit --no-fund
+npm ci --no-audit --no-fund

@@ -45,7 +45,7 @@ jobs:
 
       - name: Installer les dépendances
         working-directory: apps/expo
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Créer le projet Android
         working-directory: apps/expo
