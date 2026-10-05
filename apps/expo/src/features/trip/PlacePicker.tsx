@@ -177,7 +177,7 @@ export function PlacePicker({ tripId, dayId, tripTitle, destinations, defaultCit
             );
           })}
           {anyEstimate ? <Text variant="muted">≈ : valeur estimée d'après la catégorie, à vérifier avant d'y aller.</Text> : null}
-          <Text variant="muted" style={{ fontSize: 12 }}>Données de lieux : © contributeurs d'OpenStreetMap (licence ODbL).</Text>
+          <Text variant="muted" style={{ fontSize: 12 }}>Données de lieux : © contributeurs d'OpenStreetMap (licence ODbL) · Powered by Geoapify.</Text>
         </>
       ) : null}
 

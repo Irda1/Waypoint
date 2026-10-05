@@ -189,7 +189,7 @@ export function StayCard({ data, userId, onChanged }: { data: TripData; userId: 
                     </Pressable>
                   </View>
                 ))}
-                <Text variant="muted" style={{ fontSize: 12 }}>Données de lieux : © contributeurs d'OpenStreetMap (licence ODbL).</Text>
+                <Text variant="muted" style={{ fontSize: 12 }}>Données de lieux : © contributeurs d'OpenStreetMap (licence ODbL) · Powered by Geoapify.</Text>
               </>
             )}
           </>
