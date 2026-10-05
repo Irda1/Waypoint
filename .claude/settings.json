@@ -1,0 +1,23 @@
+{
+  "hooks": {
+    "SessionStart": [
+      { "hooks": [{ "type": "command", "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/session-start.sh" }] }
+    ]
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm test:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run build:web:*)",
+      "Bash(npm run export:web:*)",
+      "Bash(npx tsc --noEmit:*)",
+      "Bash(node --test:*)",
+      "Bash(node scripts/bundle-sql.mjs:*)",
+      "Bash(bash supabase/tests/run-local.sh:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git fetch:*)"
+    ]
+  }
+}
