@@ -30,11 +30,12 @@ export function FlightsCard({ data }: { data: TripData }) {
 
   useEffect(() => { void AsyncStorage.getItem(KEY).then((v) => { if (v) { try { setHome(JSON.parse(v) as Home); } catch { /* ignoré */ } } }).catch(() => {}); }, []);
   useEffect(() => {
-    if (!changing || text.trim().length < 2) { setHits([]); return; }
+    // On cherche tant qu'aucune ville de départ n'est choisie, ou quand on veut la changer.
+    if (!(changing || !home) || text.trim().length < 2) { setHits([]); return; }
     let alive = true;
     const id = setTimeout(() => { void searchHomeCities(text).then((r) => { if (alive) setHits(r); }); }, 250);
     return () => { alive = false; clearTimeout(id); };
-  }, [text, changing]);
+  }, [text, changing, home]);
 
   // Petit temps de « recherche » à chaque nouveau départ : les liens et estimations apparaissent ensuite.
   useEffect(() => {
