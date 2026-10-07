@@ -47,3 +47,17 @@ export function dayCities(dests: Dest[], dayIds: string[]): Map<number | null, s
   perDay.forEach((c, i) => out.set(c, [...(out.get(c) ?? []), dayIds[i]]));
   return out;
 }
+
+/**
+ * Étapes à retirer quand les jours changent de ville : celles dont le lieu appartient à une autre ville que celle du jour
+ * (ex. des lieux de Paris restés sur un jour devenu « Marseille »). Les étapes libres (sans lieu) ne sont jamais touchées.
+ */
+export function staleItems(args: { dests: Dest[]; dayIds: string[]; items: { id: string; day_id: string; place_id: number | null }[]; placeCity: Map<number, number> }): string[] {
+  const perDay = cityPerDay(args.dests, args.dayIds.length);
+  const cityOfDay = new Map(args.dayIds.map((id, i) => [id, perDay[i]]));
+  return args.items.filter((it) => {
+    const dayCity = cityOfDay.get(it.day_id);
+    const placeCity = it.place_id != null ? args.placeCity.get(it.place_id) : undefined;
+    return dayCity != null && placeCity != null && placeCity !== dayCity;
+  }).map((it) => it.id);
+}

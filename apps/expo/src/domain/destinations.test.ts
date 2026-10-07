@@ -38,3 +38,17 @@ test('détail des nuits et jours par ville', () => {
   assert.deepEqual(days.get(1), ['a', 'b']);
   assert.deepEqual(days.get(2), ['c', 'd']);
 });
+
+test('étapes périmées : un lieu de Paris sur un jour devenu Marseille est retiré, une étape libre reste', async () => {
+  const { staleItems } = await import('./destinations.ts');
+  const dests = [{ id: 1, name: '', nights: 1 }, { id: 2, name: '', nights: 1 }];
+  const dayIds = ['d1', 'd2'];
+  const items = [
+    { id: 'a', day_id: 'd1', place_id: 10 },   // Paris sur un jour de Paris : reste
+    { id: 'b', day_id: 'd2', place_id: 10 },   // Paris sur un jour de Marseille : retiré
+    { id: 'c', day_id: 'd2', place_id: null }, // étape libre : reste
+    { id: 'd', day_id: 'd2', place_id: 20 },   // Marseille sur Marseille : reste
+  ];
+  assert.deepEqual(staleItems({ dests, dayIds, items, placeCity: new Map([[10, 1], [20, 2]]) }), ['b']);
+  assert.deepEqual(staleItems({ dests: [], dayIds, items, placeCity: new Map([[10, 1]]) }), [], 'sans ville, rien n\'est retiré');
+});

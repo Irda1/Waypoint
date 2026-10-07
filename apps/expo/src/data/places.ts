@@ -138,7 +138,9 @@ export async function searchHomeCities(text: string): Promise<HomeCity[]> {
   if (term.length < 2) return [];
   const { data } = await supabase.from('cities').select('id,name,name_fr,country_code,lat,lng')
     .or(`name.ilike.%${term}%,name_fr.ilike.%${term}%,name_ascii.ilike.%${term}%`)
-    .order('population', { ascending: false, nullsFirst: false }).limit(8);
+    .order('population', { ascending: false, nullsFirst: false }).limit(40);
+  // Ville de départ d'un vol : seulement les villes qui ont un aéroport (à moins de 40 km).
   return ((data ?? []) as { id: number; name: string; name_fr: string | null; country_code: string; lat: number; lng: number }[])
+    .filter((r) => airportNear(r.lat, r.lng) !== null).slice(0, 8)
     .map((r) => ({ id: r.id, name: r.name_fr ?? r.name, country_code: r.country_code, lat: r.lat, lng: r.lng }));
 }

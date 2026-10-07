@@ -27,3 +27,24 @@ export function flightLinks(p: FlightPlan): FlightLink[] {
   if (end) out.push({ label: `Retour ${back} → ${home}`, url: link(back, home, end) });
   return out;
 }
+
+export interface FlightEstimate {
+  /** Billet le moins cher probable (aller simple, classe éco), en euros. */
+  cheapest: number;
+  /** Escale probable sur le trajet le moins cher. */
+  stopover: boolean;
+  /** Vol direct (aller simple, éco), en euros. */
+  direct: number;
+}
+
+const round10 = (n: number): number => Math.round(n / 10) * 10;
+
+/**
+ * Estimation GROSSIÈRE d'après la distance à vol d'oiseau : ce n'est pas un prix lu chez une compagnie.
+ * Aller simple en classe éco ; au-delà de ~1 200 km le billet le moins cher passe en général par une escale (environ 15 % moins cher).
+ */
+export function estimateFlight(km: number): FlightEstimate {
+  const direct = km < 2500 ? 35 + 0.065 * km : 120 + 0.055 * km;
+  const stopover = km >= 1200;
+  return { cheapest: round10(stopover ? direct * 0.85 : direct), stopover, direct: round10(direct) };
+}
