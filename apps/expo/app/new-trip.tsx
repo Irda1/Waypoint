@@ -18,6 +18,9 @@ import { StepProposals } from '../src/features/wizard/StepProposals';
 import { StepRecap } from '../src/features/wizard/StepRecap';
 import type { StepId } from '../src/features/wizard/StepRecap';
 import { useCategories } from '../src/data/categories';
+import { ModeChoice } from '../src/features/simple/ModeChoice';
+import type { TripMode } from '../src/features/simple/ModeChoice';
+import { SimpleCreate } from '../src/features/simple/SimpleCreate';
 import { fonts, space } from '../src/theme/tokens';
 import { useTheme } from '../src/theme/useTheme';
 
@@ -36,7 +39,7 @@ function blocker(step: StepId, s: WizardState): string | null {
   return null;
 }
 
-export default function NewTrip() {
+function CompleteWizard() {
   const guard = useRequireAuth();
   const categories = useCategories();
   const { colors } = useTheme();
@@ -129,4 +132,15 @@ export default function NewTrip() {
       </SafeAreaView>
     </View>
   );
+}
+
+/** Nouveau voyage : d'abord le mode (complet ou juste les lieux). « Envie de… » (pays déjà choisi) va directement au parcours complet. */
+export default function NewTrip() {
+  const guard = useRequireAuth();
+  const params = useLocalSearchParams<{ country?: string }>();
+  const [mode, setMode] = useState<TripMode | null>(typeof params.country === 'string' ? 'complet' : null);
+  if (guard) return guard;
+  if (mode === 'simple') return <SimpleCreate onBack={() => setMode(null)} />;
+  if (mode === 'complet') return <CompleteWizard />;
+  return <ModeChoice onPick={setMode} />;
 }

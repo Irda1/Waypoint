@@ -332,6 +332,11 @@ select test.as_user('cccccccc-0000-0000-0000-000000000003');
 select public.ingest_city_places((select id from public.cities where name = 'Paris'), '[]'::jsonb);
 select test.ok((select collection_status from public.cities where name = 'Paris') = 'ready', 'élargir : la ville est de nouveau prête après l''écriture');
 select test.ok(public.extend_city_collection((select id from public.cities where name_fr = 'Tokyo')) = 'busy', 'élargir : une ville pas prête n''est pas élargie');
+-- Mode du voyage (migration 1900)
+select test.as_admin();
+select test.ok((select mode from public.trips limit 1) = 'complet', 'mode : « complet » par défaut');
+select test.throws($$update public.trips set mode = 'autre'$$, '23514', 'mode : valeur inconnue refusée');
+select test.as_user('cccccccc-0000-0000-0000-000000000003');
 -- Rendre la main au robot
 select test.ok(public.begin_city_collection((select id from public.cities where name_fr = 'Tokyo')) = 'go', 'Tokyo : prise en main');
 select public.release_city_collection((select id from public.cities where name_fr = 'Tokyo'), 'Overpass injoignable');

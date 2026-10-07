@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Platform, Pressable, ScrollView, Text as RNText, TextInput, View } from 'react-native';
+import { Linking, Platform, Pressable, ScrollView, Text as RNText, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRequireAuth } from '../../src/auth/useRequireAuth';
@@ -18,6 +18,7 @@ import { SlidingPanel } from '../../src/features/map/SlidingPanel';
 import { useBottomInset } from '../../src/features/nav/FloatingNav';
 import type { PanelPos } from '../../src/features/map/SlidingPanel';
 import { formatMoney } from '../../src/lib/format';
+import { mapsUrl } from '../../src/domain/simple.ts';
 import { formatDuration } from '../../src/lib/search';
 import { categoryColors, fonts, radius, space } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/useTheme';
@@ -42,6 +43,7 @@ export default function TripMap() {
   const [focus, setFocus] = useState<string | null>(null);
   const [legendOpen, setLegendOpen] = useState(false);
   const [infoOpen, setInfoOpen] = useState(false);
+  useEffect(() => { if (data?.mode === 'simple') setDiscover(true); }, [data?.mode]);
   const [zoneStep, setZoneStep] = useState(0);
   const [widening, setWidening] = useState<number | null>(null);
   const [panel, setPanel] = useState<PanelPos>('bas');
@@ -129,10 +131,10 @@ export default function TripMap() {
               <Pressable accessibilityRole="button" accessibilityLabel="Retour au voyage" onPress={() => router.replace({ pathname: '/trip/[id]', params: { id: String(id) } })} style={{ minHeight: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
                 <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text }}>← Voyage</RNText>
               </Pressable>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
+              {data.days.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
                 <Chip label="Tous les jours" selected={day === null} onPress={() => setDay(null)} />
                 {data.days.map((d, i) => <Chip key={d.id} label={`Jour ${i + 1}`} selected={day === i + 1} onPress={() => setDay(i + 1)} />)}
-              </ScrollView>
+              </ScrollView> : null}
             </View>
             <View style={{ backgroundColor: colors.surface, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.md, minHeight: 44 }}>
               <RNText accessibilityElementsHidden importantForAccessibility="no" style={{ fontSize: 16 }}>🔍</RNText>
@@ -254,13 +256,18 @@ export default function TripMap() {
                   <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>{favorites.ids.has(point.placeId) ? '♥ Favori' : '♡ Favori'}</RNText>
                 </Pressable>
               ) : null}
+              {place ? (
+                <Pressable accessibilityRole="link" accessibilityLabel={`Ouvrir ${point.label} dans Google Maps`} onPress={() => void Linking.openURL(mapsUrl({ name: point.label, lat: place.lat, lng: place.lng }))} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong }}>
+                  <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>Maps ↗</RNText>
+                </Pressable>
+              ) : null}
               {point.kind === 'disc' && dayId ? (
                 <Pressable accessibilityRole="button" disabled={busy} onPress={add} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.accent, opacity: busy ? 0.6 : 1 }}>
                   <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: colors.onAccent }}>{`Ajouter au jour ${day}`}</RNText>
                 </Pressable>
               ) : null}
             </View>
-            {point.kind === 'disc' && !dayId ? <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: colors.text3 }}>Choisis un jour en haut pour l'ajouter à ton programme.</RNText> : null}
+            {point.kind === 'disc' && !dayId && data.mode !== 'simple' ? <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: colors.text3 }}>Choisis un jour en haut pour l'ajouter à ton programme.</RNText> : null}
             {problem ? <ErrorNote message={problem} /> : null}
           </View>
         ) : null}

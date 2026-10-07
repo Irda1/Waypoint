@@ -72,6 +72,18 @@ export async function createTrip(title: string, startsOn: string | null, endsOn:
   return { id, error: null };
 }
 
+/** Voyage « Simple » : pas de dates ni de jours, seulement des villes (éventuellement de plusieurs pays). Demande la migration 1900. */
+export async function createSimpleTrip(title: string, countries: string[], cityIds: number[]): Promise<{ id: string | null; error: string | null }> {
+  const { data, error } = await supabase.from('trips').insert({ title: title.trim().slice(0, 120), mode: 'simple', country_code: countries[0] ?? null }).select('id').single();
+  const id = (data as { id: string } | null)?.id ?? null;
+  if (!id) return { id: null, error: error && /mode/.test(error.message) ? 'Le mode Simple demande une mise à jour de la base (migration 1900) : demande à Adrien de la lancer.' : msg(error) };
+  if (cityIds.length) {
+    const res = await supabase.from('trip_destinations').insert(cityIds.map((city_id, position) => ({ trip_id: id, city_id, position })));
+    if (res.error) return { id, error: `Voyage créé, mais les villes n'ont pas pu être ajoutées : ${res.error.message}` };
+  }
+  return { id, error: null };
+}
+
 /**
  * Enregistre les villes du voyage (ordre et nuits) puis rattache chaque jour à sa ville d'après ces nuits.
  * `dayIds` : les jours du voyage, dans l'ordre des dates.
