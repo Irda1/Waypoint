@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { flightLinks } from './flights.ts';
+import { estimateFlight, flightLinks } from './flights.ts';
 
 test('aller-retour quand on repart de l\'aéroport d\'arrivée', () => {
   const l = flightLinks({ home: 'CDG', arrive: 'LIS', leave: 'LIS', start: '2026-10-30', end: '2026-11-02' });
@@ -14,4 +14,13 @@ test('deux allers simples si on repart d\'ailleurs', () => {
 });
 test('rien sans aéroport d\'arrivée', () => {
   assert.deepEqual(flightLinks({ home: 'CDG', arrive: null, leave: null, start: null, end: null }), []);
+});
+
+test('estimation de vol : court trajet direct, long trajet avec escale moins chère', () => {
+  const short = estimateFlight(500);
+  assert.equal(short.stopover, false);
+  assert.equal(short.cheapest, short.direct);
+  const long = estimateFlight(9700);
+  assert.equal(long.stopover, true);
+  assert.ok(long.cheapest < long.direct && long.direct > 500 && long.direct < 800, JSON.stringify(long));
 });

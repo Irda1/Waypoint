@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTime, formatTime, roundUp5, distanceKm, estimateTravel, positionBetween, weekdayOf, scheduleDay } from './planning.ts';
+import { parseTime, formatTime, roundUp5, distanceKm, estimateTravel, positionBetween, weekdayOf, scheduleDay, resolveOverlaps } from './planning.ts';
 import type { Place, TripItem } from './types.ts';
 
 test('heures : lecture, format, arrondi', () => {
@@ -84,4 +84,14 @@ test('journée : lieu fermé ce jour-là, étape sans heure, plans B et C sépar
   assert.deepEqual(day[1].issues.map((i) => i.type), ['no_time']);
   assert.equal(scheduleDay({ date: '2026-10-13', places, items: [item('bb', 1, '10:00', { plan: 'B' })], plan: 'B' }).length, 1);
   assert.deepEqual(scheduleDay({ date: '2026-10-14', places, items: [item('a', 1, '10:00')] })[0].issues, [], 'ouvert le mercredi');
+});
+
+test('chevauchements : les étapes sont décalées en cascade, dans l\'ordre, trajet compris', () => {
+  const mk = (id: string, start: string, dur: number): TripItem => ({ id, plan: 'A', position: 1, start_time: start, duration_min: dur, place_id: null, title: id } as unknown as TripItem);
+  const sched = scheduleDay({ date: '2026-12-14', items: [mk('a', '09:00', 90), mk('b', '10:00', 60), mk('c', '11:00', 60)], places: new Map() });
+  const r = resolveOverlaps(sched);
+  assert.deepEqual(r.changes, [{ id: 'b', startMin: 630 }, { id: 'c', startMin: 690 }]);
+  assert.equal(r.overflow, false);
+  assert.deepEqual(resolveOverlaps(scheduleDay({ date: '2026-12-14', items: [mk('a', '09:00', 60), mk('b', '10:00', 60)], places: new Map() })).changes, [], 'rien à décaler');
+  assert.equal(resolveOverlaps(scheduleDay({ date: '2026-12-14', items: [mk('a', '22:00', 120), mk('b', '22:30', 60)], places: new Map() })).overflow, true, 'ne tient pas avant minuit');
 });

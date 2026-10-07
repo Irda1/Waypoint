@@ -3,7 +3,7 @@
 // d'aucun contrôle de droits côté appli.
 import { supabase } from '../lib/supabase';
 import { loadOffline, saveOffline } from './offline';
-import { dayCities } from '../domain/destinations.ts';
+import { dayCities, staleItems } from '../domain/destinations.ts';
 import { capitalCovers, COVER_FIELDS, toCover } from './cityCover';
 import type { CityCover } from './cityCover';
 import { POSTES } from '../domain/types.ts';
@@ -96,6 +96,21 @@ export async function saveDestinations(tripId: string, dests: { id: number; nigh
   return null;
 }
 
+/** Étapes qui ne correspondraient plus à la ville de leur jour si le voyage passait aux destinations `dests`. */
+export async function findStaleItems(dests: { id: number; nights: number }[], dayIds: string[], items: { id: string; day_id: string; place_id: number | null }[]): Promise<string[]> {
+  const placeIds = [...new Set(items.map((i) => i.place_id).filter((x): x is number => x != null))];
+  if (!placeIds.length) return [];
+  const { data } = await supabase.from('places').select('id,city_id').in('id', placeIds);
+  const placeCity = new Map(((data ?? []) as { id: number; city_id: number }[]).map((p) => [p.id, p.city_id]));
+  return staleItems({ dests: dests.map((d) => ({ ...d, name: '' })), dayIds, items, placeCity });
+}
+
+export async function deleteItems(ids: string[]): Promise<string | null> {
+  if (!ids.length) return null;
+  const { error } = await supabase.from('trip_items').delete().in('id', ids);
+  return msg(error);
+}
+
 export async function addDestination(tripId: string, cityId: number, position: number): Promise<string | null> {
   const { error } = await supabase.from('trip_destinations').insert({ trip_id: tripId, city_id: cityId, position });
   return error?.code === '23505' ? null : msg(error);
@@ -122,6 +137,12 @@ export async function addExpense(args: { tripId: string; label: string; poste: P
   const { error } = await supabase.from('expenses').insert({
     trip_id: args.tripId, label: args.label.trim(), poste: args.poste, amount: args.amount, currency: args.currency, paid_by: args.paidBy, item_id: args.itemId ?? null, stay_id: args.stayId ?? null,
   });
+  return msg(error);
+}
+
+/** Remet une étape « pas encore payée » : retire les dépenses rattachées à cette étape. */
+export async function clearItemExpenses(itemId: string): Promise<string | null> {
+  const { error } = await supabase.from('expenses').delete().eq('item_id', itemId);
   return msg(error);
 }
 

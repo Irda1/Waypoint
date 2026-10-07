@@ -5,7 +5,7 @@ import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
 import { listCities } from '../../data/places';
 import type { CityOption } from '../../data/places';
-import { saveDestinations } from '../../data/trips';
+import { deleteItems, findStaleItems, saveDestinations } from '../../data/trips';
 import { addCity, moveCity, nightDetail, removeCity, shiftNights, totalNights } from '../../domain/destinations.ts';
 import type { Dest } from '../../domain/destinations.ts';
 import { addDays, shortDate } from '../../lib/dates.ts';
@@ -26,6 +26,7 @@ export function DestinationsCard({ data, onChanged }: { data: TripData; onChange
   const [found, setFound] = useState<CityOption[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<{ next: Dest[]; stale: string[] } | null>(null);
 
   const dests: Dest[] = [...data.destinations].sort((a, b) => a.position - b.position).map((d) => ({ id: d.city_id, name: d.name, nights: d.nights }));
   const dates = data.days.map((d) => d.day_date);
@@ -48,9 +49,18 @@ export function DestinationsCard({ data, onChanged }: { data: TripData; onChange
     return () => { alive = false; clearTimeout(id); };
   }, [query]);
 
-  async function apply(next: Dest[]) {
+  /** `drop` : undefined = demander si des étapes d'une autre ville sont concernées ; true = les retirer ; false = les garder. */
+  async function apply(next: Dest[], drop?: boolean) {
     setBusy(true);
-    const err = await saveDestinations(data.trip.id, next, data.days.map((d) => d.id));
+    const dayIds = data.days.map((d) => d.id);
+    let stale: string[] = [];
+    if (drop !== false) {
+      stale = await findStaleItems(next, dayIds, data.items);
+      if (stale.length && drop === undefined) { setPending({ next, stale }); setBusy(false); return; }
+    }
+    setPending(null);
+    let err = await saveDestinations(data.trip.id, next, dayIds);
+    if (!err && drop && stale.length) err = await deleteItems(stale);
     setBusy(false);
     setError(err);
     onChanged();
@@ -65,6 +75,15 @@ export function DestinationsCard({ data, onChanged }: { data: TripData; onChange
     <Card>
       <Text variant="label">Destinations · {nights} nuit{nights > 1 ? 's' : ''}</Text>
       {editing && dests.length > 1 ? <Text variant="muted">Tiens la poignée ⠿ et glisse une ville pour changer l'ordre.</Text> : null}
+      {pending ? (
+        <View style={{ gap: space.sm, padding: space.md, borderRadius: 14, backgroundColor: colors.surface2 }} accessibilityLiveRegion="polite">
+          <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>Des jours changent de ville</Text>
+          <Text variant="muted">{pending.stale.length} étape{pending.stale.length > 1 ? 's' : ''} de l'ancienne ville se retrouverai{pending.stale.length > 1 ? 'ent' : 't'} sur un jour d'une autre ville. Les retirer ? Tu pourras ensuite proposer un programme pour la nouvelle ville.</Text>
+          <Button label="Retirer ces étapes et continuer" loading={busy} onPress={() => void apply(pending.next, true)} />
+          <Button label="Les garder" variant="ghost" onPress={() => void apply(pending.next, false)} />
+          <Button label="Annuler" variant="ghost" onPress={() => setPending(null)} />
+        </View>
+      ) : null}
       {dests.length === 0 ? <Text variant="muted">Aucune destination choisie : ajoutes-en pour retrouver directement les bonnes villes dans la recherche de lieux.</Text> : null}
       <DragList count={dests.length} mode="insert" orderKey={dests.map((d) => d.id).join(',')} onMove={(from, to) => { if (editing) void apply(moveCity(dests, from, to)); }} renderRow={(index, handle) => {
         const d = dests[index];

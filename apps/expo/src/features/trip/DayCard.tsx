@@ -4,7 +4,7 @@ import { Button, Card, Chip, ErrorNote, Field, PayBadge, Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
 import { categoryColors, fonts, radius, space } from '../../theme/tokens';
 import { formatDay, isTime } from '../../lib/format';
-import { formatTime, scheduleDay, weekdayOf } from '../../domain/planning.ts';
+import { formatTime, resolveOverlaps, scheduleDay, weekdayOf } from '../../domain/planning.ts';
 import { checkOpening } from '../../domain/openingHours.ts';
 import { organizeTimes } from '../../domain/itinerary.ts';
 import { applyTimes } from '../../data/itinerary';
@@ -13,7 +13,7 @@ import type { Expense, Place, TripItem } from '../../domain/types.ts';
 import { swapItems } from '../../domain/reorder.ts';
 import { glyphFor } from '../../theme/categoryIcons';
 import { DragList } from './DragList';
-import { addExpense, addItem, applyItemMoves, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
+import { addExpense, addItem, applyItemMoves, clearItemExpenses, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
 import { deriveAltPlan } from '../../domain/altplan.ts';
 import { DEFAULT_DEPART, DEFAULT_RETURN, dayHours, hoursIssues, liveStatus } from '../../domain/dayhours.ts';
 import { todayIso } from '../../lib/dates.ts';
@@ -145,6 +145,24 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
       startTime: s.item.start_time, durationMin: s.item.duration_min, position: s.item.position,
     })));
     setError(await applyTimes(changes));
+    onChanged();
+  }
+
+  const hasOverlap = schedule.some((s) => s.issues.some((i) => i.type === 'overlap'));
+  async function fixOverlaps() {
+    const { changes, overflow } = resolveOverlaps(schedule);
+    const err = changes.length ? await applyTimes(changes) : null;
+    setError(err ?? (overflow ? 'Certaines étapes ne tiennent pas avant minuit : retire-en une ou raccourcis la journée.' : null));
+    onChanged();
+  }
+  /** Bouton « $ » : payé / pas payé (marque l'étape payée par moi, ou retire les dépenses rattachées). */
+  async function togglePaid(s: (typeof schedule)[number], state: 'paid' | 'partial' | 'unpaid' | null) {
+    if (!state || !session) return;
+    const category = s.place?.category_code ?? s.item.category_code ?? '';
+    const err = state === 'paid'
+      ? await clearItemExpenses(s.item.id)
+      : await addExpense({ tripId, label: s.place?.name ?? s.item.title ?? 'Étape', poste: posteForCategory(categories.rootOf(category)), amount: amountDue(s.item, s.place, expenses, travelers), currency, paidBy: session.user.id, itemId: s.item.id });
+    setError(err);
     onChanged();
   }
 
@@ -299,11 +317,16 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                       onPress={async () => { setError(await deleteItem(s.item.id)); onChanged(); }}
                       style={{ minHeight: 32, justifyContent: 'center' }}
                     >
-                      <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>Retirer</RNText>
+                      <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.danger, opacity: 0.85 }}>Retirer</RNText>
                     </Pressable>
                   </View>
                 </View>
-                <PayBadge state={state} />
+                {state ? (
+                  <Pressable accessibilityRole="switch" accessibilityState={{ checked: state === 'paid' }} accessibilityLabel={state === 'paid' ? `${name} : payé (toucher pour annuler)` : `Marquer ${name} comme payé`} hitSlop={10}
+                    onPress={() => { void togglePaid(s, state); }} style={{ minWidth: 32, minHeight: 32, alignItems: 'center', justifyContent: 'flex-start' }}>
+                    <PayBadge state={state} />
+                  </Pressable>
+                ) : null}
               </View>
             </View>
           );
@@ -375,6 +398,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
         <>
           <ErrorNote message={error} />
           {untimed > 0 ? <Button label={`Ranger les horaires (${untimed})`} variant="ghost" onPress={tidy} /> : null}
+          {hasOverlap ? <Button label="Corriger les chevauchements" variant="ghost" onPress={fixOverlaps} /> : null}
           <Button label="+ Ajouter un lieu" onPress={() => setAdding('place')} />
           <Button label="+ Étape libre" variant="ghost" onPress={() => setAdding('free')} />
         </>
