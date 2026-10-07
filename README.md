@@ -12,6 +12,7 @@
 
 ## Ce que fait l'application
 
+- **Deux modes** à la création : **voyage complet** (ci-dessous) ou **juste les lieux** (un ou plusieurs pays, leurs villes, une liste et une carte de lieux, ♡ pour garder les préférés, budget de la sélection).
 - **Créer un voyage** avec un assistant : pays (planète 3D ou liste), dates, villes avec nuits réparties automatiquement, voyageurs, envies, budget, puis un programme jour par jour proposé.
 - **Programme** : étapes avec horaires, glisser-déposer, vérification des horaires d'ouverture, plans B et C, « Journée en cours », fiche de chaque lieu (description, entrée estimée, durée, trajet).
 - **Carte** : le programme numéroté par jour, des lieux à découvrir filtrables par catégorie, recherche, favoris, bouton « Élargir la zone » pour charger plus de lieux autour d'une ville.

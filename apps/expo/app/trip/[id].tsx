@@ -44,6 +44,7 @@ import { photos } from '../../src/theme/photos';
 import { PlusMenu } from '../../src/features/nav/PlusMenu';
 import type { PlusChoice } from '../../src/features/nav/PlusMenu';
 import { FloatingNav, NAV_HEIGHT, useBottomInset } from '../../src/features/nav/FloatingNav';
+import { SimpleTrip } from '../../src/features/simple/SimpleTrip';
 import type { NavTab } from '../../src/features/nav/FloatingNav';
 import { fonts, radius, space } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/useTheme';
@@ -131,6 +132,7 @@ export default function TripScreen() {
     return <Screen><ErrorNote message={error ?? 'Voyage introuvable.'} /><Button label="Retour à mes voyages" onPress={() => router.replace('/')} /></Screen>;
   }
 
+  if (data.mode === 'simple') return <SimpleTrip data={data} reload={() => void reload()} />;
   const active = data.members.filter((m) => !m.left_at);
   const travelers = Math.max(1, active.length);
   const { trip } = data;

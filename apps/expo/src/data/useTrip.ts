@@ -22,6 +22,8 @@ export interface BudgetLine { poste: string; amount: number }
 
 export interface TripData {
   trip: Trip;
+  /** « simple » : sélection de lieux sans jours (migration 1900) ; « complet » sinon, y compris tant que la migration manque. */
+  mode: 'complet' | 'simple';
   members: Member[];
   days: Day[];
   items: TripItem[];
@@ -72,11 +74,15 @@ export async function fetchTripData(tripId: string): Promise<{ next: TripData | 
       for (const p of (rows ?? []) as Place[]) places.set(p.id, withEstimatedPrice(p));
     }
     // Table ajoutée par la migration 1100 : son absence ne doit jamais empêcher d'ouvrir le voyage.
+    // Colonne ajoutée par la migration 1900 : son absence ne doit jamais empêcher d'ouvrir le voyage.
+    const modeRow = await supabase.from('trips').select('mode').eq('id', tripId).maybeSingle();
+    const mode = (modeRow.data as { mode?: string } | null)?.mode === 'simple' ? 'simple' : 'complet';
     const pay = await supabase.from('settlement_payments').select('id,from_user,to_user,amount').eq('trip_id', tripId).order('created_at');
     const cc = (trip.data as { country_code?: string | null }).country_code;
     const capital = cc ? (await capitalCovers([cc])).get(cc) ?? null : null;
     const next: TripData = {
       trip: trip.data as Trip,
+      mode,
       members: (members.data ?? []) as unknown as Member[],
       days: (days.data ?? []) as Day[],
       items: (items.data ?? []) as TripItem[],
