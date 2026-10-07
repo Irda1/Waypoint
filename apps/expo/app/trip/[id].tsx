@@ -43,7 +43,7 @@ import { pickSource } from '../../src/data/cityCover';
 import { photos } from '../../src/theme/photos';
 import { PlusMenu } from '../../src/features/nav/PlusMenu';
 import type { PlusChoice } from '../../src/features/nav/PlusMenu';
-import { FloatingNav } from '../../src/features/nav/FloatingNav';
+import { FloatingNav, NAV_HEIGHT, useBottomInset } from '../../src/features/nav/FloatingNav';
 import type { NavTab } from '../../src/features/nav/FloatingNav';
 import { fonts, radius, space } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/useTheme';
@@ -83,6 +83,7 @@ export default function TripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
   const { colors } = useTheme();
+  const bottomInset = useBottomInset();
   const { data, error, loading, status, savedAt, reload } = useTrip(String(id));
   const [tab, setTab] = useState<'voyage' | 'jour' | 'budget' | 'amis'>('voyage');
   const [chosenDay, setChosenDay] = useState<number | null>(null);
@@ -389,8 +390,8 @@ export default function TripScreen() {
         ) : null}
       </ScrollView>
       <Pressable accessibilityRole="button" accessibilityLabel="Ajouter" onPress={() => setPlusOpen(true)}
-        style={{ position: 'absolute', right: 20, bottom: 84, width: 52, height: 52, borderRadius: 26, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}>
-        <RNText style={{ fontSize: 28, lineHeight: 30, color: colors.onAccent, fontFamily: fonts.sansBold }}>＋</RNText>
+        style={{ position: 'absolute', right: 16, bottom: bottomInset + NAV_HEIGHT + 4, width: 42, height: 42, borderRadius: 21, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}>
+        <RNText style={{ fontSize: 24, lineHeight: 26, color: colors.onAccent, fontFamily: fonts.sansBold }}>＋</RNText>
       </Pressable>
       <FloatingNav tabs={TABS} active={tab} onSelect={onNav} />
       <PlusMenu visible={plusOpen} onPick={onPlus} onClose={() => setPlusOpen(false)} />

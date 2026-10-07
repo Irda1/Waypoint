@@ -122,3 +122,26 @@ export function scheduleDay(args: {
   }
   return out;
 }
+
+/**
+ * Décale les étapes qui se chevauchent : chacune commence au plus tôt à la fin de la précédente + son trajet
+ * (arrondi à 5 min), l'ordre est gardé. Renvoie uniquement les étapes à modifier ; `overflow` est vrai si une étape
+ * ne tient plus avant minuit (elle et les suivantes ne sont pas déplacées).
+ */
+export function resolveOverlaps(schedule: ScheduledItem[]): { changes: { id: string; startMin: number }[]; overflow: boolean } {
+  const changes: { id: string; startMin: number }[] = [];
+  let prevEnd: number | null = null;
+  for (const s of schedule) {
+    if (s.startMin == null) continue;
+    const duration = s.endMin != null ? s.endMin - s.startMin : 60;
+    let start = s.startMin;
+    if (prevEnd != null) {
+      const earliest = roundUp5(prevEnd + (s.travelFromPrevious?.minutes ?? 0));
+      if (start < earliest) start = earliest;
+    }
+    if (start + duration > 1439) return { changes, overflow: true };
+    if (start !== s.startMin) changes.push({ id: s.item.id, startMin: start });
+    prevEnd = start + duration;
+  }
+  return { changes, overflow: false };
+}

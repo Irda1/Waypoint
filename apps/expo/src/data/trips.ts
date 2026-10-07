@@ -125,6 +125,12 @@ export async function addExpense(args: { tripId: string; label: string; poste: P
   return msg(error);
 }
 
+/** Remet une étape « pas encore payée » : retire les dépenses rattachées à cette étape. */
+export async function clearItemExpenses(itemId: string): Promise<string | null> {
+  const { error } = await supabase.from('expenses').delete().eq('item_id', itemId);
+  return msg(error);
+}
+
 /** Fixe (ou efface, avec null) l'heure de début d'une étape. */
 export async function setItemTime(itemId: string, time: string | null): Promise<string | null> {
   const { error } = await supabase.from('trip_items').update({ start_time: time }).eq('id', itemId);

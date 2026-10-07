@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, Text as RNText, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, Text as RNText, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useRequireAuth } from '../../src/auth/useRequireAuth';
@@ -15,6 +15,7 @@ import { discoverPoints, legendDays, planPoints, searchPoints, visiblePoints } f
 import type { MapPoint } from '../../src/domain/map.ts';
 import { MapCanvas } from '../../src/features/map/MapCanvas';
 import { SlidingPanel } from '../../src/features/map/SlidingPanel';
+import { useBottomInset } from '../../src/features/nav/FloatingNav';
 import type { PanelPos } from '../../src/features/map/SlidingPanel';
 import { formatMoney } from '../../src/lib/format';
 import { formatDuration } from '../../src/lib/search';
@@ -84,6 +85,17 @@ export default function TripMap() {
   const point: MapPoint | undefined = points.find((p) => p.id === selected);
   // Bande du bas seulement quand il y a quelque chose à dire (le chargement est un badge sur la carte).
   const message = notice ?? (points.length === 0 ? (discover ? (loaded === null ? null : 'Aucun lieu à afficher pour ce filtre.') : 'Rien au programme pour l\'instant. Active « Lieux à découvrir » pour voir des idées.') : null);
+
+  const bottomInset = useBottomInset();
+  // Web : la page ne doit jamais défiler quand on déplace la carte (sinon la barre du haut part avec).
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    const els = [document.documentElement, document.body];
+    const saved = els.map((e) => e.style.cssText);
+    for (const e of els) { e.style.overflow = 'hidden'; e.style.overscrollBehavior = 'none'; }
+    document.body.style.position = 'fixed'; document.body.style.inset = '0'; document.body.style.width = '100%';
+    return () => { els.forEach((e, i) => { e.style.cssText = saved[i]; }); };
+  }, []);
 
   if (guard) return guard;
   if (loading) return <Screen><Text variant="muted">Chargement de la carte…</Text></Screen>;
@@ -160,7 +172,7 @@ export default function TripMap() {
             </View>
           </View>
         </SafeAreaView>
-        <SlidingPanel containerHeight={areaH} position={panel} onPosition={setPanel} title={`${points.length} lieu${points.length > 1 ? 'x' : ''} sur la carte`}>
+        {!point ? <SlidingPanel containerHeight={areaH} position={panel} onPosition={setPanel} title={`${points.length} lieu${points.length > 1 ? 'x' : ''} sur la carte`}>
           <ScrollView scrollEnabled={panel !== 'bas'}>
             {points.length === 0 ? <Text variant="muted" style={{ padding: space.md }}>Aucun repère à lister.</Text> : points.map((p, i) => (
               <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`Voir ${p.label} sur la carte`}
@@ -175,8 +187,8 @@ export default function TripMap() {
               </Pressable>
             ))}
           </ScrollView>
-        </SlidingPanel>
-        <View pointerEvents="box-none" style={{ position: 'absolute', left: space.sm, bottom: 72 + space.sm, gap: space.xs, alignItems: 'flex-start' }}>
+        </SlidingPanel> : null}
+        {!point && panel === 'bas' ? <View pointerEvents="box-none" style={{ position: 'absolute', left: space.sm, bottom: 72 + space.sm, gap: space.xs, alignItems: 'flex-start' }}>
           {legendOpen ? (
             <View style={{ backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, padding: space.md, gap: space.xs }}>
               {legend.map((l) => (
@@ -202,40 +214,64 @@ export default function TripMap() {
           ) : null}
           <View style={{ flexDirection: 'row', gap: space.sm, alignItems: 'center' }}>
             <Pressable accessibilityRole="button" accessibilityLabel={legendOpen ? 'Masquer la légende' : 'Afficher la légende'} onPress={() => setLegendOpen((v) => !v)}
-              style={{ minHeight: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
-              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text }}>Légende</RNText>
+              style={{ minHeight: 32, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
+              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 12, color: colors.text }}>Légende</RNText>
             </Pressable>
             <Pressable accessibilityRole="button" accessibilityLabel="Crédits de la carte" onPress={() => setInfoOpen((v) => !v)}
-              style={{ width: 44, height: 44, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
-              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 16, color: colors.text }}>i</RNText>
+              style={{ width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
+              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>i</RNText>
             </Pressable>
             {discover && loaded === null ? (
-              <View accessibilityLiveRegion="polite" style={{ minHeight: 44, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
-                <RNText style={{ fontFamily: fonts.sans, fontSize: 13, color: colors.text2 }}>Chargement des lieux…</RNText>
+              <View accessibilityLiveRegion="polite" style={{ minHeight: 32, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
+                <RNText style={{ fontFamily: fonts.sans, fontSize: 12, color: colors.text2 }}>Chargement des lieux…</RNText>
               </View>
             ) : null}
           </View>
-        </View>
+        </View> : null}
+        {point ? (
+          <View style={{ position: 'absolute', left: space.sm, right: space.sm, bottom: space.sm + bottomInset, maxWidth: 560, alignSelf: 'center', backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, padding: space.md, gap: space.xs }}>
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <RNText numberOfLines={2} style={{ fontFamily: fonts.sansBold, fontSize: 17, color: colors.text }}>{point.label}</RNText>
+                <RNText numberOfLines={2} style={{ fontFamily: fonts.sans, fontSize: 13, color: colors.text2 }}>
+                  {[point.kind === 'plan' ? `Jour ${point.day} · étape ${point.order}` : 'À découvrir', category,
+                    place?.visit_duration_min ? `≈ ${formatDuration(place.visit_duration_min)}` : null,
+                    place?.price_amount != null ? `≈ ${formatMoney(place.price_amount, data.trip.currency)}` : null].filter(Boolean).join(' · ')}
+                </RNText>
+              </View>
+              <Pressable accessibilityRole="button" accessibilityLabel="Fermer" hitSlop={8} onPress={() => setSelected(null)} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
+                <RNText style={{ fontSize: 18, color: colors.text2 }}>✕</RNText>
+              </Pressable>
+            </View>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' }}>
+              {point.placeId != null ? (
+                <Pressable accessibilityRole="button" onPress={() => setDetails(true)} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong }}>
+                  <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>Détails</RNText>
+                </Pressable>
+              ) : null}
+              {point.placeId != null ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={favorites.ids.has(point.placeId) ? 'Retirer des favoris' : 'Ajouter aux favoris'} onPress={() => { void favorites.toggle(point.placeId!); }} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong }}>
+                  <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>{favorites.ids.has(point.placeId) ? '♥ Favori' : '♡ Favori'}</RNText>
+                </Pressable>
+              ) : null}
+              {point.kind === 'disc' && dayId ? (
+                <Pressable accessibilityRole="button" disabled={busy} onPress={add} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.accent, opacity: busy ? 0.6 : 1 }}>
+                  <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: colors.onAccent }}>{`Ajouter au jour ${day}`}</RNText>
+                </Pressable>
+              ) : null}
+            </View>
+            {point.kind === 'disc' && !dayId ? <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: colors.text3 }}>Choisis un jour en haut pour l'ajouter à ton programme.</RNText> : null}
+            {problem ? <ErrorNote message={problem} /> : null}
+          </View>
+        ) : null}
       </View>
 
-      {point || message || problem ? <SafeAreaView edges={['bottom']} style={{ backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line }}>
-        <View style={{ padding: space.lg, gap: space.sm, minHeight: 88 }}>
-          {point ? (
-            <>
-              <Text variant="heading">{point.label}</Text>
-              <Text variant="muted">
-                {[point.kind === 'plan' ? `Jour ${point.day} · étape ${point.order}` : 'À découvrir', category,
-                  place?.visit_duration_min ? `≈ ${formatDuration(place.visit_duration_min)}` : null,
-                  place?.price_amount != null ? `≈ ${formatMoney(place.price_amount, data.trip.currency)}` : null].filter(Boolean).join(' · ')}
-              </Text>
-              {point.placeId != null ? <Button label="Voir les détails" variant="ghost" onPress={() => setDetails(true)} /> : null}
-              {point.placeId != null ? <Button label={favorites.ids.has(point.placeId) ? '♥ Dans mes favoris' : '♡ Ajouter aux favoris'} variant="ghost" onPress={() => { void favorites.toggle(point.placeId!); }} /> : null}
-              {point.kind === 'disc' ? (dayId ? <Button label={`Ajouter au jour ${day}`} onPress={add} loading={busy} /> : <Text variant="muted">Choisis un jour en haut pour l'ajouter à ton programme.</Text>) : null}
-            </>
-          ) : <Text variant="muted" accessibilityLiveRegion="polite">{message}</Text>}
+      {!point && (message || problem) ? <View style={{ backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line, paddingBottom: bottomInset }}>
+        <View style={{ padding: space.lg, gap: space.sm }}>
+          {message ? <Text variant="muted" accessibilityLiveRegion="polite">{message}</Text> : null}
           <ErrorNote message={problem} />
         </View>
-      </SafeAreaView> : null}
+      </View> : null}
       {details && point?.placeId != null ? (
         <PlaceSheet visible tripId={data.trip.id} placeId={point.placeId} name={point.label} category={category}
           dot={categoryColors[mode][point.root] ?? colors.text3} place={place ?? null} currency={data.trip.currency}

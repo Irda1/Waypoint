@@ -103,7 +103,7 @@ export function mapHtml(opts: { dark: boolean; start: { lat: number; lng: number
   const bg = opts.dark ? '#0B0D10' : '#EDEAE3';
   return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@${MAPLIBRE_VERSION}/dist/maplibre-gl.css">
-<style>html,body,#map{margin:0;height:100%;width:100%;background:${bg}}
+<style>html,body,#map{margin:0;height:100%;width:100%;background:${bg}}html,body{overflow:hidden;overscroll-behavior:none}.maplibregl-canvas-container,.maplibregl-canvas{touch-action:none!important}
 .pin{width:30px;height:30px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.45);color:#fff;font:700 13px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .dot{width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);cursor:pointer}
 .sel{outline:3px solid #FFB95A;outline-offset:2px}

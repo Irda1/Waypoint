@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Pressable, Text as RNText, View } from 'react-native';
+import { Linking, Pressable, Text as RNText, View } from 'react-native';
 import { Button, Card, ErrorNote, Text } from '../../ui';
 import { formatMoney } from '../../lib/format';
 import { formatDuration } from '../../lib/search';
@@ -12,6 +12,7 @@ import type { TripData } from '../../data/useTrip';
 import { useTheme } from '../../theme/useTheme';
 import { categoryColors, fonts, space } from '../../theme/tokens';
 import { formatDay } from '../../lib/format';
+import { glyphFor } from '../../theme/categoryIcons';
 
 const BADGE = { pour_toi: 'Pour toi', incontournable: 'Incontournable' } as const;
 
@@ -89,14 +90,18 @@ export function ProgramCard({ data, onApplied }: { data: TripData; onApplied: ()
                 return (
                   <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}>
                     <Text variant="mono" style={{ width: 48, color: colors.text2, fontSize: 14 }}>{formatTime(i.startMin)}</Text>
-                    <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: dot }} />
-                    <View style={{ flex: 1 }}>
+                    <View accessible={false} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${dot}33`, alignItems: 'center', justifyContent: 'center' }}>
+                      <RNText style={{ fontSize: 15 }}>{glyphFor(i.root ?? '')}</RNText>
+                    </View>
+                    {/* Toucher une étape ouvre le lieu dans Google Maps ; une étape sans lieu ne fait rien. */}
+                    <Pressable disabled={!i.place} accessibilityRole={i.place ? 'link' : undefined} accessibilityLabel={i.place ? `Ouvrir ${name} dans Google Maps` : name}
+                      onPress={() => { if (i.place) void Linking.openURL(`https://www.google.com/maps/search/${encodeURIComponent(name)}/@${i.place.lat},${i.place.lng},17z`); }} style={{ flex: 1 }}>
                       <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{name}</Text>
                       <Text variant="muted">{[i.place && i.place.visit_duration_min ? `≈ ${formatDuration(i.durationMin)}` : null, ...i.badges.map((b) => BADGE[b])].filter(Boolean).join(' · ')}</Text>
-                    </View>
+                    </Pressable>
                     {i.place ? (
                       <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${name} de la proposition`} onPress={() => remove(i.place!.id)} style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'flex-end' }}>
-                        <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.text3 }}>Retirer</RNText>
+                        <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.danger, opacity: 0.85 }}>Retirer</RNText>
                       </Pressable>
                     ) : null}
                   </View>
