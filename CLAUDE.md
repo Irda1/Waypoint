@@ -22,6 +22,9 @@ Racine : `node --test pipeline/test/*.test.mjs` (collecte) · `bash supabase/tes
 - `.github/workflows/apk-app.yml` APK Android. Skill : `apk-build`.
 - `web/` + `capacitor.config.json` : ancienne maquette (v0.9), séparée de l'appli Expo.
 
+## Carte du code (Graphify)
+- `graphify-out/GRAPH_REPORT.md` et `graph.json` : carte du code (fichiers, liens, hubs). Interroger : `graphify query "…"`, `graphify explain "X"`. Mettre à jour après de gros changements : `graphify update .` (sans IA). Installation : `pip install graphifyy` ou `uv tool install graphifyy`.
+
 ## Pièges
 - Le cloud n'a que la clé anon : il ne peut pas exécuter de migration (Adrien les lance dans le SQL Editor).
 - Dans le template de `globeHtml()`, écrire `\\n` pour un retour à la ligne dans le JS de la page.
