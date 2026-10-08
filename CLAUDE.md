@@ -20,7 +20,7 @@ Racine : `node --test pipeline/test/*.test.mjs` (collecte) · `bash supabase/tes
 - `public/globe.html` et `public/map.html` sont **générés** (`domain/globe.ts`, `domain/map.ts`) : les regénérer après modif, un test vérifie la cohérence.
 - `supabase/migrations/` migrations ; `supabase/all-migrations.sql` est **généré**, ne pas l'éditer. Skill : `supabase-migrations`.
 - `.github/workflows/apk-app.yml` APK Android. Skill : `apk-build`.
-- `web/` + `capacitor.config.json` : ancienne maquette (v0.9), séparée de l'appli Expo.
+- L'ancienne maquette (`web/`, Capacitor, v0.9) a été retirée ; elle reste dans l'historique git (commit `86fbf9b`).
 
 ## Carte du code (Graphify)
 - `graphify-out/GRAPH_REPORT.md` et `graph.json` : carte du code (fichiers, liens, hubs). Interroger : `graphify query "…"`, `graphify explain "X"`. Mettre à jour après de gros changements : `graphify update .` (sans IA). Installation : `pip install graphifyy` ou `uv tool install graphifyy`.

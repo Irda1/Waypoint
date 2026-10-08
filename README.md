@@ -28,7 +28,7 @@
 | `supabase/` | La base de données (Postgres, sécurité par ligne, Realtime), les migrations et les tests de sécurité. |
 | `pipeline/` | La collecte des données de référence (pays, villes, lieux, photos), lancée par GitHub Actions. |
 | `.github/workflows/` | Publication du site web, de l'APK et collecte des données. |
-| `web/`, `scripts/` | L'ancienne maquette (voir plus bas). |
+| `scripts/` | Génération du SQL regroupé (`bundle-sql.mjs`). |
 
 **Sources de données** : [OpenStreetMap](https://www.openstreetmap.org/copyright) (lieux, ODbL), [Geoapify](https://www.geoapify.com/) (chargement rapide des lieux), GeoNames, Pexels (photos de villes), Wikipédia (descriptions, CC BY-SA), Open-Meteo (météo), OpenFreeMap (fond de carte), Frankfurter / BCE (taux de change). Détails et licences : [`docs/DESCRIPTION-TECHNIQUE.md`](docs/DESCRIPTION-TECHNIQUE.md).
 
@@ -67,7 +67,7 @@ Le dépôt contient sa configuration pour les sessions Claude Code : [`CLAUDE.md
 
 ## Ancienne maquette (v0.9)
 
-Avant l'application, une maquette interactive en un seul fichier HTML (`web/index.html`) a servi de prototype, publiée en APK via Capacitor (`publier.yml`). Elle ne reçoit plus d'évolutions. Description : [`docs/DESCRIPTION-TECHNIQUE.md`](docs/DESCRIPTION-TECHNIQUE.md). Pour la tester : `npm install && npm run build:web && npm run serve` (http://localhost:5173).
+Avant l'application, une maquette interactive en un seul fichier HTML a servi de prototype. Elle a été retirée du dépôt (octobre 2026) ; elle reste consultable dans l'historique git (dernier commit avant le retrait : `86fbf9b`, dossier `web/`). Description : [`docs/DESCRIPTION-TECHNIQUE.md`](docs/DESCRIPTION-TECHNIQUE.md).
 
 ## État du projet
 
