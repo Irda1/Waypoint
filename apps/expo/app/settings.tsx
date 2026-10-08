@@ -13,6 +13,7 @@ import type { AccentName } from '../src/theme/tokens';
 import { fonts, space } from '../src/theme/tokens';
 import { useTheme } from '../src/theme/useTheme';
 import { loadNotifPrefs, remindersEnabled, remindersSupported, saveNotifPrefs, setRemindersEnabled } from '../src/lib/reminders';
+import { BUILD_ID } from '../src/lib/env';
 import { DEFAULT_PREFS, MINUTES_CHOICES } from '../src/domain/reminders.ts';
 import type { NotifPrefs } from '../src/domain/reminders.ts';
 
@@ -131,6 +132,7 @@ export default function Settings() {
         <Text variant="label">Compte</Text>
         <Text variant="body">{session?.user.email ?? ''}</Text>
         <Button label="Se déconnecter" variant="ghost" onPress={signOut} />
+        <Text variant="muted">Version : {BUILD_ID}</Text>
       </Card>
 
       <Card>
