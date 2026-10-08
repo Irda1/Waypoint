@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- Fond de l'icône adaptative et de l'écran de lancement : noir « Carnet de nuit » -->
-    <color name="ic_launcher_background">#07090B</color>
-</resources>
