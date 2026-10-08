@@ -27,3 +27,7 @@ Thumbs.db
 
 # Projet Android de l'appli Expo, généré par la CI
 /apps/expo/android/
+
+# Graphify : on garde le graphe et le rapport, pas le cache ni la page HTML (régénérables)
+graphify-out/cache/
+graphify-out/graph.html
