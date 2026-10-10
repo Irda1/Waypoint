@@ -177,6 +177,35 @@ test('file de collecte : prend une tâche, remplit la ville, la marque terminée
   } finally { await fake.close(); }
 });
 
+test('file de collecte : la photo de la ville arrive avec ses lieux (Pexels), si elle n\'en a pas', async () => {
+  let claimed = 0;
+  const fake = await startFakeSupabase({
+    onRequest: (c) => {
+      if (c.path.endsWith('/rpc/claim_collection_job')) return { body: claimed++ === 0 ? [{ id: 9, city_id: 5, attempts: 1 }] : [] };
+      if (c.method === 'GET' && c.path.endsWith('/cities')) return { body: [{ ...lisbon, cover_media_id: null, countries: { name_en: 'Portugal' } }] };
+      return null;
+    },
+  });
+  try {
+    const sb = createSupabase({ url: fake.url, serviceKey: 'K' });
+    const places = overpassFetch(), asked = [];
+    const photo = { id: 777, url: 'https://www.pexels.com/photo/777/', photographer: 'Rui', alt: 'Lisbon skyline', width: 4000, height: 3000, src: { medium: 'm', large2x: 'l2' } };
+    const fetchImpl = async (url, init) => {
+      if (String(url).includes('api.pexels.com')) { asked.push(String(url)); return new Response(JSON.stringify({ photos: [photo] }), { status: 200 }); }
+      return places(url, init);
+    };
+    const summary = await queuePass({ sb, cfg, max: 2, fetchImpl, throttle: noWait(), log: silent });
+    assert.deepEqual(summary, { done: 1, failed: 0 });
+    assert.equal(asked.length, 1);
+    assert.match(asked[0], /Portugal/);
+    // La passe lieux met aussi la ville à jour : on cherche la mise à jour qui pose la photo.
+    const cover = fake.calls.find((c) => c.method === 'PATCH' && c.path.endsWith('/cities') && c.body?.cover_media_id);
+    assert.ok(cover, 'couverture posée sur la ville');
+    assert.equal(cover.query.id, 'eq.' + lisbon.id);
+    assert.equal(fake.calls.find((c) => c.method === 'PATCH' && c.path.endsWith('/ingestion_queue')).body.status, 'done');
+  } finally { await fake.close(); }
+});
+
 test('file de collecte : échec = nouvelle tentative, puis abandon à la 3e', async () => {
   const run = async (attempts) => {
     let claimed = 0;

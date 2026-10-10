@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BUDGET_LEVELS, POSTE_SHARES, autoTitle, budgetTotal, changeNights, cityPerDay, dayCount, flexibleDates, missingSteps, newWizard, nightCount, pickDate, pickDuration, pickParty, spreadNights, splitBudget, toggleCity, toggleExcluded, wizardPlan } from './wizard.ts';
+import { BUDGET_LEVELS, POSTE_SHARES, autoTitle, budgetTotal, changeNights, cityPerDay, dayCount, flexibleDates, missingSteps, newWizard, sameCity, nightCount, pickDate, pickDuration, pickParty, spreadNights, splitBudget, toggleCity, toggleExcluded, wizardPlan } from './wizard.ts';
 import { addDays, diffDays, monthGrid, nextMonths, todayIso } from '../lib/dates.ts';
 import { COUNTRIES, POPULAR, COUNTRY_NAME, flagEmoji, searchCountries } from './countries.ts';
 
@@ -129,4 +129,11 @@ test('propositions : un jour par jour du voyage, lieux retirés écartés, rien 
   assert.deepEqual(s2.excluded, [first]);
   assert.ok(!wizardPlan(s2, cands).flatMap((d) => d.items).some((i) => i.place?.id === first));
   assert.deepEqual(toggleExcluded(s2, first).excluded, []);
+});
+
+test('ville de départ = première ville du voyage : accents, majuscules et tirets ignorés', () => {
+  assert.ok(sameCity('Genève', 'geneve'));
+  assert.ok(sameCity('Saint-Étienne', 'saint etienne'));
+  assert.ok(!sameCity('Paris', 'Lyon'));
+  assert.ok(!sameCity('', ''));
 });

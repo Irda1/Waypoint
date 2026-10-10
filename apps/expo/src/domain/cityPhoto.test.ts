@@ -29,3 +29,16 @@ test('photo écartée : autre lieu, homonymie, carte, portrait, trop petite', ()
   assert.equal(photoFromSummary({ ...kyoto, originalimage: { ...kyoto.originalimage, width: 500, height: 300 } }, 35.02, 135.75), null);
   assert.equal(photoFromSummary(null, 0, 0), null);
 });
+
+test('adresses Wikimedia suivies de paramètres (?utm_source=…) : photo acceptée et miniature redimensionnée', () => {
+  const q = '?utm_source=fr.wikipedia.org&utm_campaign=api&utm_content=thumbnail';
+  const paris = {
+    coordinates: { lat: 48.856578, lon: 2.351828 },
+    originalimage: { source: `https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Tour_Eiffel.jpg/3840px-Tour_Eiffel.jpg${q}`, width: 4592, height: 2870 },
+    thumbnail: { source: `https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Tour_Eiffel.jpg/320px-Tour_Eiffel.jpg${q}`, width: 320, height: 200 },
+  };
+  const p = photoFromSummary(paris, 48.8566, 2.3522);
+  assert.ok(p);
+  assert.equal(p.uri, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Tour_Eiffel.jpg/1280px-Tour_Eiffel.jpg');
+  assert.equal(p.small, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Tour_Eiffel.jpg/640px-Tour_Eiffel.jpg');
+});
