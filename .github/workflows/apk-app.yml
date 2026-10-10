@@ -27,7 +27,7 @@ jobs:
       EXPO_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
       EXPO_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
       EXPO_PUBLIC_GEOAPIFY_KEY: ${{ secrets.GEOAPIFY_API_KEY }}
-      EXPO_PUBLIC_BUILD_ID: ${{ substr(github.sha, 0, 7) }}
+      EXPO_PUBLIC_BUILD_ID: ${{ github.sha }}
     steps:
       - uses: actions/checkout@v5
 
