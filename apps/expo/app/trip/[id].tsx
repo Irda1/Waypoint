@@ -12,6 +12,7 @@ import type { CityOption } from '../../src/data/places';
 import { MiniCalendar } from '../../src/features/trip/MiniCalendar';
 import { DestinationsCard } from '../../src/features/trip/DestinationsCard';
 import { Globe } from '../../src/features/globe/Globe';
+import { TripSummary } from '../../src/features/trip/TripSummary';
 import { ROUTE_BG, routeParam } from '../../src/domain/routeGlobe.ts';
 import { useAppearance } from '../../src/theme/store';
 import { DayCard } from '../../src/features/trip/DayCard';
@@ -258,6 +259,7 @@ export default function TripScreen() {
         {tab === 'voyage' ? (
         <View style={[styles.sheet, { backgroundColor: colors.bg }]}>
         <View style={styles.page}>
+          <TripSummary data={data} onOpen={(t) => onNav(t)} />
           {data.days.length > 0 ? (
             <View style={{ gap: space.sm }}>
               <Text variant="label">Les journées · {data.days.length} jour{data.days.length > 1 ? 's' : ''}</Text>
@@ -289,13 +291,13 @@ export default function TripScreen() {
             <UnplannedCard data={data} onChanged={reload} />
           </Section>
 
-          <Section title="Transports et nuits" icon="plane">
+          <Section title="Transports et nuits" icon="plane" hint="Vols, hébergements, réservations" defaultOpen={false}>
             <FlightsCard data={data} />
             <StayCard data={data} userId={session?.user.id ?? null} onChanged={reload} />
             <BookingsCard tripId={trip.id} />
           </Section>
 
-          <Section title="Préparation" icon="note">
+          <Section title="Préparation" icon="note" hint="Météo, liste, export" defaultOpen={false}>
             <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
             <ChecklistCard tripId={trip.id} />
             <ExportCard data={data} />

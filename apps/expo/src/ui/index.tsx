@@ -7,6 +7,7 @@ import { fonts, radius, space } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { useBreakpoint } from './useBreakpoint';
 import { Icon } from './Icon';
+import { FadeIn } from './FadeIn';
 import type { IconName } from './Icon';
 
 export function Screen({ children, scroll = true }: { children: React.ReactNode; scroll?: boolean }) {
@@ -114,16 +115,23 @@ export function PayBadge({ state }: { state: 'paid' | 'partial' | 'unpaid' | nul
   );
 }
 
-/** Section d'un écran long : un titre (icône + nom) puis ses cartes. Aide à se repérer sans tout dérouler. */
-export function Section({ title, icon, children }: { title: string; icon: IconName; children: React.ReactNode }) {
+/**
+ * Section d'un écran long : un titre (icône + nom) puis ses cartes. Aide à se repérer sans tout dérouler.
+ * `hint` : résumé affiché à côté du titre ; `defaultOpen={false}` : la section est repliée, toucher le titre l'ouvre.
+ */
+export function Section({ title, icon, hint, defaultOpen = true, children }: { title: string; icon: IconName; hint?: string; defaultOpen?: boolean; children: React.ReactNode }) {
   const { colors } = useTheme();
+  const [open, setOpen] = React.useState(defaultOpen);
   return (
     <View style={{ gap: space.md }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line }}>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} aria-expanded={open} accessibilityLabel={`${title}${hint ? `, ${hint}` : ''}`} onPress={() => setOpen(!open)}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 44, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line }}>
         <Icon name={icon} size={18} />
         <RNText accessibilityRole="header" style={{ fontFamily: fonts.serif, fontSize: 22, lineHeight: 28, color: colors.text }}>{title}</RNText>
-      </View>
-      {children}
+        {hint ? <RNText numberOfLines={1} style={{ flex: 1, fontFamily: fonts.sans, fontSize: 13, color: colors.text3 }}>{hint}</RNText> : <View style={{ flex: 1 }} />}
+        <Icon name={open ? 'chevronDown' : 'chevronRight'} size={18} tone="muted" />
+      </Pressable>
+      {open ? <FadeIn>{children}</FadeIn> : null}
     </View>
   );
 }
