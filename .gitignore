@@ -31,3 +31,4 @@ Thumbs.db
 # Graphify : on garde le graphe et le rapport, pas le cache ni la page HTML (régénérables)
 graphify-out/cache/
 graphify-out/graph.html
+__pycache__/
