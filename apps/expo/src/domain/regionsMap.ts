@@ -1,5 +1,5 @@
 // Page de la carte « régions et villes » de l'étape Villes (MapLibre, pays en imagerie satellite réaliste (Sentinel-2 sans nuages, EOX, CC BY-NC 4.0), le reste assombri, régions en contour turquoise).
-// Le pays est en 3D : relief réel (altitudes « Terrain Tiles » d'AWS, format terrarium, sans clé), exagéré de loin, vu incliné, avec ombrage et ciel.
+// Le pays est isolé (le reste assombri) et vu en légère perspective, sans relief ; les villes choisies sont reliées dans l'ordre du parcours par un arc lumineux.
 // Même principe que la carte du voyage et le globe : une page autonome, dans un cadre (web) ou une WebView (mobile).
 // Réglages : ?country=PT&base=<racine des fichiers>&color=5FD3BC (web) ou window.__REGIONS__ (mobile).
 // Messages reçus : {type:'cities', cities:[{id,n,lat,lng,r,a}], selected:[{id,o}]} ; envoyés : {type:'ready'}, {type:'toggle', id}.
@@ -39,17 +39,10 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   document.documentElement.style.setProperty("--c", COLOR);
   if (!window.maplibregl) { msg.textContent = "Carte indisponible : connexion requise."; post({ type: "ready" }); return; }
 
-  var DEM = { type: "raster-dem", tiles: ["https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"], encoding: "terrarium", tileSize: 256, maxzoom: 12, attribution: "Relief : Terrain Tiles (Mapzen, AWS)" };
-  // Relief exagéré vu de loin (sinon les montagnes disparaissent à l'échelle d'un pays), proche du réel en zoomant.
-  function relief(z) { return Math.max(1.4, Math.min(5, 5 - (z - 5) * 0.6)); }
   // Vue inclinée : le pays paraît plus petit qu'à plat, on rapproche un peu la caméra.
   var TILT_ZOOM = 0.1;
-  var map = new maplibregl.Map({ container: "map", style: { version: 8, sources: { sat0: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 6 }, sat: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 13, attribution: "Sentinel-2 cloudless © EOX" },
-      dem: DEM, demh: DEM }, layers: [{ id: "bg", type: "background", paint: { "background-color": "#000" } }, { id: "sat0", type: "raster", source: "sat0", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }, { id: "sat", type: "raster", source: "sat", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } },
-      { id: "relief", type: "hillshade", source: "demh", paint: { "hillshade-exaggeration": 0.45, "hillshade-shadow-color": "#000", "hillshade-highlight-color": "#fff", "hillshade-accent-color": "#000" } }],
-      terrain: { source: "dem", exaggeration: relief(5) },
-      sky: { "sky-color": "#0b1f3a", "horizon-color": "#6f8fb8", "fog-color": "#0a0d12", "sky-horizon-blend": 0.6, "horizon-fog-blend": 0.5, "fog-ground-blend": 0.75, "atmosphere-blend": 0.8 } },
-    center: [0, 20], zoom: 1.5, pitch: 50, maxPitch: 60, attributionControl: false, dragRotate: false, pitchWithRotate: false, renderWorldCopies: false, maxZoom: 14 });
+  var map = new maplibregl.Map({ container: "map", style: { version: 8, sources: { sat0: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 6 }, sat: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 13, attribution: "Sentinel-2 cloudless © EOX" } }, layers: [{ id: "bg", type: "background", paint: { "background-color": "#000" } }, { id: "sat0", type: "raster", source: "sat0", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }, { id: "sat", type: "raster", source: "sat", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }]},
+    center: [0, 20], zoom: 1.5, pitch: 42, maxPitch: 60, attributionControl: false, dragRotate: false, pitchWithRotate: false, renderWorldCopies: false, maxZoom: 14 });
   map.touchZoomRotate.disableRotation();
   // Pendant un zoom à deux doigts (et juste après), aucun toucher ne compte comme un choix.
   var pinchUntil = 0, pinching = function () { return Date.now() < pinchUntil; };
@@ -142,11 +135,29 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
     if (!countryBox && cities.length) { countryBox = union(cities.map(function (c) { return [c.lng, c.lat, c.lng, c.lat]; })); z0 = zoomFor(countryBox); zSel = z0; fit(countryBox, 0); }
     render();
   };
-  window.__setSelected = function (sel) { selected = {}; (sel || []).forEach(function (s) { selected[s.id] = s.o; }); render(); };
+  // Arc entre deux villes : courbe qui s'écarte de la ligne droite (vue de dessus, l'arc paraît « posé » grâce à l'inclinaison).
+  function arc(p, q) {
+    var dx = q[0] - p[0], dy = q[1] - p[1], k = 0.2, mx = (p[0] + q[0]) / 2 - dy * k, my = (p[1] + q[1]) / 2 + dx * k, pts = [];
+    for (var i = 0; i <= 28; i++) { var t = i / 28, u = 1 - t; pts.push([u * u * p[0] + 2 * u * t * mx + t * t * q[0], u * u * p[1] + 2 * u * t * my + t * t * q[1]]); }
+    return pts;
+  }
+  function drawRoute() {
+    var src = map.getSource("route"); if (!src) return;
+    var order = cities.filter(function (c) { return selected[c.id]; }).sort(function (a, b) { return selected[a.id] - selected[b.id]; }), feats = [];
+    for (var i = 1; i < order.length; i++) feats.push({ type: "Feature", geometry: { type: "LineString", coordinates: arc([order[i - 1].lng, order[i - 1].lat], [order[i].lng, order[i].lat]) } });
+    src.setData({ type: "FeatureCollection", features: feats });
+  }
+  function addRoute() {
+    if (map.getSource("route")) return;
+    map.addSource("route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "route-glow", type: "line", source: "route", paint: { "line-color": COLOR, "line-width": 12, "line-opacity": 0.4, "line-blur": 6 }, layout: { "line-cap": "round", "line-join": "round" } });
+    map.addLayer({ id: "route", type: "line", source: "route", paint: { "line-color": "#FFFFFF", "line-width": 3.4, "line-dasharray": [0.1, 1.9] }, layout: { "line-cap": "round", "line-join": "round" } });
+    drawRoute();
+  }
+  window.__setSelected = function (sel) { selected = {}; (sel || []).forEach(function (s) { selected[s.id] = s.o; }); drawRoute(); render(); };
   function onMsg(e) { try { var m = typeof e.data === "string" ? JSON.parse(e.data) : e.data; if (m && m.type === "cities") window.__setCities(m.cities, m.selected); else if (m && m.type === "selected") window.__setSelected(m.selected); } catch (err) {} }
   window.addEventListener("message", onMsg); document.addEventListener("message", onMsg);
   map.on("move", render); map.on("resize", render);
-  map.on("zoomend", function () { var e = relief(map.getZoom()); if (!map.getTerrain() || Math.abs(map.getTerrain().exaggeration - e) > 0.2) map.setTerrain({ source: "dem", exaggeration: e }); });
 
   function ensureLayers() {
     map.addSource("regions", { type: "geojson", data: { type: "FeatureCollection", features: regions } });
@@ -182,8 +193,8 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
     fetch(BASE + "/regions/" + CC + ".json").then(function (r) { if (!r.ok) throw new Error("no"); return r.json(); }).then(function (fc) {
       regions = fc.features; regions.forEach(function (f, i) { f.id = i; f.bb = bboxOf(f); });
       countryBox = mainBox(regions) || union(regions.map(function (f) { return f.bb; })); z0 = zoomFor(countryBox); zSel = z0; fit(countryBox, 0);
-      ensureLayers(); assign(); render(); msg.textContent = "Touche une région, puis une ville pour l'ajouter.";
-    }).catch(function () { msg.textContent = "Régions indisponibles : les villes restent choisissables ici ou dans la liste."; }).then(function () { ready = true; post({ type: "ready" }); });
+      ensureLayers(); addRoute(); assign(); render(); msg.textContent = "Touche une région, puis une ville pour l'ajouter.";
+    }).catch(function () { addRoute(); msg.textContent = "Régions indisponibles : les villes restent choisissables ici ou dans la liste."; }).then(function () { ready = true; post({ type: "ready" }); });
   });
 })();
 </script></body></html>`;
