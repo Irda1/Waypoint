@@ -32,12 +32,13 @@ export interface TripSummary {
   cover: CityCover | null;
   /** Villes du voyage, dans l'ordre (vide si aucune). */
   cities?: string[];
+  created_at?: string;
 }
 
 export async function listTrips(): Promise<{ trips: TripSummary[]; error: string | null; savedAt?: number | null }> {
   const { data, error } = await supabase
     .from('trips')
-    .select('id,title,starts_on,ends_on,currency,country_code')
+    .select('id,title,starts_on,ends_on,currency,country_code,created_at')
     .is('deleted_at', null)
     .order('starts_on', { ascending: false, nullsFirst: true });
   const rows = (data ?? []) as Omit<TripSummary, 'cover'>[];
