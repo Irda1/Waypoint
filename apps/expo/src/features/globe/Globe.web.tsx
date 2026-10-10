@@ -5,7 +5,7 @@ import { ROUTE_BG } from '../../domain/routeGlobe.ts';
 import type { GlobeProps } from './types';
 
 /** Globe 3D sur le web : page publique /globe.html dans un cadre, qui répond par messages. */
-export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick, theme = 'nuit' }: GlobeProps) {
+export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick, theme = 'nuit', route }: GlobeProps) {
   const frame = useRef<HTMLIFrameElement | null>(null);
   const pick = useRef(onPick);
   pick.current = onPick;
@@ -27,7 +27,7 @@ export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick, theme =
     return () => window.removeEventListener('message', listener);
   }, []);
 
-  const src = mode === 'route' ? `${WEB_BASE}/route.html?color=${color}&theme=${theme}` : `${WEB_BASE}/globe.html?mode=${mode}&color=${color}`;
+  const src = mode === 'route' ? `${WEB_BASE}/route.html?color=${color}&theme=${theme}${route ? `&fit=card&route=${encodeURIComponent(route)}` : ''}` : `${WEB_BASE}/globe.html?mode=${mode}&color=${color}`;
   // key = src : un nouveau cadre plutôt qu'un changement d'adresse, qui ajouterait une étape à l'historique du navigateur
   // (le bouton Retour ramènerait alors le cadre à l'ancien thème au lieu de changer d'écran).
   return React.createElement('iframe', {
