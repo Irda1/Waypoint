@@ -13,12 +13,11 @@ import { todayIso, tripStatus } from '../src/lib/dates';
 import { Globe } from '../src/features/globe/Globe';
 import { photoKeyFor } from '../src/lib/photoKey';
 import { photos } from '../src/theme/photos';
-import { fonts, radius, space } from '../src/theme/tokens';
+import { fonts, palette, radius, space } from '../src/theme/tokens';
+import { useAppearance } from '../src/theme/store';
 import { useTheme } from '../src/theme/useTheme';
 import { Icon } from '../src/ui/Icon';
 
-// Photo d'ambiance de la maquette (web/index.html), utilisée en couverture de l'accueil.
-const horizon = require('../assets/photos/horizon.jpg');
 
 // Textes posés sur la photo : toujours clairs, quel que soit le mode du téléphone.
 const ON_PHOTO = '#F4EFE6';
@@ -36,6 +35,9 @@ const IDEAS: { key: 'lisbonne' | 'porto' | 'alfama'; name: string; city: string;
 export default function Home() {
   const guard = useRequireAuth();
   const { colors } = useTheme();
+  const { accent } = useAppearance();
+  // Fond de l'accueil toujours noir : on prend l'accent du thème Nuit, lisible sur le noir.
+  const heroAccent = palette('nuit', accent).accent.slice(1);
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -71,8 +73,8 @@ export default function Home() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }} keyboardShouldPersistTaps="handled">
-        <ImageBackground source={horizon} resizeMode="cover" style={styles.hero}>
-          <View style={styles.globe} pointerEvents="none"><Globe mode="hero" /></View>
+        <View style={styles.hero}>
+          <View style={styles.globe} pointerEvents="none"><Globe mode="route" color={heroAccent} /></View>
           <View style={styles.veil}>
           <SafeAreaView edges={['top']} style={styles.heroInner}>
             <View style={styles.heroBar}>
@@ -92,7 +94,7 @@ export default function Home() {
             </View>
           </SafeAreaView>
           </View>
-        </ImageBackground>
+        </View>
 
         <View style={styles.page}>
           <ErrorNote message={error} />
@@ -167,8 +169,8 @@ export default function Home() {
 }
 
 const styles = StyleSheet.create({
-  hero: { minHeight: 500, width: '100%', overflow: 'hidden' },
-  veil: { width: '100%', backgroundColor: 'rgba(0, 0, 0, 0.28)' },
+  hero: { minHeight: 500, width: '100%', overflow: 'hidden', backgroundColor: '#000' },
+  veil: { width: '100%' },
   globe: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   heroInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xxl, minHeight: 500, width: '100%', maxWidth: 880, alignSelf: 'center' },
   heroBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: space.sm },
