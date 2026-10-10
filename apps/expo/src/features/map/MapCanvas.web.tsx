@@ -33,5 +33,5 @@ export function MapCanvas({ points, selectedId, dark, start, fitKey, focusId, on
     frame.current?.contentWindow?.postMessage({ type: 'points', points, fit, selected: selectedId, focus: focusId ?? null }, '*');
   }, [ready, points, fitKey, selectedId, focusId]);
 
-  return React.createElement('iframe', { ref: frame, src, title: 'Carte du voyage', style: { border: 0, width: '100%', height: '100%' } });
+  return React.createElement('iframe', { key: src, ref: frame, src, title: 'Carte du voyage', style: { border: 0, width: '100%', height: '100%' } });
 }
