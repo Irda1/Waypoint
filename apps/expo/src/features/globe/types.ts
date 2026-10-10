@@ -7,5 +7,7 @@ export interface GlobeProps {
   /** Pays à mettre en évidence : le globe pivote vers lui (code ISO à 2 lettres). */
   focus?: string | null;
   onPick?: (code: string, name: string) => void;
+  /** Mode route : fond nuit (noir étoilé) ou jour (sable clair). */
+  theme?: 'nuit' | 'jour';
 }
 export const GLOBE_COLOR = '5FD3BC';

@@ -1,7 +1,7 @@
 <!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Waypoint</title>
 <style>
-html,body{margin:0;height:100%;background:#000;overflow:hidden}
+html,body{margin:0;height:100%;background:var(--bg,#000);overflow:hidden}
 canvas{display:block;width:100%;height:100%}
 </style></head><body>
 <canvas id="c"></canvas>
@@ -12,13 +12,16 @@ canvas{display:block;width:100%;height:100%}
   "use strict";
   var q = new URLSearchParams(location.search), G = window.__GLOBE__ || {};
   var COLOR = "#" + String(G.color || q.get("color") || "FFB95A").replace("#", "");
+  var DAY = (G.theme || q.get("theme")) === "jour";
+  var BG = DAY ? "#F1E4CC" : "#000000";
+  document.documentElement.style.setProperty("--bg", BG);
   if (!window.THREE) return;
   var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   var canvas = document.getElementById("c");
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-  var scene = new THREE.Scene(); scene.background = new THREE.Color(0x000000);
+  var scene = new THREE.Scene(); scene.background = new THREE.Color(BG);
   var camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
   var group = new THREE.Group(); scene.add(group);
   // Cadrage : sur téléphone la planète occupe le haut du bandeau (le texte de l'accueil est en bas) ;
@@ -30,26 +33,41 @@ canvas{display:block;width:100%;height:100%}
     var wide = w / h > 1.1, z = wide ? 10 : 12.5, halfW = Math.tan(18 * Math.PI / 180) * z * (w / h);
     camera.position.set(0, 0, z); camera.lookAt(0, 0, 0);
     group.position.set(wide ? Math.min(halfW - 2.4, 4.2) : 0.7, wide ? 0 : 1.55, 0);
+    if (sun) { var hh = Math.tan(18 * Math.PI / 180) * (z + 30); sun.position.set(hh * (w / h) * 0.92, hh * 0.86, -30); }
     camera.updateProjectionMatrix(); draw();
   }
 
   function vec(lon, lat, r) { var phi = (90 - lat) * Math.PI / 180, th = (lon + 180) * Math.PI / 180; return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(th), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(th)); }
 
-  // Sphère sombre : cache les points de la face arrière (profondeur) et donne le volume.
-  group.add(new THREE.Mesh(new THREE.SphereGeometry(1.985, 96, 64), new THREE.MeshBasicMaterial({ color: 0x07090b })));
+  // Nuit : ciel étoilé et halo de soleil discret dans le coin haut droit (placé au redimensionnement).
+  var sun = null;
+  if (!DAY) {
+    var NS = 900, sp = new Float32Array(NS * 3);
+    for (var si = 0; si < NS; si++) { var u = Math.random() * 2 - 1, th = Math.random() * 6.2832, rr = Math.sqrt(1 - u * u), d = 55 + Math.random() * 25; sp[si * 3] = d * rr * Math.cos(th); sp[si * 3 + 1] = d * u; sp[si * 3 + 2] = d * rr * Math.sin(th) - 20; }
+    var sgeo = new THREE.BufferGeometry(); sgeo.setAttribute("position", new THREE.BufferAttribute(sp, 3));
+    scene.add(new THREE.Points(sgeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.16, sizeAttenuation: true, transparent: true, opacity: 0.7, depthWrite: false })));
+    var hc = document.createElement("canvas"); hc.width = hc.height = 256; var hx = hc.getContext("2d");
+    var hg = hx.createRadialGradient(128, 128, 0, 128, 128, 128); hg.addColorStop(0, "rgba(255,240,205,.95)"); hg.addColorStop(0.07, "rgba(255,214,150,.75)"); hg.addColorStop(0.3, "rgba(255,160,90,.18)"); hg.addColorStop(1, "rgba(255,140,60,0)");
+    hx.fillStyle = hg; hx.fillRect(0, 0, 256, 256);
+    sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(hc), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    sun.scale.set(16, 16, 1); scene.add(sun);
+  }
+
+  // Sphère pleine : cache les points de la face arrière (profondeur) et donne le volume.
+  group.add(new THREE.Mesh(new THREE.SphereGeometry(1.985, 96, 64), new THREE.MeshBasicMaterial({ color: DAY ? 0xFBF4E8 : 0x07090b })));
   // Liseré discret sur le bord de la planète, couleur d'accent.
   var accent = new THREE.Color(COLOR);
   group.add(new THREE.Mesh(new THREE.SphereGeometry(2.06, 96, 64), new THREE.ShaderMaterial({
-    uniforms: { col: { value: accent } }, side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+    uniforms: { col: { value: DAY ? new THREE.Color(0xC9B48F) : accent } }, side: THREE.BackSide, transparent: true, blending: DAY ? THREE.NormalBlending : THREE.AdditiveBlending, depthWrite: false,
     vertexShader: "varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
-    fragmentShader: "uniform vec3 col; varying vec3 vN; void main(){ float i = pow(max(0.0, 0.58 - dot(normalize(vN), vec3(0.0, 0.0, 1.0))), 5.0); gl_FragColor = vec4(col * i * 0.9, 1.0); }"
+    fragmentShader: "uniform vec3 col; varying vec3 vN; void main(){ float i = pow(max(0.0, 0.58 - dot(normalize(vN), vec3(0.0, 0.0, 1.0))), 5.0); gl_FragColor = " + (DAY ? "vec4(col, min(1.0, i * 9.0) * 0.55)" : "vec4(col * i * 0.9, 1.0)") + "; }"
   })));
 
   // Terres en points : les continents sont rasterisés sur une petite carte, puis échantillonnés sur une grille régulière.
   var dotMat = new THREE.ShaderMaterial({
     uniforms: { scale: { value: 1 } }, transparent: true, depthWrite: false,
     vertexShader: "uniform float scale; varying float vF; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vF = dot(normalize(normalMatrix * position), vec3(0.0, 0.0, 1.0)); gl_PointSize = scale / -mv.z; gl_Position = projectionMatrix * mv; }",
-    fragmentShader: "varying float vF; void main(){ vec2 p = gl_PointCoord - 0.5; if (dot(p, p) > 0.25) discard; float a = mix(0.18, 0.62, smoothstep(0.0, 0.8, vF)); gl_FragColor = vec4(vec3(0.62, 0.66, 0.68), a); }"
+    fragmentShader: "varying float vF; void main(){ vec2 p = gl_PointCoord - 0.5; if (dot(p, p) > 0.25) discard; float a = mix(0.18, 0.62, smoothstep(0.0, 0.8, vF)); gl_FragColor = vec4(" + (DAY ? "vec3(0.29, 0.38, 0.41)" : "vec3(0.62, 0.66, 0.68)") + ", a); }"
   });
   function addLand(topo) {
     var W = 1024, H = 512, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
@@ -107,9 +125,9 @@ canvas{display:block;width:100%;height:100%}
 
   function glow(size, alpha) {
     var cv = document.createElement("canvas"); cv.width = cv.height = 128; var x = cv.getContext("2d");
-    var gr = x.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, "rgba(255,255,255," + alpha + ")"); gr.addColorStop(0.25, COLOR); gr.addColorStop(1, "rgba(0,0,0,0)");
+    var gr = x.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, DAY ? COLOR : "rgba(255,255,255," + alpha + ")"); gr.addColorStop(0.25, COLOR); gr.addColorStop(1, "rgba(0,0,0,0)");
     x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
-    var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), blending: DAY ? THREE.NormalBlending : THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     sp.scale.set(size, size, 1); return sp;
   }
   var head = glow(0.34, 1); group.add(head);

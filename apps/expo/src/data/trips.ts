@@ -28,8 +28,10 @@ export interface TripSummary {
   ends_on: string | null;
   currency: string;
   country_code: string | null;
-  /** Photo (Pexels) de la capitale du pays du voyage, sinon de sa première ville. */
+  /** Photo de la première ville du voyage, sinon de la capitale du pays : deux voyages au même pays n'ont pas la même image. */
   cover: CityCover | null;
+  /** Villes du voyage, dans l'ordre (vide si aucune). */
+  cities?: string[];
 }
 
 export async function listTrips(): Promise<{ trips: TripSummary[]; error: string | null; savedAt?: number | null }> {
@@ -40,13 +42,16 @@ export async function listTrips(): Promise<{ trips: TripSummary[]; error: string
     .order('starts_on', { ascending: false, nullsFirst: true });
   const rows = (data ?? []) as Omit<TripSummary, 'cover'>[];
   const covers = new Map<string, CityCover>();
+  const names = new Map<string, string[]>();
   if (rows.length) {
     const { data: dest } = await supabase.from('trip_destinations')
-      .select(`trip_id,position,cities(${COVER_FIELDS})`)
+      .select(`trip_id,position,cities(name,name_fr,${COVER_FIELDS})`)
       .in('trip_id', rows.map((t) => t.id)).order('position');
-    for (const d of (dest ?? []) as unknown as { trip_id: string; cities: { cover_media: Parameters<typeof toCover>[0] } | null }[]) {
+    for (const d of (dest ?? []) as unknown as { trip_id: string; cities: { name: string; name_fr: string | null; cover_media: Parameters<typeof toCover>[0] } | null }[]) {
       const c = toCover(d.cities?.cover_media ?? null);
       if (c && !covers.has(d.trip_id)) covers.set(d.trip_id, c);
+      const n = d.cities ? d.cities.name_fr ?? d.cities.name : null;
+      if (n) names.set(d.trip_id, [...(names.get(d.trip_id) ?? []), n]);
     }
   }
   const capitals = await capitalCovers(rows.map((t) => t.country_code ?? ''));
@@ -55,7 +60,7 @@ export async function listTrips(): Promise<{ trips: TripSummary[]; error: string
     if (copy) return { trips: copy.data, error: null, savedAt: copy.savedAt };
     return { trips: [], error: msg(error) };
   }
-  const trips = rows.map((t) => ({ ...t, cover: (t.country_code ? capitals.get(t.country_code) : null) ?? covers.get(t.id) ?? null }));
+  const trips = rows.map((t) => ({ ...t, cover: covers.get(t.id) ?? (t.country_code ? capitals.get(t.country_code) : null) ?? null, cities: names.get(t.id) ?? [] }));
   void saveOffline('trips', trips);
   return { trips, error: null, savedAt: null };
 }

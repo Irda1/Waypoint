@@ -7,6 +7,7 @@ import { Button, Card, ErrorNote, Field, Text } from '../src/ui';
 import { useBreakpoint } from '../src/ui/useBreakpoint';
 import { Globe } from '../src/features/globe/Globe';
 import { useAppearance } from '../src/theme/store';
+import { ROUTE_BG } from '../src/domain/routeGlobe.ts';
 import { isConfigured } from '../src/lib/env';
 import { fonts, palette, space } from '../src/theme/tokens';
 import { useTheme } from '../src/theme/useTheme';
@@ -25,7 +26,8 @@ const safeNext = (next: string | string[] | undefined): string => {
 export default function SignIn() {
   const { session, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
   const { next } = useLocalSearchParams<{ next?: string }>();
-  const { colors } = useTheme();
+  const { colors, mode: theme } = useTheme();
+  const H = theme === 'jour' ? { text: colors.text, soft: colors.text2, eyebrow: colors.accent } : { text: ON_PHOTO, soft: ON_PHOTO_SOFT, eyebrow: ON_PHOTO_ACCENT };
   const { accent } = useAppearance();
   const { breakpoint } = useBreakpoint();
   const wide = breakpoint === 'desktop';
@@ -72,14 +74,14 @@ export default function SignIn() {
   );
 
   const hero = (
-    <View style={wide ? styles.heroWide : styles.hero}>
-      <View style={StyleSheet.absoluteFill} pointerEvents="none"><Globe mode="route" color={palette('nuit', accent).accent.slice(1)} /></View>
+    <View style={[wide ? styles.heroWide : styles.hero, { backgroundColor: ROUTE_BG[theme] }]}>
+      <View style={StyleSheet.absoluteFill} pointerEvents="none"><Globe mode="route" theme={theme} color={(theme === 'jour' ? colors.accent : palette('nuit', accent).accent).slice(1)} /></View>
       <SafeAreaView edges={['top']} style={styles.heroInner}>
-        <RNText style={styles.brand} accessibilityRole="header">Waypoint</RNText>
+        <RNText style={[styles.brand, { color: H.text }]} accessibilityRole="header">Waypoint</RNText>
         <View style={{ gap: space.sm }}>
-          <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>Compagnon de voyage</RNText>
-          <RNText style={wide ? styles.posterWide : styles.poster}>Le voyage se prépare à plusieurs.</RNText>
-          <RNText style={styles.lead}>Programme jour par jour, carte, budget partagé. Même sans connexion.</RNText>
+          <RNText style={[styles.eyebrow, { color: H.eyebrow }]}>Compagnon de voyage</RNText>
+          <RNText style={[wide ? styles.posterWide : styles.poster, { color: H.text }]}>Le voyage se prépare à plusieurs.</RNText>
+          <RNText style={[styles.lead, { color: H.soft }]}>Programme jour par jour, carte, budget partagé. Même sans connexion.</RNText>
         </View>
       </SafeAreaView>
     </View>
