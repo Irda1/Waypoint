@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BUDGET_LEVELS, POSTE_SHARES, autoTitle, budgetTotal, changeNights, cityPerDay, dayCount, flexibleDates, missingSteps, newWizard, nightCount, pickDate, pickDuration, pickParty, spreadNights, splitBudget, toggleCity, toggleExcluded, wizardPlan } from './wizard.ts';
+import { BUDGET_LEVELS, POSTE_SHARES, autoTitle, budgetTotal, changeNights, cityPerDay, dayCount, flexibleDates, missingSteps, moveCity, newWizard, nightCount, pickDate, pickDuration, pickParty, spreadNights, splitBudget, toggleCity, toggleExcluded, wizardPlan } from './wizard.ts';
 import { addDays, diffDays, monthGrid, nextMonths, todayIso } from '../lib/dates.ts';
 import { COUNTRIES, POPULAR, COUNTRY_NAME, flagEmoji, searchCountries } from './countries.ts';
 
@@ -66,6 +66,16 @@ test('nuits : +/− garde le total et au moins une nuit par ville', () => {
   const min = spreadNights([city(1), city(2)], 2);                      // 1, 1
   assert.deepEqual(changeNights(min, 0, -1), min);
   assert.deepEqual(changeNights(min, 0, 1), min);
+});
+
+test('ordre : une ville monte ou descend en gardant ses nuits', () => {
+  const start = spreadNights([city(1), city(2), city(3)], 7);           // 3, 2, 2
+  const down = moveCity(start, 0, 1);
+  assert.deepEqual(down.map((c) => c.id), [2, 1, 3]);
+  assert.deepEqual(down.map((c) => c.nights), [2, 3, 2]);
+  assert.deepEqual(moveCity(start, 2, -1).map((c) => c.id), [1, 3, 2]);
+  assert.equal(moveCity(start, 0, -1), start);                          // déjà en tête
+  assert.equal(moveCity(start, 2, 1), start);                           // déjà en dernier
 });
 
 test('jours par ville : chacune garde ses nuits, la dernière prend le reste', () => {

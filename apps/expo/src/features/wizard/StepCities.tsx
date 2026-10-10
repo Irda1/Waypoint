@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, Text as RNText, View, useWindowDimensions } from 'react-native';
+import { Pressable, ScrollView, Text as RNText, View, useWindowDimensions } from 'react-native';
 import { Button, ErrorNote, Field, Text } from '../../ui';
 import { RegionMap } from '../regions/RegionMap';
 import { listCountryCities, listCountryCityPoints } from '../../data/places';
@@ -7,7 +7,7 @@ import { warmCity } from '../../data/cityCollection';
 import type { CityOption, CityPoint } from '../../data/places';
 import { Flag } from '../../ui/Flag';
 import { COUNTRY_NAME } from '../../domain/countries.ts';
-import { changeNights, nightCount, toggleCity } from '../../domain/wizard.ts';
+import { changeNights, moveCity, nightCount, toggleCity } from '../../domain/wizard.ts';
 import type { WizardState } from '../../domain/wizard.ts';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
@@ -97,6 +97,20 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
           <ScrollView horizontal={!wide} showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }} style={wide ? undefined : { flexGrow: 0 }}>
           {state.cities.map((c, i) => (
             <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.sm, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface }}>
+              {state.cities.length > 1 ? (
+                <View style={{ gap: 2 }}>
+                  {([[-1, '↑', 'Avancer'], [1, '↓', 'Reculer']] as const).map(([d, arrow, verb]) => {
+                    const off = i + d < 0 || i + d >= state.cities.length;
+                    return (
+                      <Pressable key={d} accessibilityRole="button" accessibilityLabel={`${verb} ${c.name} dans le parcours`} disabled={off} hitSlop={6}
+                        onPress={() => update({ ...state, cities: moveCity(state.cities, i, d) })}
+                        style={{ width: 30, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface2, opacity: off ? 0.3 : 1 }}>
+                        <RNText style={{ fontFamily: fonts.sansBold, fontSize: 14, color: colors.text }}>{arrow}</RNText>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              ) : null}
               <View style={{ flex: 1 }}>
                 <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{i + 1}. {c.name}</Text>
               </View>
