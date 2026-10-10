@@ -95,8 +95,8 @@ export default function SignIn() {
       ) : null}
 
       <View style={{ gap: space.xs }}>
-        <Text variant="title" style={{ fontSize: 28, lineHeight: 34 }}>{mode === 'in' ? 'Bon retour' : 'Créer un compte'}</Text>
-        <Text variant="muted">{mode === 'in' ? 'Connecte-toi pour retrouver tes voyages.' : 'Gratuit. Tes voyages restent privés, partagés seulement avec qui tu invites.'}</Text>
+        <Text variant="title" style={{ fontSize: 28, lineHeight: 34 }}>{mode === 'in' ? 'Connexion' : 'Créer un compte'}</Text>
+        <Text variant="muted">{mode === 'in' ? 'Connecte-toi pour retrouver tes voyages. Première visite ? Crée ton compte en bas.' : 'Gratuit. Tes voyages restent privés, partagés seulement avec qui tu invites.'}</Text>
       </View>
 
       <View style={{ gap: space.md }}>
