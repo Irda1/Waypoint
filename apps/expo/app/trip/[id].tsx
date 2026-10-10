@@ -11,7 +11,9 @@ import { addDay, addDestination, createInvite, removeDestination } from '../../s
 import type { CityOption } from '../../src/data/places';
 import { MiniCalendar } from '../../src/features/trip/MiniCalendar';
 import { DestinationsCard } from '../../src/features/trip/DestinationsCard';
-import { TripRouteCard } from '../../src/features/trip/TripRouteCard';
+import { Globe } from '../../src/features/globe/Globe';
+import { ROUTE_BG, routeParam } from '../../src/domain/routeGlobe.ts';
+import { useAppearance } from '../../src/theme/store';
 import { DayCard } from '../../src/features/trip/DayCard';
 import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
@@ -50,7 +52,7 @@ import { SimpleTrip } from '../../src/features/simple/SimpleTrip';
 import type { NavTab } from '../../src/features/nav/FloatingNav';
 import { Icon } from '../../src/ui/Icon';
 import { FadeIn } from '../../src/ui/FadeIn';
-import { fonts, radius, space } from '../../src/theme/tokens';
+import { fonts, palette, radius, space } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/useTheme';
 
 const TABS: NavTab[] = [
@@ -87,7 +89,8 @@ export default function TripScreen() {
   const guard = useRequireAuth();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
+  const { accent } = useAppearance();
   const bottomInset = useBottomInset();
   const { data, error, loading, status, savedAt, reload } = useTrip(String(id));
   const [tab, setTab] = useState<'voyage' | 'jour' | 'budget' | 'amis'>('voyage');
@@ -143,9 +146,10 @@ export default function TripScreen() {
   const travelers = Math.max(1, active.length);
   const { trip } = data;
   const destNames = destinationOptions.map((d) => d.name).join(' · ');
-  // Grande photo : la capitale du pays, sinon la première ville, sinon l'image intégrée à l'appli.
-  const firstCity = data?.destinations[0];
-  const heroPick = pickSource(photos[photoKeyFor(`${data?.trip.title ?? ''} ${destNames}`)], data?.capitalCover, firstCity?.cover ?? (firstCity ? cityPhotos.get(firstCity.city_id) : null));
+  // Bandeau du haut (onglet Voyage) : mêmes couleurs que l'accueil selon le mode.
+  const H = mode === 'jour'
+    ? { text: colors.text, soft: colors.text2, eyebrow: colors.accent, glassBg: colors.surface, glassLine: colors.lineStrong }
+    : { text: ON_PHOTO, soft: ON_PHOTO_SOFT, eyebrow: ON_PHOTO_ACCENT, glassBg: 'rgba(7, 9, 11, 0.45)', glassLine: 'rgba(245, 245, 242, 0.25)' };
   const destDetail = data.destinations.map((d) => (d.nights > 0 ? `${d.name} (${d.nights} nuit${d.nights > 1 ? 's' : ''})` : d.name)).join(' → ');
 
   async function changeDestination(action: () => Promise<string | null>) {
@@ -208,29 +212,32 @@ export default function TripScreen() {
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
         <FadeIn key={tab}>
         {tab === 'voyage' ? (
-          <ImageBackground source={heroPick.source} resizeMode="cover" style={styles.cover}>
-            <View style={styles.veil} pointerEvents="none" />
+          // Itinéraire en fond : la planète de l'accueil suit le trajet de ville en ville, puis montre tout le parcours.
+          <View style={[styles.cover, { backgroundColor: ROUTE_BG[mode] }]}>
+            {data.destinations.length ? (
+              <View style={StyleSheet.absoluteFill} pointerEvents="none">
+                <Globe mode="route" color={(mode === 'jour' ? colors.accent : palette('nuit', accent).accent).slice(1)} theme={mode} route={routeParam(data.destinations)} />
+              </View>
+            ) : null}
             <SafeAreaView edges={['top']} style={styles.coverInner}>
               <View style={styles.coverBar}>
-                <Pressable accessibilityRole="button" accessibilityLabel="Retour à mes voyages" onPress={() => router.replace('/')} style={styles.glass}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="back" size={16} color={ON_PHOTO} /><RNText style={styles.glassLabel}>Mes voyages</RNText></View>
+                <Pressable accessibilityRole="button" accessibilityLabel="Retour à mes voyages" onPress={() => router.replace('/')} style={[styles.glass, { backgroundColor: H.glassBg, borderColor: H.glassLine }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="back" size={16} color={H.text} /><RNText style={[styles.glassLabel, { color: H.text }]}>Mes voyages</RNText></View>
                 </Pressable>
-                <View style={styles.glass} accessibilityLiveRegion="polite">
-                  <RNText style={styles.glassLabel}>{savedAt ? `Copie hors ligne · ${savedLabel(savedAt)}` : STATUS[status]}</RNText>
+                <View style={[styles.glass, { backgroundColor: H.glassBg, borderColor: H.glassLine }]} accessibilityLiveRegion="polite">
+                  <RNText style={[styles.glassLabel, { color: H.text }]}>{savedAt ? `Copie hors ligne · ${savedLabel(savedAt)}` : STATUS[status]}</RNText>
                 </View>
               </View>
-              <View style={styles.coverText}>
-                <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>
-                  {destNames ? `${destNames} · ` : ''}{data.days.length} jour{data.days.length > 1 ? 's' : ''} · {active.length} voyageur{active.length > 1 ? 's' : ''}
+              <View style={styles.coverText} pointerEvents="none">
+                <RNText style={[styles.eyebrow, { color: H.eyebrow }]}>
+                  {data.days.length} jour{data.days.length > 1 ? 's' : ''} · {active.length} voyageur{active.length > 1 ? 's' : ''}
                 </RNText>
-                <RNText style={styles.poster} accessibilityRole="header">{trip.title}</RNText>
-                <RNText style={styles.lead}>{dates}</RNText>
-                {heroPick.cover?.credit ? (
-                  <RNText style={{ fontFamily: fonts.sans, fontSize: 10, color: ON_PHOTO_SOFT }}>{heroPick.cover.credit}</RNText>
-                ) : null}
+                <RNText style={[styles.poster, { color: H.text }]} accessibilityRole="header">{trip.title}</RNText>
+                <RNText style={[styles.lead, { color: H.soft }]}>{dates}</RNText>
+                {destNames ? <RNText style={[styles.route, { color: H.text }]} numberOfLines={2}>{destNames.replace(/ · /g, ' → ')}</RNText> : null}
               </View>
             </SafeAreaView>
-          </ImageBackground>
+          </View>
         ) : tab === 'jour' && data.days.length > 0 ? (
           <ImageBackground source={dayPick.source} resizeMode="cover" style={styles.dayHero}>
             <View style={styles.veil} pointerEvents="none" />
@@ -276,7 +283,6 @@ export default function TripScreen() {
           <MemoCard tripId={trip.id} memo={trip.memo ?? ''} onChanged={reload} startEditing={pendingMemo} onStarted={() => setPendingMemo(false)} />
 
           <Section title="Itinéraire" icon="map">
-            <TripRouteCard tripId={trip.id} destinations={data.destinations} />
             <DestinationsCard data={data} onChanged={reload} />
             <HoursCard data={data} onOpen={(i, itemId) => { setChosenDay(i); setFocusItem(itemId); setTab('jour'); }} />
             <ProgramCard data={data} onApplied={reload} />
@@ -427,9 +433,9 @@ const SHEET_OVERLAP = 28;
 
 const styles = StyleSheet.create({
   sheet: { marginTop: -SHEET_OVERLAP, borderTopLeftRadius: SHEET_OVERLAP, borderTopRightRadius: SHEET_OVERLAP, zIndex: 2, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: -6 }, elevation: 6 },
-  cover: { minHeight: 400, width: '100%' },
+  cover: { minHeight: 460, width: '100%' },
   veil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(7, 9, 11, 0.5)' },
-  coverInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xl + SHEET_OVERLAP, minHeight: 400, width: '100%', maxWidth: 880, alignSelf: 'center' },
+  coverInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xl + SHEET_OVERLAP, minHeight: 460, width: '100%', maxWidth: 880, alignSelf: 'center' },
   coverBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.sm, paddingTop: space.sm },
   glass: { minHeight: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: 'rgba(7, 9, 11, 0.45)', borderWidth: 1, borderColor: 'rgba(245, 245, 242, 0.25)' },
   glassLabel: { fontFamily: fonts.sansSemi, fontSize: 13, color: ON_PHOTO },
@@ -437,6 +443,7 @@ const styles = StyleSheet.create({
   eyebrow: { fontFamily: fonts.sansSemi, fontSize: 11.5, letterSpacing: 1.6, textTransform: 'uppercase' },
   poster: { fontFamily: fonts.serif, fontSize: 46, lineHeight: 50, color: ON_PHOTO },
   lead: { fontFamily: fonts.sans, fontSize: 16, lineHeight: 23, color: ON_PHOTO_SOFT },
+  route: { fontFamily: fonts.sansSemi, fontSize: 14, lineHeight: 20, maxWidth: 420 },
   page: { width: '100%', maxWidth: 880, alignSelf: 'center', padding: space.lg, paddingTop: space.xl, gap: space.lg },
   dayHero: { minHeight: 230, width: '100%' },
   dayHeroInner: { justifyContent: 'flex-end', gap: 4, paddingHorizontal: space.lg, paddingTop: space.xl, paddingBottom: space.lg + SHEET_OVERLAP, minHeight: 230, width: '100%', maxWidth: 880, alignSelf: 'center' },
