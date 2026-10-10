@@ -1,8 +1,8 @@
 // Parcours « Démarrer un voyage » : logique pure (aucune dépendance), reprise de la maquette Escale v0.6.
 // Pays > Dates > Villes (nuits réparties automatiquement) > Voyageurs > Envies > Budget > Récap.
 
-import { COUNTRY_NAME } from './countries.ts';
-import { addDays, diffDays } from '../lib/dates.ts';
+import { COUNTRY_NAME, flagEmoji } from './countries.ts';
+import { addDays, diffDays, dateRange } from '../lib/dates.ts';
 import type { Poste } from './types.ts';
 import { buildPlan } from './itinerary.ts';
 import type { Candidate, PlannedDay } from './itinerary.ts';
@@ -210,4 +210,18 @@ export function wizardPlan(s: WizardState, candidates: Candidate[]): PlannedDay[
 /** Retire ou remet un lieu dans la proposition. */
 export function toggleExcluded(s: WizardState, placeId: number): WizardState {
   return { ...s, excluded: s.excluded.includes(placeId) ? s.excluded.filter((id) => id !== placeId) : [...s.excluded, placeId] };
+}
+
+/** « Tes choix » : une pastille par étape déjà renseignée (pays, dates, villes, voyageurs, départ, envies, budget), dans l'ordre du parcours. */
+export function choiceTrail(s: WizardState): { step: 'pays' | 'dates' | 'villes' | 'voyageurs' | 'depart' | 'interets' | 'budget'; label: string }[] {
+  const out: ReturnType<typeof choiceTrail> = [];
+  if (s.country) out.push({ step: 'pays', label: `${flagEmoji(s.country)} ${COUNTRY_NAME[s.country] ?? s.country}` });
+  if (s.start && s.end) out.push({ step: 'dates', label: `${s.indicative ? '≈ ' : ''}${dateRange(s.start, s.end)}` });
+  if (s.cities.length) out.push({ step: 'villes', label: `${s.cities.length} ville${s.cities.length > 1 ? 's' : ''}` });
+  if (s.party) out.push({ step: 'voyageurs', label: `${s.travelers} pers.` });
+  if (s.home) out.push({ step: 'depart', label: `Départ ${s.home.name}` });
+  if (s.interests.length) out.push({ step: 'interets', label: `${s.interests.length} envie${s.interests.length > 1 ? 's' : ''}` });
+  const total = budgetTotal(s);
+  if (total !== null) out.push({ step: 'budget', label: `≈ ${Math.round(total).toLocaleString('fr-FR')} €` });
+  return out;
 }

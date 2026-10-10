@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BUDGET_LEVELS, POSTE_SHARES, autoTitle, budgetTotal, changeNights, cityPerDay, dayCount, flexibleDates, missingSteps, newWizard, sameCity, nightCount, pickDate, pickDuration, pickParty, spreadNights, splitBudget, toggleCity, toggleExcluded, wizardPlan } from './wizard.ts';
+import { BUDGET_LEVELS, choiceTrail, POSTE_SHARES, autoTitle, budgetTotal, changeNights, cityPerDay, dayCount, flexibleDates, missingSteps, newWizard, sameCity, nightCount, pickDate, pickDuration, pickParty, spreadNights, splitBudget, toggleCity, toggleExcluded, wizardPlan } from './wizard.ts';
 import { addDays, diffDays, monthGrid, nextMonths, todayIso } from '../lib/dates.ts';
 import { COUNTRIES, POPULAR, COUNTRY_NAME, flagEmoji, searchCountries } from './countries.ts';
 
@@ -136,4 +136,15 @@ test('ville de départ = première ville du voyage : accents, majuscules et tire
   assert.ok(sameCity('Saint-Étienne', 'saint etienne'));
   assert.ok(!sameCity('Paris', 'Lyon'));
   assert.ok(!sameCity('', ''));
+});
+
+test('tes choix : une pastille par étape renseignée, dans l\'ordre', () => {
+  assert.deepEqual(choiceTrail(newWizard()), []);
+  const s = { ...newWizard(), country: 'PT', start: '2026-10-13', end: '2026-10-18', travelers: 2, party: 'deux' as const, cities: [city(1, 'Lisbonne', 5)], interests: ['culture'], budget: { level: 'moyen' as const, amount: null, currency: 'EUR' } };
+  const trail = choiceTrail(s);
+  assert.deepEqual(trail.map((t) => t.step), ['pays', 'dates', 'villes', 'voyageurs', 'interets', 'budget']);
+  assert.match(trail[0].label, /Portugal/);
+  assert.equal(trail[2].label, '1 ville');
+  assert.match(trail[5].label, /1\s?440/);
+  assert.match(choiceTrail({ ...s, indicative: true })[1].label, /^≈ /);
 });
