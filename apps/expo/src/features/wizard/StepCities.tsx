@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, Text as RNText, View, useWindowDimensions } from 'react-native';
+import { Text as RNText, View, useWindowDimensions } from 'react-native';
 import { Button, ErrorNote, Field, Text } from '../../ui';
 import { RegionMap } from '../regions/RegionMap';
 import { listCountryCities, listCountryCityPoints } from '../../data/places';
@@ -7,7 +7,9 @@ import { warmCity } from '../../data/cityCollection';
 import type { CityOption, CityPoint } from '../../data/places';
 import { Flag } from '../../ui/Flag';
 import { COUNTRY_NAME } from '../../domain/countries.ts';
-import { changeNights, moveCity, nightCount, toggleCity } from '../../domain/wizard.ts';
+import { changeNights, nightCount, toggleCity } from '../../domain/wizard.ts';
+import { moveCity } from '../../domain/destinations.ts';
+import { DragList } from '../trip/DragList';
 import type { WizardState } from '../../domain/wizard.ts';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
@@ -93,24 +95,13 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
     <>
       {state.cities.length > 0 ? (
         <View style={{ gap: space.xs }}>
-          <Text variant="label">Ton parcours</Text>
-          <ScrollView horizontal={!wide} showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }} style={wide ? undefined : { flexGrow: 0 }}>
-          {state.cities.map((c, i) => (
-            <View key={c.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.sm, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface }}>
-              {state.cities.length > 1 ? (
-                <View style={{ gap: 2 }}>
-                  {([[-1, '↑', 'Avancer'], [1, '↓', 'Reculer']] as const).map(([d, arrow, verb]) => {
-                    const off = i + d < 0 || i + d >= state.cities.length;
-                    return (
-                      <Pressable key={d} accessibilityRole="button" accessibilityLabel={`${verb} ${c.name} dans le parcours`} disabled={off} hitSlop={6}
-                        onPress={() => update({ ...state, cities: moveCity(state.cities, i, d) })}
-                        style={{ width: 30, height: 24, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface2, opacity: off ? 0.3 : 1 }}>
-                        <RNText style={{ fontFamily: fonts.sansBold, fontSize: 14, color: colors.text }}>{arrow}</RNText>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-              ) : null}
+          <Text variant="label">Ton parcours{state.cities.length > 1 ? ' · glisse ⠿ pour changer l\'ordre' : ''}</Text>
+          <DragList count={state.cities.length} mode="insert" orderKey={state.cities.map((c) => c.id).join(',')} onMove={(from, to) => update({ ...state, cities: moveCity(state.cities, from, to) })} renderRow={(i, handle) => {
+            const c = state.cities[i];
+            return (
+            <View style={{ paddingBottom: space.sm }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.sm, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface }}>
+              {state.cities.length > 1 ? handle : null}
               <View style={{ flex: 1 }}>
                 <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{i + 1}. {c.name}</Text>
               </View>
@@ -125,8 +116,9 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
                 <RoundButton label="+" name={`Ajouter une nuit à ${c.name}`} disabled={!state.cities.some((o, j) => j !== i && o.nights > 1)} onPress={() => update({ ...state, cities: changeNights(state.cities, i, 1) })} />
               ) : null}
             </View>
-          ))}
-          </ScrollView>
+            </View>
+            );
+          }} />
         </View>
       ) : (
         <Text variant="muted">Tu peux aussi continuer sans choisir : « Je choisirai sur place ».</Text>
