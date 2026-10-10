@@ -4,6 +4,7 @@ import type { WebViewMessageEvent } from 'react-native-webview';
 import { globeHtml } from '../../domain/globe.ts';
 import { ROUTE_BG, routeHtml } from '../../domain/routeGlobe.ts';
 import { GLOBE_COLOR } from './types';
+import { REGIONS_BASE_NATIVE } from '../regions/types';
 import type { GlobeProps } from './types';
 
 const WebViewView = WebView as unknown as React.ComponentType<Record<string, unknown>>;
@@ -12,7 +13,7 @@ const WebViewView = WebView as unknown as React.ComponentType<Record<string, unk
 export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick, theme = 'nuit', route }: GlobeProps) {
   const view = useRef<{ injectJavaScript: (script: string) => void } | null>(null);
   const html = useMemo(() => (mode === 'route' ? routeHtml() : globeHtml()), [mode]);
-  const before = `window.__GLOBE__=${JSON.stringify(route ? { mode, color, theme, route } : { mode, color, theme })}; true;`;
+  const before = `window.__GLOBE__=${JSON.stringify(route ? { mode, color, theme, route } : { mode, color, theme, base: REGIONS_BASE_NATIVE })}; true;`;
   const send = useCallback(() => {
     if (focus && /^[A-Z]{2}$/.test(focus)) view.current?.injectJavaScript(`window.__focus && window.__focus(${JSON.stringify(focus)}); true;`);
   }, [focus]);

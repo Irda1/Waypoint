@@ -51,39 +51,71 @@ canvas{display:block;width:100%;height:100%}
   var rim = halo(6.4, [[0.62, "rgba(0,0,0,0)"], [0.8, "rgba(120,190,255,.10)"], [1, "rgba(120,190,255,0)"]]);
   scene.add(rim);
 
-  // planète : jour/nuit calculés d'après une lumière fixe (en haut à droite, vers l'avant), nuages légers, halo bleu
+  // planète : images NASA en 4K (domaine public), servies avec l'appli (public/tex) :
+  //   jour = Blue Marble Next Generation (juillet), nuit = Black Marble 2016, nuages = Blue Marble Clouds,
+  //   relief = pentes calculées d'après l'altitude GEBCO (rouge/vert) + masque des mers (bleu, Natural Earth 1:50m).
+  // Le jour/nuit vient d'une lumière fixe (en haut à droite, vers l'avant) ; le relief accroche la lumière, surtout près
+  // de la ligne du crépuscule ; le soleil se reflète sur les océans ; les nuages dérivent et ombrent le sol.
   var SUN = new THREE.Vector3(0.8, 0.3, 0.45).normalize();
-  var TEX = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/";
+  var BASE = String(G.base || q.get("base") || location.origin).replace(/\/+$/, "") + "/tex/";
+  var OLD_TEX = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_atmos_4096.jpg";
   var loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
   var aniso = renderer.capabilities.getMaxAnisotropy();
-  function tex(name, srgb) { var t = loader.load(TEX + name); if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso; return t; }
+  function plain(r, g, b) { var t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1); t.needsUpdate = true; return t; }
+  // Une image manquante (hors ligne, adresse pas encore publiée) ne casse rien : jour = ancienne image, sinon couleur neutre.
+  function tex(name, srgb, uniform, fallback) {
+    loader.load(BASE + name, function (t) { if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso; uniform.value = t; },
+      undefined, function () { if (typeof fallback === "string") loader.load(fallback, function (t) { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso; uniform.value = t; }); });
+  }
+  var U = { day: { value: plain(10, 20, 40) }, night: { value: plain(0, 0, 0) }, relief: { value: plain(128, 128, 0) }, clouds: { value: plain(0, 0, 0) }, sun: { value: SUN }, drift: { value: 0 }, cloudy: { value: 1 } };
+  tex("earth_day_4k.jpg", true, U.day, OLD_TEX); tex("earth_night_4k.jpg", true, U.night); tex("earth_relief_4k.jpg", false, U.relief); tex("earth_clouds_4k.jpg", false, U.clouds);
+  // repère local de chaque point (est, nord) pour orienter les pentes du relief
+  var FRAME_VS = "varying vec2 vUv; varying vec3 vN; varying vec3 vE; varying vec3 vNo;" +
+    "void main(){ vUv = uv; vec3 p = normalize(position); vec3 e = normalize(vec3(p.z, 0.0, -p.x) + vec3(1e-5, 0.0, 0.0)); vN = normalize(normalMatrix * p); vE = normalize(normalMatrix * e); vNo = normalize(normalMatrix * cross(p, e));" +
+    " gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }";
   var earthMat = new THREE.ShaderMaterial({
-    uniforms: { day: { value: tex(MODE === "pick" ? "earth_atmos_4096.jpg" : "earth_atmos_2048.jpg", true) }, night: { value: tex("earth_lights_2048.png", true) }, spec: { value: tex("earth_specular_2048.jpg", false) }, sun: { value: SUN } },
-    vertexShader: "varying vec2 vUv; varying vec3 vN; void main(){ vUv = uv; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
-    fragmentShader: "uniform sampler2D day; uniform sampler2D night; uniform sampler2D spec; uniform vec3 sun; varying vec2 vUv; varying vec3 vN;" +
+    uniforms: U, vertexShader: FRAME_VS,
+    fragmentShader: "uniform sampler2D day; uniform sampler2D night; uniform sampler2D relief; uniform sampler2D clouds; uniform vec3 sun; uniform float drift; uniform float cloudy; varying vec2 vUv; varying vec3 vN; varying vec3 vE; varying vec3 vNo;" +
       "void main(){ vec3 n = normalize(vN); float l = dot(n, sun); float k = smoothstep(-0.12, 0.3, l);" +
+      "vec4 rf = texture2D(relief, vUv); vec2 sl = rf.rg * 2.0 - 1.0; float w = rf.b;" +
+      "vec3 np = normalize(n * sqrt(max(0.0, 1.0 - dot(sl, sl))) + normalize(vE) * sl.x + normalize(vNo) * sl.y);" +
+      // ombre des nuages : décalée à l'opposé du soleil
+      "vec2 away = -vec2(dot(sun, normalize(vE)), dot(sun, normalize(vNo))) * 0.0022;" +
+      "float sh = texture2D(clouds, vUv + vec2(drift, 0.0) + away).r * cloudy;" +
       "vec3 d = texture2D(day, vUv).rgb; vec3 c = texture2D(night, vUv).rgb;" +
-      "vec3 dayC = d * (0.62 + 0.55 * max(l, 0.0)); vec3 nightC = d * 0.045 + c * 1.25;" +
+      "float relief = 1.0 + (max(dot(np, sun), 0.0) - max(l, 0.0)) * 2.6;" +
+      "vec3 dayC = d * (0.6 + 0.6 * max(l, 0.0)) * relief; dayC = mix(dayC, dayC * 1.3 + vec3(0.006, 0.024, 0.065), w) * (1.0 - 0.42 * smoothstep(0.1, 0.8, sh));" +
+      "vec3 nightC = d * 0.03 + c * c * 2.4 * (1.0 - 0.6 * sh);" +
       "vec3 col = mix(nightC, dayC, k);" +
-      "float tw = smoothstep(-0.25, 0.0, l) * (1.0 - smoothstep(0.0, 0.3, l)); col += vec3(0.9, 0.5, 0.25) * tw * 0.022;" +
-      "float rim = pow(1.0 - max(n.z, 0.0), 3.0); col += vec3(0.25, 0.5, 1.0) * rim * 0.55 * k;" +
-      // reflet du soleil sur les océans (masque spéculaire : blanc = eau)
-      "vec3 hv = normalize(sun + vec3(0.0, 0.0, 1.0)); float sp = pow(max(dot(n, hv), 0.0), 38.0) * texture2D(spec, vUv).r; col += vec3(1.0, 0.92, 0.78) * sp * 0.38 * k;" +
+      "float tw = smoothstep(-0.25, 0.0, l) * (1.0 - smoothstep(0.0, 0.3, l)); col += vec3(0.9, 0.45, 0.2) * tw * 0.008;" +
+      // océans : reflet du soleil (net + large) et ciel reflété au bord
+      "vec3 hv = normalize(sun + vec3(0.0, 0.0, 1.0)); float nh = max(dot(n, hv), 0.0);" +
+      "col += vec3(1.0, 0.9, 0.75) * (pow(nh, 90.0) * 0.5 + pow(nh, 16.0) * 0.03) * w * k * (1.0 - sh);" +
+      "float fr = pow(1.0 - max(n.z, 0.0), 4.0); col = mix(col, vec3(0.32, 0.5, 0.82) * k, fr * 0.35 * w);" +
+      "float rim = pow(1.0 - max(n.z, 0.0), 3.0); col += vec3(0.25, 0.5, 1.0) * rim * 0.45 * k;" +
       "gl_FragColor = vec4(col, 1.0);\n#include <colorspace_fragment>\n}"
   });
-  var globe = new THREE.Mesh(new THREE.SphereGeometry(2, 160, 120), earthMat);
+  var globe = new THREE.Mesh(new THREE.SphereGeometry(2, 192, 144), earthMat);
   var group = new THREE.Group(); group.add(globe); scene.add(group);
   group.rotation.y = -1.2; group.rotation.x = 0.35;
 
-  var sunLight = new THREE.DirectionalLight(0xffffff, 1.6); sunLight.position.copy(SUN.clone().multiplyScalar(20)); scene.add(sunLight);
-  scene.add(new THREE.AmbientLight(0x88a8ff, 0.07));
-  var clouds = new THREE.Mesh(new THREE.SphereGeometry(2.035, 96, 64), new THREE.MeshLambertMaterial({ map: tex("earth_clouds_1024.png", true), transparent: true, opacity: 0.42, depthWrite: false }));
+  // nuages : éclairés côté jour, rosés au crépuscule, presque invisibles la nuit
+  var cloudMat = new THREE.ShaderMaterial({
+    uniforms: U, transparent: true, depthWrite: false, vertexShader: FRAME_VS,
+    fragmentShader: "uniform sampler2D clouds; uniform vec3 sun; uniform float drift; uniform float cloudy; varying vec2 vUv; varying vec3 vN;" +
+      "void main(){ vec3 n = normalize(vN); float l = dot(n, sun); float a = smoothstep(0.12, 0.85, texture2D(clouds, vUv + vec2(drift, 0.0)).r) * cloudy;" +
+      "float lit = smoothstep(-0.15, 0.35, l); vec3 col = mix(vec3(0.03, 0.035, 0.05), mix(vec3(1.0, 0.62, 0.42), vec3(1.0), smoothstep(0.0, 0.3, l)) * (0.55 + 0.5 * max(l, 0.0)), lit);" +
+      "gl_FragColor = vec4(col, a * mix(0.35, 0.92, lit));\n#include <colorspace_fragment>\n}"
+  });
+  var clouds = new THREE.Mesh(new THREE.SphereGeometry(2.03, 128, 96), cloudMat);
   group.add(clouds);
+  // atmosphère : halo bleu côté jour, orangé au crépuscule
   var atmos = new THREE.Mesh(new THREE.SphereGeometry(2.16, 96, 64), new THREE.ShaderMaterial({
     uniforms: { sun: { value: SUN } }, side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
     vertexShader: "varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
-    fragmentShader: "uniform vec3 sun; varying vec3 vN; void main(){ float i = pow(max(0.0, 0.74 - dot(normalize(vN), vec3(0.0, 0.0, 1.0))), 3.2); float k = mix(0.22, 1.0, smoothstep(-0.35, 0.45, dot(normalize(vN), sun)));" +
-      "gl_FragColor = vec4(vec3(0.28, 0.55, 1.0) * i * 2.2 * k, 1.0); }"
+    fragmentShader: "uniform vec3 sun; varying vec3 vN; void main(){ vec3 n = normalize(vN); float i = pow(max(0.0, 0.74 - dot(n, vec3(0.0, 0.0, 1.0))), 3.2); float s = dot(n, sun);" +
+      "float k = mix(0.16, 1.0, smoothstep(-0.35, 0.45, s)); float dusk = smoothstep(-0.4, -0.1, s) * (1.0 - smoothstep(-0.1, 0.25, s)); vec3 tint = mix(vec3(0.28, 0.55, 1.0), vec3(1.0, 0.5, 0.25), dusk * 0.8);" +
+      "gl_FragColor = vec4(tint * i * 2.2 * k, 1.0); }"
   }));
   scene.add(atmos);
 
@@ -233,16 +265,17 @@ canvas{display:block;width:100%;height:100%}
   // Détail satellite au zoom (choix du pays) : l'image du globe (4096 px pour toute la Terre) s'étale quand on
   // zoome sur un pays. On charge alors les tuiles Sentinel-2 sans nuages (EOX, CC BY-NC 4.0, niveau 6 ≈ 2,4 km
   // par pixel) de la zone regardée et on les pose sur une portion de sphère juste au-dessus de la Terre, avec
-  // le même éclairage jour/nuit ; les nuages s'effacent en même temps.
+  // le même éclairage jour/nuit ; les nuages s'effacent en même temps. Tant qu'une tuile n'est pas arrivée, sa place reste
+  // transparente et l'image 4K de la Terre se voit dessous.
   var DZ = 6, NX = 8, NY = 6, N2 = Math.pow(2, DZ), detail = null, detailKey = "", detailAt = 0;
   var patchMat = new THREE.ShaderMaterial({
     uniforms: { map: { value: null }, sun: { value: SUN }, fade: { value: 0 } }, transparent: true, depthWrite: false,
     vertexShader: "varying vec2 vUv; varying vec3 vN; void main(){ vUv = uv; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
     fragmentShader: "uniform sampler2D map; uniform vec3 sun; uniform float fade; varying vec2 vUv; varying vec3 vN;" +
-      "void main(){ vec3 n = normalize(vN); float l = dot(n, sun); float k = smoothstep(-0.12, 0.3, l); vec3 c = texture2D(map, vUv).rgb;" +
+      "void main(){ vec3 n = normalize(vN); float l = dot(n, sun); float k = smoothstep(-0.12, 0.3, l); vec4 t = texture2D(map, vUv); vec3 c = t.rgb;" +
       "vec3 col = mix(c * 0.05, c * (0.7 + 0.5 * max(l, 0.0)), k);" +
       "float e = smoothstep(0.0, 0.1, vUv.x) * smoothstep(0.0, 0.1, 1.0 - vUv.x) * smoothstep(0.0, 0.1, vUv.y) * smoothstep(0.0, 0.1, 1.0 - vUv.y);" +
-      "gl_FragColor = vec4(col, e * fade);\n#include <colorspace_fragment>\n}"
+      "gl_FragColor = vec4(col, e * fade * t.a);\n#include <colorspace_fragment>\n}"
   });
   function tileX(lon) { return (lon + 180) / 360 * N2; }
   function tileY(lat) { var r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * N2; }
@@ -281,14 +314,14 @@ canvas{display:block;width:100%;height:100%}
     var k = Math.min(1, (now - t0) / 2600), ease = 1 - Math.pow(1 - k, 3);
     if (MODE === "pick") {
       var near = Math.max(0, Math.min(1, (4.4 - dist) / 0.9));
-      clouds.material.opacity = 0.42 * (1 - near);
+      U.cloudy.value = 1 - near;
       patchMat.uniforms.fade.value = near;
       if (detail) detail.visible = near > 0.01;
       if (near > 0 && !drag && now - detailAt > 450) { detailAt = now; buildDetail(); }
     }
     if (MODE === "pick" && k < 1) dist = 16 + (target - 16) * ease; else dist += (target - dist) * 0.12;
     camera.position.set(0, 0, dist); camera.lookAt(0, 0, 0);
-    camera.near = Math.max(0.3, dist - 2.6); camera.updateProjectionMatrix(); clouds.rotation.y += 0.00012;
+    camera.near = Math.max(0.3, dist - 2.6); camera.updateProjectionMatrix(); U.drift.value = (U.drift.value + 0.000012) % 1;
     if (anim && !drag) {
       group.rotation.y += (anim.ry - group.rotation.y) * 0.08; group.rotation.x += (anim.rx - group.rotation.x) * 0.08;
       if (Math.abs(anim.ry - group.rotation.y) < 0.002 && Math.abs(anim.rx - group.rotation.x) < 0.002) anim = null;
