@@ -43,6 +43,26 @@ export function bestPhoto(photos, cityName) {
     .sort((a, b) => b.s - a.s || a.i - b.i)[0]?.p;
 }
 
+/**
+ * Photo Pexels d'une seule ville (nom + pays en anglais) : enregistrée dans media puis posée comme couverture.
+ * Sert à la passe images et à la file de collecte (la photo arrive avec les lieux). Rend le quota restant.
+ */
+export async function coverForCity({ sb, cfg, city, fetchImpl = fetch, throttle = new Throttle(cfg.pexelsIntervalMs), log = console.log }) {
+  await throttle.wait();
+  const q = `${city.name} ${city.countries?.name_en ?? ''} city`.trim();
+  const res = await fetchRetry(
+    `https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=15&orientation=landscape`,
+    { headers: { Authorization: cfg.pexelsKey } }, { fetchImpl, retries: 2, baseDelayMs: 5000 });
+  const remaining = Number(res.headers.get('x-ratelimit-remaining'));
+  const { photos = [] } = await res.json();
+  const best = bestPhoto(photos, city.name);
+  if (!best) { log(`  ${city.name} : aucune photo trouvée`); return { found: false, written: false, remaining }; }
+  const [media] = await sb.upsert('media', [photoToMedia(best)], { onConflict: 'provider,provider_id', returning: 'id' });
+  if (media) await sb.patch('cities', `id=eq.${city.id}`, { cover_media_id: media.id });
+  log(`  ${city.name} : photo ${best.id} (${best.photographer})`);
+  return { found: true, written: !!media, remaining };
+}
+
 export async function imagesPass({ sb, cfg, max = 20, country = null, redo = false, fetchImpl = fetch, throttle = new Throttle(cfg.pexelsIntervalMs), log = console.log }) {
   if (!cfg.pexelsKey) throw new Error('PEXELS_API_KEY manquante (secret GitHub ou variable locale).');
   const runId = await startRun(sb, { pass: 'images', source: 'pexels', license: 'Pexels License' });
@@ -54,24 +74,10 @@ export async function imagesPass({ sb, cfg, max = 20, country = null, redo = fal
     const cities = await sb.select('cities',
       `select=id,name,country_code,countries(name_en)${filter}${country ? `&country_code=eq.${encodeURIComponent(String(country).toUpperCase())}` : ''}&order=is_capital.desc,featured_rank.asc.nullslast,population.desc.nullslast&limit=${max}`);
     for (const city of cities) {
-      await throttle.wait();
-      const q = `${city.name} ${city.countries?.name_en ?? ''} city`.trim();
-      const res = await fetchRetry(
-        `https://api.pexels.com/v1/search?query=${encodeURIComponent(q)}&per_page=15&orientation=landscape`,
-        { headers: { Authorization: cfg.pexelsKey } }, { fetchImpl, retries: 2, baseDelayMs: 5000 });
-      const remaining = Number(res.headers.get('x-ratelimit-remaining'));
-      const { photos = [] } = await res.json();
+      const { found, written, remaining } = await coverForCity({ sb, cfg, city, fetchImpl, throttle, log });
       stats.read++;
-      const best = bestPhoto(photos, city.name);
-      if (best) {
-        const [media] = await sb.upsert('media', [photoToMedia(best)], { onConflict: 'provider,provider_id', returning: 'id' });
-        if (media) await sb.patch('cities', `id=eq.${city.id}`, { cover_media_id: media.id });
-        stats.kept++;
-        stats.written += media ? 1 : 0;
-        log(`  ${city.name} : photo ${best.id} (${best.photographer})`);
-      } else {
-        log(`  ${city.name} : aucune photo trouvée`);
-      }
+      if (found) stats.kept++;
+      if (written) stats.written++;
       if (Number.isFinite(remaining) && remaining <= 5) {
         log(`Quota Pexels presque atteint (${remaining} restantes) : arrêt propre.`);
         break;

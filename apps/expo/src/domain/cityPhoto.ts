@@ -19,9 +19,13 @@ function km(aLat: number, aLng: number, bLat: number, bLng: number): number {
   return 12742 * Math.asin(Math.sqrt(h));
 }
 
+// Wikipédia ajoute des paramètres de suivi (« ?utm_source=… ») : on les retire avant de lire l'adresse.
+const bare = (url: string): string => url.split('?')[0];
+
 /** Même image Wikimedia à une autre largeur (miniature « …/320px-Nom.jpg » → « …/1280px-Nom.jpg »). */
 export function resizeThumb(url: string, width: number): string {
-  return /\/\d+px-[^/]+$/.test(url) ? url.replace(/\/(\d+)px-([^/]+)$/, `/${width}px-$2`) : url;
+  const u = bare(url);
+  return /\/\d+px-[^/]+$/.test(u) ? u.replace(/\/(\d+)px-([^/]+)$/, `/${width}px-$2`) : u;
 }
 
 /** Photo utilisable pour la ville (lat, lng), ou null si la page ne correspond pas ou si l'image ne convient pas. */
@@ -29,11 +33,11 @@ export function photoFromSummary(s: WikiSummary | null | undefined, lat: number,
   if (!s || s.type === 'disambiguation' || !s.coordinates || !s.originalimage) return null;
   if (km(lat, lng, s.coordinates.lat, s.coordinates.lon) > MAX_KM) return null;
   const o = s.originalimage;
-  if (!/\.jpe?g$/i.test(o.source) || o.width < 800 || o.width < o.height) return null;
+  if (!/\.jpe?g$/i.test(bare(o.source)) || o.width < 800 || o.width < o.height) return null;
   const thumb = s.thumbnail?.source;
   return {
-    uri: thumb && o.width > 1280 ? resizeThumb(thumb, 1280) : o.source,
-    small: thumb && o.width > 640 ? resizeThumb(thumb, 640) : o.source,
+    uri: thumb && o.width > 1280 ? resizeThumb(thumb, 1280) : bare(o.source),
+    small: thumb && o.width > 640 ? resizeThumb(thumb, 640) : bare(o.source),
     credit: 'Photo : Wikimedia Commons',
   };
 }
