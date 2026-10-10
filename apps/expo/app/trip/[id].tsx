@@ -16,6 +16,7 @@ import { TripSummary } from '../../src/features/trip/TripSummary';
 import { ROUTE_BG, routeParam } from '../../src/domain/routeGlobe.ts';
 import { useAppearance } from '../../src/theme/store';
 import { DayCard } from '../../src/features/trip/DayCard';
+import { DayStrip } from '../../src/features/trip/DayStrip';
 import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
 import { ProgramCard } from '../../src/features/trip/ProgramCard';
@@ -69,9 +70,6 @@ function weekdayShort(iso: string): string {
   return new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'short' }).replace('.', '');
 }
 
-function monthShort(iso: string): string {
-  return new Date(`${iso}T12:00:00`).toLocaleDateString('fr-FR', { month: 'short' }).replace('.', '');
-}
 
 const STATUS = { connecting: 'Connexion en direct…', live: 'Synchronisé en direct', offline: 'Hors ligne : reprise à la reconnexion' } as const;
 
@@ -96,6 +94,7 @@ export default function TripScreen() {
   const { data, error, loading, status, savedAt, reload } = useTrip(String(id));
   const [tab, setTab] = useState<'voyage' | 'jour' | 'budget' | 'amis'>('voyage');
   const [chosenDay, setChosenDay] = useState<number | null>(null);
+  const [dayDir, setDayDir] = useState<1 | -1>(1);
   const [plusOpen, setPlusOpen] = useState(false);
   const [confirmTrash, setConfirmTrash] = useState(false);
   const [trashError, setTrashError] = useState<string | null>(null);
@@ -199,6 +198,7 @@ export default function TripScreen() {
 
   // Jour choisi : sa ville, sa photo, et les séries de jours par ville pour la bande du haut.
   const selIdx = Math.min(dayIndex, Math.max(data.days.length - 1, 0));
+  const pickDay = (i: number) => { setDayDir(i >= selIdx ? 1 : -1); setChosenDay(i); };
   const selDay = data.days[selIdx];
   const cityOfDay = (d: { city_id: number | null }) => d.city_id ?? data.destinations[0]?.city_id ?? null;
   const nameOfCity = (id: number | null) => data.destinations.find((x) => x.city_id === id)?.name ?? '';
@@ -311,38 +311,12 @@ export default function TripScreen() {
         <View style={styles.page}>
           {data.days.length === 0 ? <Card><Text variant="muted">Aucun jour pour l'instant. Ajoute le premier ci-dessous.</Text></Card> : (
             <>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} accessibilityRole="tablist">
-                <View style={{ gap: 6 }}>
-                  <View style={{ flexDirection: 'row', gap: space.sm }}>
-                    {runs.map((r) => {
-                      const here = selIdx >= r.start && selIdx < r.start + r.count;
-                      return (
-                        <View key={r.start} style={{ width: r.count * 56 + (r.count - 1) * 8, gap: 4 }}>
-                          {r.start > 0 ? <View style={{ position: 'absolute', left: -5, top: 0, width: 2, height: 30, borderRadius: 1, backgroundColor: colors.line }} /> : null}
-                          <RNText numberOfLines={1} style={[styles.runLabel, { color: here ? colors.accent : colors.text3 }]}>{nameOfCity(r.cityId) || 'Ville à choisir'}{r.count > 1 ? ` · ${r.count} j` : ''}</RNText>
-                          <View style={{ height: 3, borderRadius: 2, backgroundColor: here ? colors.accent : colors.surface2 }} />
-                        </View>
-                      );
-                    })}
-                  </View>
-                  <View style={{ flexDirection: 'row', gap: space.sm }}>
-                    {data.days.map((d, i) => {
-                      const on = i === selIdx;
-                      return (
-                        <Pressable key={d.id} accessibilityRole="tab" accessibilityState={{ selected: on }} accessibilityLabel={`Jour ${i + 1}, ${formatDay(d.day_date)}`} onPress={() => setChosenDay(i)}
-                          style={[styles.bubble, { backgroundColor: on ? colors.accent : colors.surface2 }]}>
-                          <RNText style={[styles.bubbleNum, { color: on ? colors.onAccent : colors.text }]}>{d.day_date.slice(8, 10).replace(/^0/, '')}</RNText>
-                          <RNText style={[styles.bubbleDay, { color: on ? colors.onAccent : colors.text3 }]}>{monthShort(d.day_date)}</RNText>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </View>
-              </ScrollView>
+              <DayStrip days={data.days} selected={selIdx} runs={runs} cityName={nameOfCity} onPick={pickDay} />
               {(() => {
                 const i = Math.min(dayIndex, data.days.length - 1);
                 const d = data.days[i];
-                return <DayCard key={d.id} tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={i + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} allDayIds={data.days.map((x) => x.id)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} openAdd={pendingAdd} onOpenedAdd={() => setPendingAdd(false)} focusItemId={focusItem} />;
+                // Changement de jour : la journée arrive du côté où l'on va (glissé latéral, 220 ms).
+                return <FadeIn key={d.id} dx={24 * dayDir} dy={0}><DayCard tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={i + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} allDayIds={data.days.map((x) => x.id)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} openAdd={pendingAdd} onOpenedAdd={() => setPendingAdd(false)} focusItemId={focusItem} /></FadeIn>;
               })()}
             </>
           )}
@@ -449,16 +423,12 @@ const styles = StyleSheet.create({
   page: { width: '100%', maxWidth: 880, alignSelf: 'center', padding: space.lg, paddingTop: space.xl, gap: space.lg },
   dayHero: { minHeight: 230, width: '100%' },
   dayHeroInner: { justifyContent: 'flex-end', gap: 4, paddingHorizontal: space.lg, paddingTop: space.xl, paddingBottom: space.lg + SHEET_OVERLAP, minHeight: 230, width: '100%', maxWidth: 880, alignSelf: 'center' },
-  runLabel: { fontFamily: fonts.sansBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 },
   slimHead: { width: '100%', maxWidth: 880, alignSelf: 'center', paddingHorizontal: space.lg, paddingTop: space.lg, gap: 4 },
   slimTitle: { fontFamily: fonts.serif, fontSize: 30, lineHeight: 34 },
   dayTile: { width: 124, height: 128, borderRadius: radius.card, padding: 12, justifyContent: 'space-between', backgroundColor: '#101315', overflow: 'hidden' },
   tileVeil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, borderRadius: radius.card, backgroundColor: 'rgba(7, 9, 11, 0.45)' },
   tileNumber: { fontFamily: fonts.serif, fontSize: 34, lineHeight: 36, color: ON_PHOTO },
   tileCity: { fontFamily: fonts.sansBold, fontSize: 15, lineHeight: 17, color: ON_PHOTO },
-  bubble: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  bubbleNum: { fontFamily: fonts.sansBold, fontSize: 18 },
-  bubbleDay: { fontFamily: fonts.sansBold, fontSize: 11 },
   avatar: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   avatarLetter: { fontFamily: fonts.sansBold, fontSize: 13, color: '#14100A' },
 });
