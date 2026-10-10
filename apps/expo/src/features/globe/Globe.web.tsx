@@ -27,8 +27,11 @@ export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick, theme =
     return () => window.removeEventListener('message', listener);
   }, []);
 
+  const src = mode === 'route' ? `${WEB_BASE}/route.html?color=${color}&theme=${theme}` : `${WEB_BASE}/globe.html?mode=${mode}&color=${color}`;
+  // key = src : un nouveau cadre plutôt qu'un changement d'adresse, qui ajouterait une étape à l'historique du navigateur
+  // (le bouton Retour ramènerait alors le cadre à l'ancien thème au lieu de changer d'écran).
   return React.createElement('iframe', {
-    ref: frame, onLoad: send, src: mode === 'route' ? `${WEB_BASE}/route.html?color=${color}&theme=${theme}` : `${WEB_BASE}/globe.html?mode=${mode}&color=${color}`, title: 'Globe terrestre',
+    key: src, ref: frame, onLoad: send, src, title: 'Globe terrestre',
     style: { border: 0, width: '100%', height: '100%', background: mode === 'route' && theme === 'jour' ? ROUTE_BG.jour : '#000', pointerEvents: mode === 'pick' ? 'auto' : 'none' },
   });
 }

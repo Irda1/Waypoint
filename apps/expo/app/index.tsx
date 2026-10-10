@@ -99,6 +99,10 @@ export default function Home() {
     ],
   };
 
+  // Badge « Nouveau » : le dernier voyage créé, pendant 7 jours.
+  const newest = (trips ?? []).reduce<TripSummary | null>((a, t) => (t.created_at && (!a?.created_at || t.created_at > a.created_at) ? t : a), null);
+  const newestId = newest?.created_at && Date.now() - Date.parse(newest.created_at) < 7 * 864e5 ? newest.id : null;
+
   // Prochain départ : le voyage à venir le plus proche.
   const next = (trips ?? [])
     .map((t) => ({ title: t.title, st: tripStatus(t.starts_on, t.ends_on, today) }))
@@ -162,6 +166,7 @@ export default function Home() {
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }], opacity: pressed ? 0.92 : 1 })}>
                   <ImageBackground source={t.cover ? { uri: t.cover.small } : photos[photoKeyFor(t.title)]} resizeMode="cover" style={styles.tripCard} imageStyle={{ borderRadius: radius.card }}>
                     <View style={styles.tripVeil} pointerEvents="none" />
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
                     {t.title.startsWith(SIMPLE_PREFIX) ? (
                       <View style={[styles.statusPill, { backgroundColor: ON_PHOTO }]}>
                         <RNText style={[styles.statusLabel, { color: '#0E2A35' }]}>Juste les lieux</RNText>
@@ -171,6 +176,13 @@ export default function Home() {
                         <RNText style={[styles.statusLabel, { color: colors.onAccent }]}>{tripStatusLabel(tripStatus(t.starts_on, t.ends_on, today))}</RNText>
                       </View>
                     )}
+                    {t.id === newestId ? (
+                      <View style={[styles.statusPill, { backgroundColor: ON_PHOTO, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                        <Icon name="sparkles" size={13} color="#0E2A35" />
+                        <RNText style={[styles.statusLabel, { color: '#0E2A35' }]}>Nouveau</RNText>
+                      </View>
+                    ) : null}
+                    </View>
                     <View style={{ gap: 2 }}>
                       <RNText style={styles.tripEyebrow} numberOfLines={1}>
                         {[t.cities?.length ? (t.country_code ? COUNTRY_NAME[t.country_code] : null) ?? t.title.replace(SIMPLE_PREFIX, '') : null, t.starts_on ? `${formatDay(t.starts_on)}${t.ends_on ? ` → ${formatDay(t.ends_on)}` : ''}` : t.title.startsWith(SIMPLE_PREFIX) ? null : 'Dates à définir'].filter(Boolean).join(' · ')}

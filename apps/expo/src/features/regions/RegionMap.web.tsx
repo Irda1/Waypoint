@@ -35,5 +35,5 @@ export function RegionMap({ country, cities, selected, onToggle }: RegionMapProp
     else send({ type: 'selected', selected: sel });
   }, [ready, points, sel, send]);
 
-  return React.createElement('iframe', { ref: frame, src, title: 'Carte des régions', style: { border: 0, width: '100%', height: '100%', background: '#000' } });
+  return React.createElement('iframe', { key: src, ref: frame, src, title: 'Carte des régions', style: { border: 0, width: '100%', height: '100%', background: '#000' } });
 }
