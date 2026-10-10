@@ -1,4 +1,5 @@
 // Page de la carte « régions et villes » de l'étape Villes (MapLibre, pays en imagerie satellite réaliste (Sentinel-2 sans nuages, EOX, CC BY-NC 4.0), le reste assombri, régions en contour turquoise).
+// Le pays est isolé (le reste assombri) et vu en légère perspective, sans relief ; les villes choisies sont reliées dans l'ordre du parcours par un arc lumineux.
 // Même principe que la carte du voyage et le globe : une page autonome, dans un cadre (web) ou une WebView (mobile).
 // Réglages : ?country=PT&base=<racine des fichiers>&color=5FD3BC (web) ou window.__REGIONS__ (mobile).
 // Messages reçus : {type:'cities', cities:[{id,n,lat,lng,r,a}], selected:[{id,o}]} ; envoyés : {type:'ready'}, {type:'toggle', id}.
@@ -38,8 +39,10 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   document.documentElement.style.setProperty("--c", COLOR);
   if (!window.maplibregl) { msg.textContent = "Carte indisponible : connexion requise."; post({ type: "ready" }); return; }
 
-  var map = new maplibregl.Map({ container: "map", style: { version: 8, sources: { sat0: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 6 }, sat: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 13, attribution: "Sentinel-2 cloudless © EOX" } }, layers: [{ id: "bg", type: "background", paint: { "background-color": "#000" } }, { id: "sat0", type: "raster", source: "sat0", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }, { id: "sat", type: "raster", source: "sat", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }] },
-    center: [0, 20], zoom: 1.5, attributionControl: false, dragRotate: false, pitchWithRotate: false, renderWorldCopies: false, maxZoom: 14 });
+  // Vue inclinée : le pays paraît plus petit qu'à plat, on rapproche un peu la caméra.
+  var TILT_ZOOM = 0.1;
+  var map = new maplibregl.Map({ container: "map", style: { version: 8, sources: { sat0: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 6 }, sat: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 13, attribution: "Sentinel-2 cloudless © EOX" } }, layers: [{ id: "bg", type: "background", paint: { "background-color": "#000" } }, { id: "sat0", type: "raster", source: "sat0", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }, { id: "sat", type: "raster", source: "sat", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }]},
+    center: [0, 20], zoom: 1.5, pitch: 42, maxPitch: 60, attributionControl: false, dragRotate: false, pitchWithRotate: false, renderWorldCopies: false, maxZoom: 14 });
   map.touchZoomRotate.disableRotation();
   // Pendant un zoom à deux doigts (et juste après), aucun toucher ne compte comme un choix.
   var pinchUntil = 0, pinching = function () { return Date.now() < pinchUntil; };
@@ -58,7 +61,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   function bboxOf(f) { var b = [1e9, 1e9, -1e9, -1e9]; polysOf(f.geometry).forEach(function (p) { p[0].forEach(function (c) { if (c[0] < b[0]) b[0] = c[0]; if (c[1] < b[1]) b[1] = c[1]; if (c[0] > b[2]) b[2] = c[0]; if (c[1] > b[3]) b[3] = c[1]; }); }); return b; }
   function union(bs) { return bs.reduce(function (a, b) { return [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.max(a[2], b[2]), Math.max(a[3], b[3])]; }); }
   var pad = function () { return { top: 50, bottom: 40, left: 30, right: 30 }; };
-  function fit(b, dur) { map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: pad(), maxZoom: 10, duration: dur }); }
+  function fit(b, dur) { var c = map.cameraForBounds([[b[0], b[1]], [b[2], b[3]]], { padding: pad(), maxZoom: 10 }); if (c) map.easeTo({ center: c.center, zoom: Math.min(10, c.zoom + TILT_ZOOM), duration: dur }); }
   var countryBox = null;
   // Zone principale du pays (ou d'une région) : on ignore les îles lointaines (Açores, Canaries, Alaska, îles d'Ogasawara pour Tokyo…) pour cadrer sur l'essentiel.
   function mainBox(list, extra) {
@@ -68,7 +71,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
     var bc = [(big[0] + big[2]) / 2, (big[1] + big[3]) / 2], reach = 1.5 * Math.hypot(big[2] - big[0], big[3] - big[1]) + (extra == null ? 3 : extra);
     return union(parts.filter(function (b) { return Math.hypot((b[0] + b[2]) / 2 - bc[0], (b[1] + b[3]) / 2 - bc[1]) < reach; }));
   }
-  function zoomFor(b) { var c = map.cameraForBounds([[b[0], b[1]], [b[2], b[3]]], { padding: pad(), maxZoom: 10 }); return c ? c.zoom : map.getZoom(); }
+  function zoomFor(b) { var c = map.cameraForBounds([[b[0], b[1]], [b[2], b[3]]], { padding: pad(), maxZoom: 10 }); return c ? Math.min(10, c.zoom + TILT_ZOOM) : map.getZoom(); }
 
   function assign() {
     cities.forEach(function (c) {
@@ -132,7 +135,26 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
     if (!countryBox && cities.length) { countryBox = union(cities.map(function (c) { return [c.lng, c.lat, c.lng, c.lat]; })); z0 = zoomFor(countryBox); zSel = z0; fit(countryBox, 0); }
     render();
   };
-  window.__setSelected = function (sel) { selected = {}; (sel || []).forEach(function (s) { selected[s.id] = s.o; }); render(); };
+  // Arc entre deux villes : courbe qui s'écarte de la ligne droite (vue de dessus, l'arc paraît « posé » grâce à l'inclinaison).
+  function arc(p, q) {
+    var dx = q[0] - p[0], dy = q[1] - p[1], k = 0.2, mx = (p[0] + q[0]) / 2 - dy * k, my = (p[1] + q[1]) / 2 + dx * k, pts = [];
+    for (var i = 0; i <= 28; i++) { var t = i / 28, u = 1 - t; pts.push([u * u * p[0] + 2 * u * t * mx + t * t * q[0], u * u * p[1] + 2 * u * t * my + t * t * q[1]]); }
+    return pts;
+  }
+  function drawRoute() {
+    var src = map.getSource("route"); if (!src) return;
+    var order = cities.filter(function (c) { return selected[c.id]; }).sort(function (a, b) { return selected[a.id] - selected[b.id]; }), feats = [];
+    for (var i = 1; i < order.length; i++) feats.push({ type: "Feature", geometry: { type: "LineString", coordinates: arc([order[i - 1].lng, order[i - 1].lat], [order[i].lng, order[i].lat]) } });
+    src.setData({ type: "FeatureCollection", features: feats });
+  }
+  function addRoute() {
+    if (map.getSource("route")) return;
+    map.addSource("route", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+    map.addLayer({ id: "route-glow", type: "line", source: "route", paint: { "line-color": COLOR, "line-width": 12, "line-opacity": 0.4, "line-blur": 6 }, layout: { "line-cap": "round", "line-join": "round" } });
+    map.addLayer({ id: "route", type: "line", source: "route", paint: { "line-color": "#FFFFFF", "line-width": 3.4, "line-dasharray": [0.1, 1.9] }, layout: { "line-cap": "round", "line-join": "round" } });
+    drawRoute();
+  }
+  window.__setSelected = function (sel) { selected = {}; (sel || []).forEach(function (s) { selected[s.id] = s.o; }); drawRoute(); render(); };
   function onMsg(e) { try { var m = typeof e.data === "string" ? JSON.parse(e.data) : e.data; if (m && m.type === "cities") window.__setCities(m.cities, m.selected); else if (m && m.type === "selected") window.__setSelected(m.selected); } catch (err) {} }
   window.addEventListener("message", onMsg); document.addEventListener("message", onMsg);
   map.on("move", render); map.on("resize", render);
@@ -171,8 +193,8 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
     fetch(BASE + "/regions/" + CC + ".json").then(function (r) { if (!r.ok) throw new Error("no"); return r.json(); }).then(function (fc) {
       regions = fc.features; regions.forEach(function (f, i) { f.id = i; f.bb = bboxOf(f); });
       countryBox = mainBox(regions) || union(regions.map(function (f) { return f.bb; })); z0 = zoomFor(countryBox); zSel = z0; fit(countryBox, 0);
-      ensureLayers(); assign(); render(); msg.textContent = "Touche une région, puis une ville pour l'ajouter.";
-    }).catch(function () { msg.textContent = "Régions indisponibles : les villes restent choisissables ici ou dans la liste."; }).then(function () { ready = true; post({ type: "ready" }); });
+      ensureLayers(); addRoute(); assign(); render(); msg.textContent = "Touche une région, puis une ville pour l'ajouter.";
+    }).catch(function () { addRoute(); msg.textContent = "Régions indisponibles : les villes restent choisissables ici ou dans la liste."; }).then(function () { ready = true; post({ type: "ready" }); });
   });
 })();
 </script></body></html>`;

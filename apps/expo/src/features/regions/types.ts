@@ -9,5 +9,5 @@ export interface RegionMapProps {
   onToggle: (id: number) => void;
 }
 export const REGIONS_COLOR = '5FD3BC';
-// Fichiers des régions sur GitHub : le mobile n'a pas d'adresse de site à laquelle les demander.
+// Fichiers publics (régions, images de la Terre) sur GitHub : le mobile n'a pas d'adresse de site à laquelle les demander.
 export const REGIONS_BASE_NATIVE = 'https://raw.githubusercontent.com/Irda1/Waypoint/main/apps/expo/public';
