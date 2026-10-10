@@ -24,7 +24,7 @@ export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick, theme =
     } catch { /* message étranger : ignoré */ }
   }
   return (
-    <WebViewView key={`${mode}-${theme}`} ref={view} onLoadEnd={send} originWhitelist={['*']} source={{ html, baseUrl: 'https://waypoint.local' }} javaScriptEnabled domStorageEnabled
+    <WebViewView key={`${mode}-${theme}-${color}`} ref={view} onLoadEnd={send} originWhitelist={['*']} source={{ html, baseUrl: 'https://waypoint.local' }} javaScriptEnabled domStorageEnabled
       injectedJavaScriptBeforeContentLoaded={before} onMessage={onMessage} scrollEnabled={false} bounces={false}
       pointerEvents={mode === 'pick' ? 'auto' : 'none'} style={{ flex: 1, backgroundColor: mode === 'route' && theme === 'jour' ? ROUTE_BG.jour : '#000' }} />
   );

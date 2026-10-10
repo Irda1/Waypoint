@@ -53,12 +53,12 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   var pad = function () { return { top: 50, bottom: 40, left: 30, right: 30 }; };
   function fit(b, dur) { map.fitBounds([[b[0], b[1]], [b[2], b[3]]], { padding: pad(), maxZoom: 10, duration: dur }); }
   var countryBox = null;
-  // Zone principale du pays : on ignore les îles lointaines (Açores, Canaries, Alaska…) pour cadrer sur l'essentiel.
-  function mainBox(list) {
+  // Zone principale du pays (ou d'une région) : on ignore les îles lointaines (Açores, Canaries, Alaska, îles d'Ogasawara pour Tokyo…) pour cadrer sur l'essentiel.
+  function mainBox(list, extra) {
     var parts = []; list.forEach(function (f) { polysOf(f.geometry).forEach(function (p) { var b = [1e9, 1e9, -1e9, -1e9]; p[0].forEach(function (c) { if (c[0] < b[0]) b[0] = c[0]; if (c[1] < b[1]) b[1] = c[1]; if (c[0] > b[2]) b[2] = c[0]; if (c[1] > b[3]) b[3] = c[1]; }); parts.push(b); }); });
     if (!parts.length) return null;
     var big = parts.reduce(function (a, b) { return (b[2] - b[0]) * (b[3] - b[1]) > (a[2] - a[0]) * (a[3] - a[1]) ? b : a; });
-    var bc = [(big[0] + big[2]) / 2, (big[1] + big[3]) / 2], reach = 1.5 * Math.hypot(big[2] - big[0], big[3] - big[1]) + 3;
+    var bc = [(big[0] + big[2]) / 2, (big[1] + big[3]) / 2], reach = 1.5 * Math.hypot(big[2] - big[0], big[3] - big[1]) + (extra == null ? 3 : extra);
     return union(parts.filter(function (b) { return Math.hypot((b[0] + b[2]) / 2 - bc[0], (b[1] + b[3]) / 2 - bc[1]) < reach; }));
   }
   function zoomFor(b) { var c = map.cameraForBounds([[b[0], b[1]], [b[2], b[3]]], { padding: pad(), maxZoom: 10 }); return c ? c.zoom : map.getZoom(); }
@@ -112,7 +112,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   function selectRegion(i) {
     if (i === selRegion) i = -1;
     setState(selRegion, "sel", false); selRegion = i; setState(i, "sel", true);
-    if (i >= 0) { var b = regions[i].bb; zSel = zoomFor(b); fit(b, 650); back.textContent = "‹ Tout le pays · " + regions[i].properties.name; back.style.display = "block"; }
+    if (i >= 0) { var b = mainBox([regions[i]], 0.5) || regions[i].bb; zSel = zoomFor(b); fit(b, 650); back.textContent = "‹ Tout le pays · " + regions[i].properties.name; back.style.display = "block"; }
     else { zSel = z0; if (countryBox) fit(countryBox, 650); back.style.display = "none"; }
     render();
   }

@@ -98,6 +98,15 @@ export function changeNights(cities: WizardCity[], index: number, delta: 1 | -1)
   return next;
 }
 
+/** Monte (−1) ou descend (+1) une ville dans l'ordre du parcours ; chacune garde ses nuits. */
+export function moveCity(cities: WizardCity[], index: number, delta: 1 | -1): WizardCity[] {
+  const to = index + delta;
+  if (to < 0 || to >= cities.length) return cities;
+  const next = cities.slice();
+  [next[index], next[to]] = [next[to], next[index]];
+  return next;
+}
+
 /** Ville de chaque jour : chacune garde ses nuits en jours, la dernière prend le reste (jour du départ compris). */
 export function cityPerDay(cities: WizardCity[], days: number): (number | null)[] {
   if (!cities.length) return Array.from({ length: days }, () => null);

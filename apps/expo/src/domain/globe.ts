@@ -111,14 +111,15 @@ canvas{display:block;width:100%;height:100%}
       }
     });
     var g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
-    group.add(new THREE.LineSegments(g, lineMat));
+    var borders = new THREE.LineSegments(g, lineMat); borders.renderOrder = 2; group.add(borders);
   }
 
   // pays survolé et pays choisi : remplissage dessiné sur une couche transparente
   var W = 4096, H = 2048, tex2 = document.createElement("canvas"); tex2.width = W; tex2.height = H;
   var ctx = tex2.getContext("2d"), overlay = new THREE.CanvasTexture(tex2);
   overlay.colorSpace = THREE.SRGBColorSpace; overlay.anisotropy = aniso;
-  group.add(new THREE.Mesh(new THREE.SphereGeometry(2.012, 128, 96), new THREE.MeshBasicMaterial({ map: overlay, transparent: true, depthWrite: false })));
+  var overlayMesh = new THREE.Mesh(new THREE.SphereGeometry(2.012, 128, 96), new THREE.MeshBasicMaterial({ map: overlay, transparent: true, depthWrite: false }));
+  overlayMesh.renderOrder = 2; group.add(overlayMesh);
   var selLine = outlineLine(COLOR), hoverLine = outlineLine(0xffffff);
 
   var feats = [], fr = new Intl.DisplayNames(["fr"], { type: "region" }), en = new Intl.DisplayNames(["en"], { type: "region" }), byEn = {}, byFr = {};
@@ -238,8 +239,62 @@ canvas{display:block;width:100%;height:100%}
     canvas.addEventListener("touchend", function () { pinch = null; });
   }
 
+  // Détail satellite au zoom (choix du pays) : l'image du globe (4096 px pour toute la Terre) s'étale quand on
+  // zoome sur un pays. On charge alors les tuiles Sentinel-2 sans nuages (EOX, CC BY-NC 4.0, niveau 6 ≈ 2,4 km
+  // par pixel) de la zone regardée et on les pose sur une portion de sphère juste au-dessus de la Terre, avec
+  // le même éclairage jour/nuit ; les nuages s'effacent en même temps.
+  var DZ = 6, NX = 8, NY = 6, N2 = Math.pow(2, DZ), detail = null, detailKey = "", detailAt = 0;
+  var patchMat = new THREE.ShaderMaterial({
+    uniforms: { map: { value: null }, sun: { value: SUN }, fade: { value: 0 } }, transparent: true, depthWrite: false,
+    vertexShader: "varying vec2 vUv; varying vec3 vN; void main(){ vUv = uv; vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+    fragmentShader: "uniform sampler2D map; uniform vec3 sun; uniform float fade; varying vec2 vUv; varying vec3 vN;" +
+      "void main(){ vec3 n = normalize(vN); float l = dot(n, sun); float k = smoothstep(-0.12, 0.3, l); vec3 c = texture2D(map, vUv).rgb;" +
+      "vec3 col = mix(c * 0.05, c * (0.7 + 0.5 * max(l, 0.0)), k);" +
+      "float e = smoothstep(0.0, 0.1, vUv.x) * smoothstep(0.0, 0.1, 1.0 - vUv.x) * smoothstep(0.0, 0.1, vUv.y) * smoothstep(0.0, 0.1, 1.0 - vUv.y);" +
+      "gl_FragColor = vec4(col, e * fade);\\n#include <colorspace_fragment>\\n}"
+  });
+  function tileX(lon) { return (lon + 180) / 360 * N2; }
+  function tileY(lat) { var r = lat * Math.PI / 180; return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * N2; }
+  function latOfY(y) { return Math.atan(Math.sinh(Math.PI * (1 - 2 * y / N2))) * 180 / Math.PI; }
+  function viewCenter() {
+    var v = new THREE.Vector3(0, 0, 1).applyQuaternion(group.quaternion.clone().invert());
+    var lat = Math.asin(Math.max(-1, Math.min(1, v.y))) * 180 / Math.PI, lon = Math.atan2(v.z, -v.x) * 180 / Math.PI - 180;
+    return [lon < -180 ? lon + 360 : lon, lat];
+  }
+  function buildDetail() {
+    var c = viewCenter();
+    var x0 = Math.floor(tileX(c[0]) - NX / 2), y0 = Math.max(0, Math.min(N2 - NY, Math.floor(tileY(Math.max(-80, Math.min(80, c[1]))) - NY / 2)));
+    var key = x0 + "/" + y0; if (key === detailKey) return; detailKey = key;
+    var cv = document.createElement("canvas"); cv.width = NX * 256; cv.height = NY * 256;
+    var cx = cv.getContext("2d"), tex = new THREE.CanvasTexture(cv); tex.colorSpace = THREE.SRGBColorSpace; tex.anisotropy = aniso;
+    for (var ty = 0; ty < NY; ty++) for (var tx = 0; tx < NX; tx++) (function (tx, ty) {
+      var img = new Image(); img.crossOrigin = "anonymous";
+      img.onload = function () { if (detailKey !== key) return; cx.drawImage(img, tx * 256, ty * 256); tex.needsUpdate = true; };
+      img.src = "https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/" + DZ + "/" + (y0 + ty) + "/" + (((x0 + tx) % N2) + N2) % N2 + ".jpg";
+    })(tx, ty);
+    var lon0 = x0 / N2 * 360 - 180, lon1 = (x0 + NX) / N2 * 360 - 180, SX = 48, SY = 36, pos = [], nor = [], uv = [], idx = [];
+    for (var j = 0; j <= SY; j++) {
+      var lat = latOfY(y0 + NY * j / SY);
+      for (var i = 0; i <= SX; i++) { var p = vec(lon0 + (lon1 - lon0) * i / SX, lat, 2.003), q = p.clone().normalize(); pos.push(p.x, p.y, p.z); nor.push(q.x, q.y, q.z); uv.push(i / SX, 1 - j / SY); }
+    }
+    for (j = 0; j < SY; j++) for (i = 0; i < SX; i++) { var a = j * (SX + 1) + i, b = a + 1, d = a + SX + 1, e = d + 1; idx.push(a, d, b, b, d, e); }
+    var geo = new THREE.BufferGeometry();
+    geo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3)); geo.setAttribute("normal", new THREE.Float32BufferAttribute(nor, 3));
+    geo.setAttribute("uv", new THREE.Float32BufferAttribute(uv, 2)); geo.setIndex(idx);
+    if (detail) { group.remove(detail); detail.geometry.dispose(); if (patchMat.uniforms.map.value) patchMat.uniforms.map.value.dispose(); }
+    patchMat.uniforms.map.value = tex;
+    detail = new THREE.Mesh(geo, patchMat); patchMat.side = THREE.DoubleSide; detail.renderOrder = 1; group.add(detail);
+  }
+
   function frame(now) {
     var k = Math.min(1, (now - t0) / 2600), ease = 1 - Math.pow(1 - k, 3);
+    if (MODE === "pick") {
+      var near = Math.max(0, Math.min(1, (4.4 - dist) / 0.9));
+      clouds.material.opacity = 0.42 * (1 - near);
+      patchMat.uniforms.fade.value = near;
+      if (detail) detail.visible = near > 0.01;
+      if (near > 0 && !drag && now - detailAt > 450) { detailAt = now; buildDetail(); }
+    }
     if (MODE === "pick" && k < 1) dist = 16 + (target - 16) * ease; else dist += (target - dist) * 0.12;
     camera.position.set(0, 0, dist); camera.lookAt(0, 0, 0);
     camera.near = Math.max(0.3, dist - 2.6); camera.updateProjectionMatrix(); clouds.rotation.y += 0.00012;
