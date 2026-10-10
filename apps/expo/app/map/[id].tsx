@@ -21,6 +21,7 @@ import { formatMoney } from '../../src/lib/format';
 import { mapsUrl } from '../../src/domain/simple.ts';
 import { formatDuration } from '../../src/lib/search';
 import { categoryColors, fonts, radius, space } from '../../src/theme/tokens';
+import { Icon } from '../../src/ui/Icon';
 import { useTheme } from '../../src/theme/useTheme';
 
 export default function TripMap() {
@@ -129,7 +130,7 @@ export default function TripMap() {
           <View style={{ padding: space.sm, gap: space.sm }} pointerEvents="box-none">
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
               <Pressable accessibilityRole="button" accessibilityLabel="Retour au voyage" onPress={() => router.replace({ pathname: '/trip/[id]', params: { id: String(id) } })} style={{ minHeight: 44, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
-                <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text }}>← Voyage</RNText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="back" size={16} tone="text" /><RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text }}>Voyage</RNText></View>
               </Pressable>
               {data.days.length ? <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
                 <Chip label="Tous les jours" selected={day === null} onPress={() => setDay(null)} />
@@ -137,12 +138,12 @@ export default function TripMap() {
               </ScrollView> : null}
             </View>
             <View style={{ backgroundColor: colors.surface, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.line, flexDirection: 'row', alignItems: 'center', paddingHorizontal: space.md, minHeight: 44 }}>
-              <RNText accessibilityElementsHidden importantForAccessibility="no" style={{ fontSize: 16 }}>🔍</RNText>
+              <Icon name="search" size={18} tone="muted" />
               <TextInput accessibilityLabel="Chercher un lieu" value={term} onChangeText={setTerm} placeholder="Chercher un lieu" placeholderTextColor={colors.text3}
                 style={{ flex: 1, minHeight: 44, paddingHorizontal: space.sm, fontFamily: fonts.sans, fontSize: 15, color: colors.text }} />
               {term ? (
                 <Pressable accessibilityRole="button" accessibilityLabel="Effacer la recherche" onPress={() => setTerm('')} style={{ minWidth: 44, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}>
-                  <RNText style={{ color: colors.text3, fontSize: 16 }}>✕</RNText>
+                  <Icon name="close" size={18} tone="muted" />
                 </Pressable>
               ) : null}
             </View>
@@ -165,7 +166,7 @@ export default function TripMap() {
             ) : null}
             <View style={{ flexDirection: 'row', gap: space.sm }}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
-                <Chip label="♥ Favoris" selected={onlyFav} onPress={() => setOnlyFav((v) => !v)} />
+                <Chip label="Favoris" icon="heart" selected={onlyFav} onPress={() => setOnlyFav((v) => !v)} />
                 <Chip label={discover ? 'Lieux à découvrir : oui' : 'Lieux à découvrir'} selected={discover} onPress={() => setDiscover((v) => !v)} />
                 {discover ? categories.activityRoots.map((c) => (
                   <Chip key={c.code} label={c.name_fr} selected={roots.includes(c.code)} onPress={() => setRoots((r) => (r.includes(c.code) ? r.filter((x) => x !== c.code) : [...r, c.code]))} />
@@ -242,7 +243,7 @@ export default function TripMap() {
                 </RNText>
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel="Fermer" hitSlop={8} onPress={() => setSelected(null)} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-                <RNText style={{ fontSize: 18, color: colors.text2 }}>✕</RNText>
+                <Icon name="close" size={20} tone="muted" />
               </Pressable>
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' }}>
@@ -252,13 +253,15 @@ export default function TripMap() {
                 </Pressable>
               ) : null}
               {point.placeId != null ? (
-                <Pressable accessibilityRole="button" accessibilityLabel={favorites.ids.has(point.placeId) ? 'Retirer des favoris' : 'Ajouter aux favoris'} onPress={() => { void favorites.toggle(point.placeId!); }} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong }}>
-                  <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>{favorites.ids.has(point.placeId) ? '♥ Favori' : '♡ Favori'}</RNText>
+                <Pressable accessibilityRole="button" accessibilityLabel={favorites.ids.has(point.placeId) ? 'Retirer des favoris' : 'Ajouter aux favoris'} onPress={() => { void favorites.toggle(point.placeId!); }} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.lineStrong }}>
+                  <Icon name="heart" size={16} filled={favorites.ids.has(point.placeId)} />
+                  <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>Favori</RNText>
                 </Pressable>
               ) : null}
               {place ? (
-                <Pressable accessibilityRole="link" accessibilityLabel={`Ouvrir ${point.label} dans Google Maps`} onPress={() => void Linking.openURL(mapsUrl({ name: point.label, lat: place.lat, lng: place.lng }))} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong }}>
-                  <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>Maps ↗</RNText>
+                <Pressable accessibilityRole="link" accessibilityLabel={`Ouvrir ${point.label} dans Google Maps`} onPress={() => void Linking.openURL(mapsUrl({ name: point.label, lat: place.lat, lng: place.lng }))} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.lineStrong }}>
+                  <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>Maps</RNText>
+                  <Icon name="external" size={14} tone="text" />
                 </Pressable>
               ) : null}
               {point.kind === 'disc' && dayId ? (

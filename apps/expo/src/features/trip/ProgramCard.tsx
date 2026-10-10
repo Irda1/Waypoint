@@ -12,7 +12,8 @@ import type { TripData } from '../../data/useTrip';
 import { useTheme } from '../../theme/useTheme';
 import { categoryColors, fonts, space } from '../../theme/tokens';
 import { formatDay } from '../../lib/format';
-import { glyphFor } from '../../theme/categoryIcons';
+import { iconFor } from '../../theme/categoryIcons';
+import { Icon } from '../../ui/Icon';
 
 const BADGE = { pour_toi: 'Pour toi', incontournable: 'Incontournable' } as const;
 
@@ -91,7 +92,7 @@ export function ProgramCard({ data, onApplied }: { data: TripData; onApplied: ()
                   <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}>
                     <Text variant="mono" style={{ width: 48, color: colors.text2, fontSize: 14 }}>{formatTime(i.startMin)}</Text>
                     <View accessible={false} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${dot}33`, alignItems: 'center', justifyContent: 'center' }}>
-                      <RNText style={{ fontSize: 15 }}>{glyphFor(i.root ?? '')}</RNText>
+                      <Icon name={iconFor(i.root ?? '')} size={15} color={dot} />
                     </View>
                     {/* Toucher une étape ouvre le lieu dans Google Maps ; une étape sans lieu ne fait rien. */}
                     <Pressable disabled={!i.place} accessibilityRole={i.place ? 'link' : undefined} accessibilityLabel={i.place ? `Ouvrir ${name} dans Google Maps` : name}

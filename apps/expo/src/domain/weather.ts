@@ -5,23 +5,25 @@
 export const FORECAST_DAYS = 16;
 
 export type Sky = 'clair' | 'nuageux' | 'brouillard' | 'bruine' | 'pluie' | 'neige' | 'orage';
+/** Nom d'icône de l'appli (voir ui/Icon). */
+export type WeatherIcon = 'sunny' | 'partlySunny' | 'cloudy' | 'fog' | 'rainy' | 'snow' | 'storm' | 'thermometer';
 
-const WMO: Record<number, { label: string; sky: Sky; icon: string }> = {
-  0: { label: 'Ciel dégagé', sky: 'clair', icon: '☀️' }, 1: { label: 'Plutôt dégagé', sky: 'clair', icon: '🌤️' },
-  2: { label: 'Partiellement nuageux', sky: 'nuageux', icon: '⛅' }, 3: { label: 'Couvert', sky: 'nuageux', icon: '☁️' },
-  45: { label: 'Brouillard', sky: 'brouillard', icon: '🌫️' }, 48: { label: 'Brouillard givrant', sky: 'brouillard', icon: '🌫️' },
-  51: { label: 'Bruine légère', sky: 'bruine', icon: '🌦️' }, 53: { label: 'Bruine', sky: 'bruine', icon: '🌦️' }, 55: { label: 'Bruine forte', sky: 'bruine', icon: '🌦️' },
-  56: { label: 'Bruine verglaçante', sky: 'bruine', icon: '🌦️' }, 57: { label: 'Bruine verglaçante forte', sky: 'bruine', icon: '🌦️' },
-  61: { label: 'Pluie légère', sky: 'pluie', icon: '🌧️' }, 63: { label: 'Pluie', sky: 'pluie', icon: '🌧️' }, 65: { label: 'Pluie forte', sky: 'pluie', icon: '🌧️' },
-  66: { label: 'Pluie verglaçante', sky: 'pluie', icon: '🌧️' }, 67: { label: 'Pluie verglaçante forte', sky: 'pluie', icon: '🌧️' },
-  71: { label: 'Neige légère', sky: 'neige', icon: '🌨️' }, 73: { label: 'Neige', sky: 'neige', icon: '🌨️' }, 75: { label: 'Neige forte', sky: 'neige', icon: '❄️' }, 77: { label: 'Grains de neige', sky: 'neige', icon: '🌨️' },
-  80: { label: 'Averses légères', sky: 'pluie', icon: '🌦️' }, 81: { label: 'Averses', sky: 'pluie', icon: '🌧️' }, 82: { label: 'Averses violentes', sky: 'pluie', icon: '⛈️' },
-  85: { label: 'Averses de neige', sky: 'neige', icon: '🌨️' }, 86: { label: 'Fortes averses de neige', sky: 'neige', icon: '❄️' },
-  95: { label: 'Orage', sky: 'orage', icon: '⛈️' }, 96: { label: 'Orage et grêle', sky: 'orage', icon: '⛈️' }, 99: { label: 'Orage et forte grêle', sky: 'orage', icon: '⛈️' },
+const WMO: Record<number, { label: string; sky: Sky; icon: WeatherIcon }> = {
+  0: { label: 'Ciel dégagé', sky: 'clair', icon: 'sunny' }, 1: { label: 'Plutôt dégagé', sky: 'clair', icon: 'partlySunny' },
+  2: { label: 'Partiellement nuageux', sky: 'nuageux', icon: 'partlySunny' }, 3: { label: 'Couvert', sky: 'nuageux', icon: 'cloudy' },
+  45: { label: 'Brouillard', sky: 'brouillard', icon: 'fog' }, 48: { label: 'Brouillard givrant', sky: 'brouillard', icon: 'fog' },
+  51: { label: 'Bruine légère', sky: 'bruine', icon: 'rainy' }, 53: { label: 'Bruine', sky: 'bruine', icon: 'rainy' }, 55: { label: 'Bruine forte', sky: 'bruine', icon: 'rainy' },
+  56: { label: 'Bruine verglaçante', sky: 'bruine', icon: 'rainy' }, 57: { label: 'Bruine verglaçante forte', sky: 'bruine', icon: 'rainy' },
+  61: { label: 'Pluie légère', sky: 'pluie', icon: 'rainy' }, 63: { label: 'Pluie', sky: 'pluie', icon: 'rainy' }, 65: { label: 'Pluie forte', sky: 'pluie', icon: 'rainy' },
+  66: { label: 'Pluie verglaçante', sky: 'pluie', icon: 'rainy' }, 67: { label: 'Pluie verglaçante forte', sky: 'pluie', icon: 'rainy' },
+  71: { label: 'Neige légère', sky: 'neige', icon: 'snow' }, 73: { label: 'Neige', sky: 'neige', icon: 'snow' }, 75: { label: 'Neige forte', sky: 'neige', icon: 'snow' }, 77: { label: 'Grains de neige', sky: 'neige', icon: 'snow' },
+  80: { label: 'Averses légères', sky: 'pluie', icon: 'rainy' }, 81: { label: 'Averses', sky: 'pluie', icon: 'rainy' }, 82: { label: 'Averses violentes', sky: 'pluie', icon: 'storm' },
+  85: { label: 'Averses de neige', sky: 'neige', icon: 'snow' }, 86: { label: 'Fortes averses de neige', sky: 'neige', icon: 'snow' },
+  95: { label: 'Orage', sky: 'orage', icon: 'storm' }, 96: { label: 'Orage et grêle', sky: 'orage', icon: 'storm' }, 99: { label: 'Orage et forte grêle', sky: 'orage', icon: 'storm' },
 };
 
-export function describeCode(code: number | null | undefined): { label: string; sky: Sky; icon: string } {
-  return (code != null ? WMO[code] : undefined) ?? { label: 'Météo indisponible', sky: 'nuageux', icon: '🌡️' };
+export function describeCode(code: number | null | undefined): { label: string; sky: Sky; icon: WeatherIcon } {
+  return (code != null ? WMO[code] : undefined) ?? { label: 'Météo indisponible', sky: 'nuageux', icon: 'thermometer' };
 }
 
 export interface HourForecast { time: string; temp: number | null; feels: number | null; rainProb: number | null; code: number | null; wind: number | null; humidity: number | null }

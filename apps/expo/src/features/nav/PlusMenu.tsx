@@ -2,15 +2,16 @@ import React from 'react';
 import { Modal, Pressable, Text as RNText, View } from 'react-native';
 import { Text } from '../../ui';
 import { Icon } from '../../ui/Icon';
+import type { IconName } from '../../ui/Icon';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
 
 export type PlusChoice = 'activite' | 'depense' | 'memo';
 
-const CHOICES: { key: PlusChoice; icon: string; title: string; hint: string }[] = [
-  { key: 'activite', icon: '📍', title: 'Une activité', hint: 'Ajouter une étape à la journée en cours' },
-  { key: 'depense', icon: '💶', title: 'Une dépense', hint: 'Partagée entre les voyageurs' },
-  { key: 'memo', icon: '📝', title: 'Une note', hint: 'Dans le mémo du voyage' },
+const CHOICES: { key: PlusChoice; icon: IconName; title: string; hint: string }[] = [
+  { key: 'activite', icon: 'places', title: 'Une activité', hint: 'Ajouter une étape à la journée en cours' },
+  { key: 'depense', icon: 'expense', title: 'Une dépense', hint: 'Partagée entre les voyageurs' },
+  { key: 'memo', icon: 'note', title: 'Une note', hint: 'Dans le mémo du voyage' },
 ];
 
 // Menu « + Ajouter » (maquette v0.8) : les trois ajouts les plus fréquents, depuis n'importe quel onglet.
@@ -25,7 +26,7 @@ export function PlusMenu({ visible, onPick, onClose }: { visible: boolean; onPic
           {CHOICES.map((c) => (
             <Pressable key={c.key} accessibilityRole="button" accessibilityLabel={`Ajouter ${c.title.toLowerCase()}`} onPress={() => onPick(c.key)}
               style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 64, paddingVertical: space.sm, borderTopWidth: 1, borderTopColor: colors.line }}>
-              <Icon glyph={c.icon} size={26} />
+              <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }}><Icon name={c.icon} size={22} /></View>
               <View style={{ flex: 1, gap: 2 }}>
                 <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 16, color: colors.text }}>{c.title}</RNText>
                 <Text variant="muted">{c.hint}</Text>

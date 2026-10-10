@@ -5,7 +5,7 @@ import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthProvider';
 import { useRequireAuth } from '../../src/auth/useRequireAuth';
-import { Button, Card, Columns, ErrorNote, Field, Screen, Text } from '../../src/ui';
+import { Button, Card, Columns, ErrorNote, Field, Screen, Section, Text } from '../../src/ui';
 import { useTrip } from '../../src/data/useTrip';
 import { addDay, addDestination, createInvite, removeDestination } from '../../src/data/trips';
 import type { CityOption } from '../../src/data/places';
@@ -46,16 +46,18 @@ import type { PlusChoice } from '../../src/features/nav/PlusMenu';
 import { FloatingNav, NAV_HEIGHT, useBottomInset } from '../../src/features/nav/FloatingNav';
 import { SimpleTrip } from '../../src/features/simple/SimpleTrip';
 import type { NavTab } from '../../src/features/nav/FloatingNav';
+import { Icon } from '../../src/ui/Icon';
+import { FadeIn } from '../../src/ui/FadeIn';
 import { fonts, radius, space } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/useTheme';
 
 const TABS: NavTab[] = [
-  { key: 'accueil', label: 'Accueil', icon: '🏠' },
-  { key: 'voyage', label: 'Voyage', icon: '🧳' },
-  { key: 'jour', label: 'Jour', icon: '☀️' },
-  { key: 'carte', label: 'Carte', icon: '🗺️' },
-  { key: 'budget', label: 'Budget', icon: '💶' },
-  { key: 'amis', label: 'Amis', icon: '👥' },
+  { key: 'accueil', label: 'Accueil', icon: 'home' },
+  { key: 'voyage', label: 'Voyage', icon: 'trip' },
+  { key: 'jour', label: 'Jour', icon: 'day' },
+  { key: 'carte', label: 'Carte', icon: 'map' },
+  { key: 'budget', label: 'Budget', icon: 'budget' },
+  { key: 'amis', label: 'Amis', icon: 'friends' },
 ];
 
 function weekdayShort(iso: string): string {
@@ -198,13 +200,14 @@ export default function TripScreen() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 120 }} keyboardShouldPersistTaps="handled">
+        <FadeIn key={tab}>
         {tab === 'voyage' ? (
           <ImageBackground source={heroPick.source} resizeMode="cover" style={styles.cover}>
             <View style={styles.veil} pointerEvents="none" />
             <SafeAreaView edges={['top']} style={styles.coverInner}>
               <View style={styles.coverBar}>
                 <Pressable accessibilityRole="button" accessibilityLabel="Retour à mes voyages" onPress={() => router.replace('/')} style={styles.glass}>
-                  <RNText style={styles.glassLabel}>← Mes voyages</RNText>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="back" size={16} color={ON_PHOTO} /><RNText style={styles.glassLabel}>Mes voyages</RNText></View>
                 </Pressable>
                 <View style={styles.glass} accessibilityLiveRegion="polite">
                   <RNText style={styles.glassLabel}>{savedAt ? `Copie hors ligne · ${savedLabel(savedAt)}` : STATUS[status]}</RNText>
@@ -263,20 +266,26 @@ export default function TripScreen() {
             </View>
           ) : null}
 
-          <DestinationsCard data={data} onChanged={reload} />
-
           <MemoCard tripId={trip.id} memo={trip.memo ?? ''} onChanged={reload} startEditing={pendingMemo} onStarted={() => setPendingMemo(false)} />
-          <FlightsCard data={data} />
-          <StayCard data={data} userId={session?.user.id ?? null} onChanged={reload} />
 
-          <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
+          <Section title="Itinéraire" icon="map">
+            <DestinationsCard data={data} onChanged={reload} />
+            <HoursCard data={data} onOpen={(i, itemId) => { setChosenDay(i); setFocusItem(itemId); setTab('jour'); }} />
+            <ProgramCard data={data} onApplied={reload} />
+            <UnplannedCard data={data} onChanged={reload} />
+          </Section>
 
-          <HoursCard data={data} onOpen={(i, itemId) => { setChosenDay(i); setFocusItem(itemId); setTab('jour'); }} />
-          <ProgramCard data={data} onApplied={reload} />
-          <UnplannedCard data={data} onChanged={reload} />
-          <BookingsCard tripId={trip.id} />
-          <ChecklistCard tripId={trip.id} />
-          <ExportCard data={data} />
+          <Section title="Transports et nuits" icon="plane">
+            <FlightsCard data={data} />
+            <StayCard data={data} userId={session?.user.id ?? null} onChanged={reload} />
+            <BookingsCard tripId={trip.id} />
+          </Section>
+
+          <Section title="Préparation" icon="note">
+            <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
+            <ChecklistCard tripId={trip.id} />
+            <ExportCard data={data} />
+          </Section>
         </View>
         ) : null}
 
@@ -390,10 +399,11 @@ export default function TripScreen() {
 
         </View>
         ) : null}
+        </FadeIn>
       </ScrollView>
       <Pressable accessibilityRole="button" accessibilityLabel="Ajouter" onPress={() => setPlusOpen(true)}
-        style={{ position: 'absolute', right: 16, bottom: bottomInset + NAV_HEIGHT + 4, width: 42, height: 42, borderRadius: 21, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6 }}>
-        <RNText style={{ fontSize: 24, lineHeight: 26, color: colors.onAccent, fontFamily: fonts.sansBold }}>＋</RNText>
+        style={({ pressed }) => ({ position: 'absolute', right: 16, bottom: bottomInset + NAV_HEIGHT + 4, width: 48, height: 48, borderRadius: 24, backgroundColor: colors.accent, alignItems: 'center', justifyContent: 'center', shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 6, transform: [{ scale: pressed ? 0.92 : 1 }] })}>
+        <Icon name="add" size={26} tone="onAccent" filled />
       </Pressable>
       <FloatingNav tabs={TABS} active={tab} onSelect={onNav} />
       <PlusMenu visible={plusOpen} onPick={onPlus} onClose={() => setPlusOpen(false)} />

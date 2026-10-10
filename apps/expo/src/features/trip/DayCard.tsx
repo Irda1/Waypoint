@@ -11,7 +11,8 @@ import { applyTimes } from '../../data/itinerary';
 import { amountDue, paymentState, posteForCategory } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
 import { swapItems } from '../../domain/reorder.ts';
-import { glyphFor } from '../../theme/categoryIcons';
+import { iconFor } from '../../theme/categoryIcons';
+import { Icon } from '../../ui/Icon';
 import { DragList } from './DragList';
 import { addExpense, addItem, applyItemMoves, clearItemExpenses, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
 import { deriveAltPlan } from '../../domain/altplan.ts';
@@ -188,7 +189,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
       </View>
       {weather ? (
         <View style={{ gap: 2 }} accessibilityLabel={`Météo prévue : ${describeCode(weather.day.code).label}, ${tempRange(weather.day)}`}>
-          <Text variant="muted">{describeCode(weather.day.code).icon} {describeCode(weather.day.code).label} · {tempRange(weather.day)} · prévision</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}><Icon name={describeCode(weather.day.code).icon} size={18} /><Text variant="muted">{describeCode(weather.day.code).label} · {tempRange(weather.day)} · prévision</Text></View>
           {weather.advice ? <Text variant="muted" style={{ color: colors.warm }}>{weather.advice}</Text> : null}
         </View>
       ) : null}
@@ -242,7 +243,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
       {tips.length ? (
         <View style={{ gap: space.xs, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }} accessibilityLabel="Conseils pour cette journée">
           <Text variant="label">Conseils</Text>
-          {tips.map((t) => <Text key={t.id} variant="muted">💡 {t.text}</Text>)}
+          {tips.map((t) => <View key={t.id} style={{ flexDirection: 'row', gap: space.sm }}><Icon name="tip" size={16} /><Text variant="muted" style={{ flex: 1 }}>{t.text}</Text></View>)}
         </View>
       ) : null}
       <View>
@@ -272,7 +273,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                 </Pressable>
                 <View style={{ alignItems: 'center', width: 28 }}>
                   <View accessible={false} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${dot}33`, alignItems: 'center', justifyContent: 'center' }}>
-                    <RNText style={{ fontSize: 15 }}>{glyphFor(categories.rootOf(category))}</RNText>
+                    <Icon name={iconFor(categories.rootOf(category))} size={15} color={dot} />
                   </View>
                   {!isLast ? <View style={{ flex: 1, width: 1, backgroundColor: colors.lineStrong, marginTop: 4 }} /> : null}
                 </View>

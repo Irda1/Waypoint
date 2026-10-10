@@ -3,6 +3,7 @@ import { Pressable, Text as RNText, View } from 'react-native';
 import { Button, Card, Chip, ErrorNote, Field, Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
+import { Icon } from '../../ui/Icon';
 import { listCities } from '../../data/places';
 import type { CityOption } from '../../data/places';
 import { deleteItems, findStaleItems, saveDestinations } from '../../data/trips';
@@ -101,10 +102,10 @@ export function DestinationsCard({ data, onChanged }: { data: TripData; onChange
                     <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 20, color: colors.accent }}>−</RNText>
                   </Pressable>
                   <Pressable accessibilityRole="button" accessibilityLabel={`Une nuit de plus à ${d.name}`} disabled={busy || dests.length < 2} onPress={() => void apply(shiftNights(dests, index, 1))} style={{ minWidth: 40, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}>
-                    <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 20, color: colors.accent }}>＋</RNText>
+                    <Icon name="add" size={22} filled />
                   </Pressable>
                   <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${d.name}`} disabled={busy} onPress={() => void apply(removeCity(dests, d.id, nights))} style={{ minWidth: 36, minHeight: 44, justifyContent: 'center', alignItems: 'center' }}>
-                    <RNText style={{ fontSize: 16, color: colors.text3 }}>✕</RNText>
+                    <Icon name="close" size={18} tone="muted" />
                   </Pressable>
                 </>
               ) : null}

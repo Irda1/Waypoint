@@ -10,6 +10,7 @@ import type { CityOption } from '../../data/places';
 import { createSimpleTrip } from '../../data/trips';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
+import { Icon } from '../../ui/Icon';
 import { Choice, StepTitle } from '../wizard/parts';
 
 interface Picked { id: number; name: string; country: string }
@@ -68,7 +69,7 @@ export function SimpleCreate({ onBack }: { onBack: () => void }) {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <SafeAreaView edges={['top']} style={{ backgroundColor: colors.bg }}>
         <Pressable accessibilityRole="button" accessibilityLabel="Étape précédente" onPress={goBack} style={{ minWidth: 44, minHeight: 44, justifyContent: 'center', paddingHorizontal: space.lg }}>
-          <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 20, color: colors.text }}>←</RNText>
+          <Icon name="back" size={24} tone="text" />
         </Pressable>
       </SafeAreaView>
       <ScrollView contentContainerStyle={{ padding: space.lg, gap: space.md, width: '100%', maxWidth: 720, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">

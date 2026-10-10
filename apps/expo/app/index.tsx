@@ -15,6 +15,7 @@ import { photoKeyFor } from '../src/lib/photoKey';
 import { photos } from '../src/theme/photos';
 import { fonts, radius, space } from '../src/theme/tokens';
 import { useTheme } from '../src/theme/useTheme';
+import { Icon } from '../src/ui/Icon';
 
 // Photo d'ambiance de la maquette (web/index.html), utilisée en couverture de l'accueil.
 const horizon = require('../assets/photos/horizon.jpg');
@@ -80,7 +81,7 @@ export default function Home() {
                 <RNText style={styles.brand} accessibilityRole="header">Waypoint</RNText>
               </View>
               <Pressable accessibilityRole="button" accessibilityLabel="Paramètres" onPress={() => router.push('/settings')} style={styles.glass}>
-                <RNText style={styles.glassLabel}>⚙️ Paramètres</RNText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="settings" size={16} color={ON_PHOTO} /><RNText style={styles.glassLabel}>Paramètres</RNText></View>
               </Pressable>
             </View>
             <View style={styles.heroText}>

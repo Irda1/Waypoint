@@ -22,6 +22,7 @@ import { ModeChoice } from '../src/features/simple/ModeChoice';
 import type { TripMode } from '../src/features/simple/ModeChoice';
 import { SimpleCreate } from '../src/features/simple/SimpleCreate';
 import { fonts, space } from '../src/theme/tokens';
+import { Icon } from '../src/ui/Icon';
 import { useTheme } from '../src/theme/useTheme';
 
 const ORDER: StepId[] = ['pays', 'dates', 'villes', 'voyageurs', 'interets', 'budget', 'propositions', 'recap'];
@@ -94,7 +95,7 @@ function CompleteWizard() {
       <SafeAreaView edges={['top']} style={{ backgroundColor: colors.bg }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingHorizontal: space.lg, paddingVertical: space.sm, width: '100%', maxWidth: 880, alignSelf: 'center' }}>
           <Pressable accessibilityRole="button" accessibilityLabel={index === 0 && !fromRecap ? 'Fermer' : 'Étape précédente'} onPress={back} style={{ minWidth: 44, minHeight: 44, justifyContent: 'center' }}>
-            <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 20, color: colors.text }}>{index === 0 && !fromRecap ? '✕' : '←'}</RNText>
+            <Icon name={index === 0 && !fromRecap ? 'close' : 'back'} size={24} tone="text" />
           </Pressable>
           <View style={{ flex: 1, flexDirection: 'row', gap: 6 }} accessibilityLabel={`Étape ${index + 1} sur ${ORDER.length}`}>
             {ORDER.map((s, i) => <View key={s} style={{ flex: 1, height: 4, borderRadius: 2, backgroundColor: i <= index ? colors.accent : colors.surface2 }} />)}

@@ -17,21 +17,22 @@ import type { SimplePlace } from '../../domain/simple.ts';
 import { todayIso } from '../../lib/dates.ts';
 import { formatMoney } from '../../lib/format';
 import { formatDuration } from '../../lib/search';
-import { glyphFor } from '../../theme/categoryIcons';
+import { iconFor } from '../../theme/categoryIcons';
+import { Icon } from '../../ui/Icon';
 import { categoryColors, fonts, radius, space } from '../../theme/tokens';
 import { useTheme } from '../../theme/useTheme';
 import { FloatingNav } from '../nav/FloatingNav';
 import type { NavTab } from '../nav/FloatingNav';
 
 const TABS: NavTab[] = [
-  { key: 'accueil', label: 'Accueil', icon: '🏠' },
-  { key: 'lieux', label: 'Lieux', icon: '📍' },
-  { key: 'carte', label: 'Carte', icon: '🗺️' },
-  { key: 'budget', label: 'Budget', icon: '💶' },
+  { key: 'accueil', label: 'Accueil', icon: 'home' },
+  { key: 'lieux', label: 'Lieux', icon: 'places' },
+  { key: 'carte', label: 'Carte', icon: 'map' },
+  { key: 'budget', label: 'Budget', icon: 'budget' },
 ];
 const PAGE = 40;
 
-/** Voyage en mode Simple : la liste des lieux des villes choisies, la carte, et le budget de la sélection (♡). */
+/** Voyage en mode Simple : la liste des lieux des villes choisies, la carte, et le budget de la sélection (cœur). */
 export function SimpleTrip({ data, reload }: { data: TripData; reload: () => void }) {
   const { colors, mode } = useTheme();
   const categories = useCategories();
@@ -108,7 +109,7 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
         <SafeAreaView edges={['top']} style={{ paddingHorizontal: space.lg, paddingTop: space.lg, gap: 4, width: '100%', maxWidth: 720, alignSelf: 'center' }}>
           <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
             {countries.map((c) => <Flag key={c} code={c} width={22} />)}
-            <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 12, color: colors.accent }}>{dests.length} ville{dests.length > 1 ? 's' : ''} · {selected.length} ♥</RNText>
+            <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 12, color: colors.accent }}>{dests.length} ville{dests.length > 1 ? 's' : ''} · {selected.length} gardé{selected.length > 1 ? 's' : ''}</RNText>
           </View>
           <RNText accessibilityRole="header" style={{ fontFamily: fonts.serif, fontSize: 28, color: colors.text }}>{trip.title}</RNText>
         </SafeAreaView>
@@ -119,7 +120,7 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
                 <Chip label="Toutes les villes" selected={cityId === null} onPress={() => { setCityId(null); setShown(PAGE); }} />
                 {dests.map((d) => <Chip key={d.city_id} label={d.name} selected={cityId === d.city_id} onPress={() => { setCityId(d.city_id); setShown(PAGE); }} />)}
-                <Chip label={editing ? 'Terminé' : '＋ Villes'} selected={editing} onPress={() => setEditing((v) => !v)} />
+                <Chip label={editing ? 'Terminé' : 'Ajouter des villes'} selected={editing} onPress={() => setEditing((v) => !v)} />
               </ScrollView>
               {editing ? (
                 <Card>
@@ -140,13 +141,13 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
                 </Card>
               ) : null}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
-                <Chip label={`♥ Ma sélection (${selected.length})`} selected={onlySel} onPress={() => { setOnlySel((v) => !v); setShown(PAGE); }} />
+                <Chip label={`Ma sélection (${selected.length})`} selected={onlySel} onPress={() => { setOnlySel((v) => !v); setShown(PAGE); }} />
                 <Chip label="Tout" selected={root === null} onPress={() => { setRoot(null); setShown(PAGE); }} />
                 {categories.activityRoots.map((c) => <Chip key={c.code} label={c.name_fr} selected={root === c.code} onPress={() => { setRoot(root === c.code ? null : c.code); setShown(PAGE); }} />)}
               </ScrollView>
               {progress !== null ? <Text variant="muted" accessibilityLiveRegion="polite">Chargement des lieux… {Math.round(progress)} %</Text> : null}
               {places === null && progress === null ? <Text variant="muted">Chargement des lieux…</Text> : null}
-              {places !== null && !list.length && progress === null ? <Text variant="muted">{onlySel ? 'Aucun lieu dans ta sélection : touche ♡ sur un lieu pour le garder.' : 'Aucun lieu pour ce filtre.'}</Text> : null}
+              {places !== null && !list.length && progress === null ? <Text variant="muted">{onlySel ? 'Aucun lieu dans ta sélection : touche le cœur d’un lieu pour le garder.' : 'Aucun lieu pour ce filtre.'}</Text> : null}
               {list.slice(0, shown).map((p) => {
                 const r = rootOf(p.category_code);
                 const dot = categoryColors[mode][r] ?? colors.text3;
@@ -155,7 +156,7 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
                 return (
                   <View key={p.id} style={{ flexDirection: 'row', gap: space.md, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
                     <View accessible={false} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: `${dot}33`, alignItems: 'center', justifyContent: 'center' }}>
-                      <RNText style={{ fontSize: 18 }}>{glyphFor(r)}</RNText>
+                      <Icon name={iconFor(r)} size={18} color={dot} />
                     </View>
                     <View style={{ flex: 1, gap: 2 }}>
                       <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 15.5, color: colors.text }}>{p.name}</RNText>
@@ -164,11 +165,11 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
                       </RNText>
                       {open ? <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: open.startsWith('Fermé') ? colors.warm : colors.text3 }}>{open}</RNText> : null}
                       <Pressable accessibilityRole="link" accessibilityLabel={`Ouvrir ${p.name} dans Google Maps`} onPress={() => void Linking.openURL(mapsUrl(p))} style={{ minHeight: 32, justifyContent: 'center' }}>
-                        <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.accent }}>Google Maps ↗</RNText>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.accent }}>Google Maps</RNText><Icon name="external" size={13} /></View>
                       </Pressable>
                     </View>
                     <Pressable accessibilityRole="switch" accessibilityState={{ checked: on }} accessibilityLabel={on ? `Retirer ${p.name} de ma sélection` : `Garder ${p.name}`} hitSlop={8} onPress={() => { void favorites.toggle(p.id); }} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-                      <RNText style={{ fontSize: 24, color: on ? colors.accent : colors.text3 }}>{on ? '♥' : '♡'}</RNText>
+                      <Icon name="heart" filled={on} size={24} tone={on ? 'accent' : 'muted'} />
                     </Pressable>
                   </View>
                 );
@@ -181,7 +182,7 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
             <>
               <Card>
                 <Text variant="label">Ma sélection · {selected.length} lieu{selected.length > 1 ? 'x' : ''}</Text>
-                {selected.length === 0 ? <Text variant="muted">Touche ♡ sur les lieux de l'onglet Lieux : leur budget s'additionne ici.</Text> : (
+                {selected.length === 0 ? <Text variant="muted">Touche le cœur des lieux de l'onglet Lieux : leur budget s'additionne ici.</Text> : (
                   <>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
                       <Text variant="muted" style={{ flex: 1 }}>Personnes</Text>
@@ -197,7 +198,7 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
                     <Text variant="muted">{travelers > 1 ? `pour ${travelers} personnes · ≈ ${eur(budget.perPerson)} par personne` : 'pour une personne'}</Text>
                     {budget.byRoot.map((b) => (
                       <View key={b.root} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 32 }}>
-                        <RNText style={{ fontSize: 16 }}>{glyphFor(b.root)}</RNText>
+                        <Icon name={iconFor(b.root)} size={18} />
                         <Text variant="body" style={{ flex: 1 }}>{rootName(b.root)} · {b.count}</Text>
                         <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>≈ {eur(b.amount)}</Text>
                       </View>
@@ -208,14 +209,14 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
               </Card>
               {selected.map((p) => (
                 <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48 }}>
-                  <RNText style={{ fontSize: 18 }}>{glyphFor(rootOf(p.category_code))}</RNText>
+                  <Icon name={iconFor(rootOf(p.category_code))} size={20} />
                   <View style={{ flex: 1 }}>
                     <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{p.name}</Text>
                     {dests.length > 1 ? <Text variant="muted">{cityName(p.city_id)}</Text> : null}
                   </View>
                   <Text variant="muted">{p.price_amount == null ? 'prix inconnu' : p.price_amount === 0 ? 'Gratuit' : `≈ ${eur(p.price_amount * travelers)}`}</Text>
                   <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${p.name} de ma sélection`} hitSlop={8} onPress={() => { void favorites.toggle(p.id); }} style={{ minWidth: 36, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
-                    <RNText style={{ fontSize: 20, color: colors.accent }}>♥</RNText>
+                    <Icon name="heart" filled size={20} />
                   </Pressable>
                 </View>
               ))}

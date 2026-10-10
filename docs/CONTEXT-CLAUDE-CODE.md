@@ -1,4 +1,4 @@
-# Waypoint — contexte complet du projet (à jour v1.10.65, 07/10/2026)
+# Waypoint — contexte complet du projet (à jour v1.11.0, 10/10/2026)
 
 Document de reprise : à donner à toute nouvelle session Claude. Détails techniques : `docs/BACKEND.md` (guide + journal de chaque version), `docs/DESCRIPTION-TECHNIQUE.md`.
 
@@ -23,6 +23,8 @@ Compagnon de voyage collaboratif : créer un voyage (pays, dates, villes avec nu
 - **Budget** : total/budget, payé/prévu, reste par jour, détail par poste, Groupe/Par personne, ajout de dépense (**prérempli depuis une activité liée : titre, poste, montant estimé × voyageurs**, « Payé par » masqué en solo), **Entre amis** (qui doit quoi, relancer, marquer reçu).
 - **Météo** Open-Meteo avec cache hors connexion ; **lecture hors connexion** des voyages ; **rappels** sur téléphone (veille du départ, 1 h avant la première étape).
 - Temps de trajet : à pied/vélo/voiture calculés ; **transports en commun estimés** (vraie source = à faire).
+
+- **Design** (v1.11.0) : direction « Crépuscule affiné » (nuit par défaut, Fraunces + Plus Jakarta Sans, accent soleil). Icônes vectorielles Ionicons via `ui/Icon.tsx` (noms propres à l'appli, jamais d'émoji comme icône) ; barre du bas avec icône + nom ; onglet Voyage en sections (`Section` dans `ui/index.tsx`) ; fondu de changement d'onglet (`ui/FadeIn.tsx`). Maquettes de pistes : canevas Claude Design « Waypoint · pistes de design ».
 
 ## 4. Architecture
 - **Backend** Supabase (Postgres + RLS + Realtime + RPC). Membres égaux. Migrations `supabase/migrations/2026092900*.sql` (0100→1900) lancées **à la main par Adrien** dans le SQL Editor (jusqu'à 1700 lancées ; **1800** = bouton « Élargir la zone », **1900** = mode Simple : à lancer si pas fait). Le cloud n'a que la clé anon : il ne peut pas lancer de migration.

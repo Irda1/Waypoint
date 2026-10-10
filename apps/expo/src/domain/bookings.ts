@@ -2,12 +2,12 @@
 
 export type BookingKind = 'vol' | 'train' | 'hebergement' | 'activite' | 'autre';
 
-export const BOOKING_KINDS: readonly { kind: BookingKind; label: string; glyph: string }[] = [
-  { kind: 'vol', label: 'Vol', glyph: '✈️' },
-  { kind: 'train', label: 'Train', glyph: '🚆' },
-  { kind: 'hebergement', label: 'Hébergement', glyph: '🛏️' },
-  { kind: 'activite', label: 'Activité', glyph: '🎟️' },
-  { kind: 'autre', label: 'Autre', glyph: '📌' },
+export const BOOKING_KINDS: readonly { kind: BookingKind; label: string; icon: 'plane' | 'train' | 'bed' | 'ticket' | 'pin' }[] = [
+  { kind: 'vol', label: 'Vol', icon: 'plane' },
+  { kind: 'train', label: 'Train', icon: 'train' },
+  { kind: 'hebergement', label: 'Hébergement', icon: 'bed' },
+  { kind: 'activite', label: 'Activité', icon: 'ticket' },
+  { kind: 'autre', label: 'Autre', icon: 'pin' },
 ];
 
 export interface Booking {
