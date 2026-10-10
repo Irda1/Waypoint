@@ -63,7 +63,7 @@ Les migrations de la base ne sont pas automatiques : elles se collent dans le SQ
 
 ## Travailler avec Claude Code
 
-Le dépôt contient sa configuration pour les sessions Claude Code : [`CLAUDE.md`](CLAUDE.md) (consignes du projet), un hook de démarrage qui installe les dépendances, et des skills dans `.claude/skills/` (migrations Supabase, build de l'APK, et le mode « ponytail » qui privilégie le plus petit changement qui marche).
+Le dépôt contient sa configuration pour les sessions Claude Code : [`CLAUDE.md`](CLAUDE.md) (consignes du projet), un hook de démarrage qui installe les dépendances, et des skills dans `.claude/skills/` (migrations Supabase, build de l'APK, mode « ponytail », revue, sécurité, `ui-ux-pro-max`, `taste-skill`, `redesign-skill` et les skills de génération d'images pour le design, `playwright-cli` pour piloter un navigateur et tester le site).
 
 ## Ancienne maquette (v0.9)
 
