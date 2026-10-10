@@ -12,7 +12,7 @@ const WebViewView = WebView as unknown as React.ComponentType<Record<string, unk
 export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick, theme = 'nuit', route }: GlobeProps) {
   const view = useRef<{ injectJavaScript: (script: string) => void } | null>(null);
   const html = useMemo(() => (mode === 'route' ? routeHtml() : globeHtml()), [mode]);
-  const before = `window.__GLOBE__=${JSON.stringify(route ? { mode, color, theme, route, fit: 'card' } : { mode, color, theme })}; true;`;
+  const before = `window.__GLOBE__=${JSON.stringify(route ? { mode, color, theme, route } : { mode, color, theme })}; true;`;
   const send = useCallback(() => {
     if (focus && /^[A-Z]{2}$/.test(focus)) view.current?.injectJavaScript(`window.__focus && window.__focus(${JSON.stringify(focus)}); true;`);
   }, [focus]);

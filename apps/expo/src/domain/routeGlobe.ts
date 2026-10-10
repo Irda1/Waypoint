@@ -4,8 +4,8 @@
 // La même page sert sur le web (public/route.html, dans un cadre) et sur mobile (WebView). Fichier pur : testable avec Node.
 // Réglages passés dans l'adresse (?color=FFB95A&theme=nuit|jour) ou dans window.__GLOBE__ (mobile).
 // Nuit : fond noir étoilé, halo de soleil dans le coin haut droit. Jour : fond sable, planète claire aux points gris-bleu.
-// Itinéraire d'un voyage (&route=lng,lat;lng,lat… et &fit=card) : la planète se centre et zoome sur les villes du voyage,
-// le tracé va de ville en ville ; autour du parcours, les terres sont plus finement pointillées.
+// Itinéraire d'un voyage (&route=lng,lat,Nom;…) : la caméra suit le point en gros plan de ville en ville, puis recule
+// pour montrer tout le trajet, reste quelques secondes et recommence. Autour du parcours, les terres sont plus finement pointillées.
 
 /** Couleur de fond de la page selon le thème (l'appli peint son bandeau de la même couleur). */
 export const ROUTE_BG = { nuit: '#000000', jour: '#F1E4CC' } as const;
@@ -53,8 +53,8 @@ canvas{display:block;width:100%;height:100%}
   var q = new URLSearchParams(location.search), G = window.__GLOBE__ || {};
   var COLOR = "#" + String(G.color || q.get("color") || "FFB95A").replace("#", "");
   var DAY = (G.theme || q.get("theme")) === "jour";
-  var CARD = (G.fit || q.get("fit")) === "card";
   var TRIP = String(G.route || q.get("route") || "").split(";").map(function (s) { var f = s.split(","), v = [Number(f[0]), Number(f[1])]; return f.length >= 2 && isFinite(v[0]) && isFinite(v[1]) && Math.abs(v[1]) <= 90 ? [v[0], v[1], (f[2] || "").slice(0, 40)] : null; }).filter(Boolean).slice(0, 30);
+  var TRIPV = TRIP.length > 0;
   var BG = DAY ? "${ROUTE_BG.jour}" : "${ROUTE_BG.nuit}";
   document.documentElement.style.setProperty("--bg", BG);
   if (!window.THREE) return;
@@ -73,13 +73,26 @@ canvas{display:block;width:100%;height:100%}
     renderer.setSize(w, h, false); camera.aspect = w / h;
     // Même calcul que routeFrame() côté appli (constantes partagées).
     var wide = w / h > ${F.wideRatio}, z = wide ? ${F.wideZ} : ${F.narrowZ}, halfW = Math.tan(18 * Math.PI / 180) * z * (w / h);
-    // Carte d'itinéraire : planète centrée, assez près pour que le parcours remplisse le cadre (le plus étroit des deux côtés).
-    if (CARD) z = Math.min(8.5, 2 + VIEW / (Math.tan(18 * Math.PI / 180) * Math.min(1, w / h)));
     camera.position.set(0, 0, z); camera.lookAt(0, 0, 0);
-    if (CARD) group.position.set(0, 0, 0);
-    else group.position.set(wide ? Math.min(halfW - ${F.wideMargin}, ${F.wideMaxX}) : ${F.narrowX}, wide ? 0 : ${F.narrowY}, 0);
+    group.position.set(wide ? Math.min(halfW - ${F.wideMargin}, ${F.wideMaxX}) : ${F.narrowX}, wide ? 0 : ${F.narrowY}, 0);
+    if (TRIPV) {
+      W0 = w; H0 = h; zCur = reduce ? zFor(VIEW) : (zCur || zFor(VIEWF)); place(zCur); z = zCur;
+      // Voile de la couleur du fond derrière le texte de l'écran : en bas sur téléphone, à gauche sur grand écran.
+      veil.style.background = "linear-gradient(" + (wide ? "to right" : "to top") + "," + BG + "f2 0%," + BG + "cc " + (wide ? "36%" : "30%") + "," + BG + "00 " + (wide ? "68%" : "62%") + ")";
+    }
     if (sun) { var hh = Math.tan(18 * Math.PI / 180) * (z + 30); sun.position.set(hh * (w / h) * 0.92, hh * 0.86, -30); }
     camera.updateProjectionMatrix(); draw();
+  }
+
+  // Itinéraire : distance de la caméra pour une demi-hauteur de vue donnée ; le point regardé se place à droite
+  // sur grand écran, dans le haut sur téléphone (le texte de l'écran garde sa place).
+  var zCur = 0, W0 = 1, H0 = 1, veil = document.createElement("div");
+  if (TRIPV) { veil.style.cssText = "position:absolute;inset:0;pointer-events:none"; document.body.appendChild(veil); }
+  function zFor(v) { return Math.min(8.5, 2 + v / (Math.tan(18 * Math.PI / 180) * Math.min(1, W0 / H0))); }
+  function place(z) {
+    camera.position.set(0, 0, z); camera.lookAt(0, 0, 0);
+    var hs = Math.tan(18 * Math.PI / 180) * (z - 2), wide = W0 / H0 > ${F.wideRatio};
+    group.position.set(wide ? 0.45 * hs * (W0 / H0) : 0, wide ? 0 : 0.42 * hs, 0);
   }
 
   function vec(lon, lat, r) { var phi = (90 - lat) * Math.PI / 180, th = (lon + 180) * Math.PI / 180; return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(th), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(th)); }
@@ -91,9 +104,11 @@ canvas{display:block;width:100%;height:100%}
   if (mid.lengthSq() < 1e-6) mid.set(0, 0, 1); mid.normalize();
   var SPAN = CITIES.reduce(function (m, c) { return Math.max(m, vec(c[0], c[1], 1).angleTo(mid)); }, 0);
   // Demi-hauteur de vue utile (en unités, planète de rayon 2) et taille relative des repères lumineux.
-  var VIEW = CARD ? Math.max(2 * Math.sin(Math.min(SPAN, 1.2)) * 2.2, 0.2) : 2, K = CARD ? Math.max(0.2, Math.min(1, VIEW / 1.8)) : 1;
+  // VIEW : vue d'ensemble du trajet ; VIEWF : gros plan qui suit le point.
+  var VIEW = TRIPV ? Math.max(2 * Math.sin(Math.min(SPAN, 1.2)) * 2.2, 0.2) : 2, VIEWF = TRIPV ? Math.max(0.2, Math.min(VIEW * 0.45, 1.2)) : 2;
+  var K = TRIPV ? Math.max(0.25, Math.min(1, VIEWF / 1.2)) : 1;
   // Terres plus finement pointillées autour d'un parcours régional (pas de 0,35° au lieu de 1,35°).
-  var FINE = CARD && SPAN < 0.35;
+  var FINE = TRIPV && SPAN < 0.35;
 
   // Nuit : ciel étoilé et halo de soleil discret dans le coin haut droit (placé au redimensionnement).
   var sun = null;
@@ -172,7 +187,7 @@ canvas{display:block;width:100%;height:100%}
   for (var c = 0; c < CITIES.length - 1; c++) {
     var a = vec(CITIES[c][0], CITIES[c][1], 1).normalize(), b = vec(CITIES[c + 1][0], CITIES[c + 1][1], 1).normalize();
     var ang = a.angleTo(b), lift = 0.08 + 0.32 * ang / Math.PI;
-    if (CARD) lift = Math.min(lift, 0.6 * ang);
+    if (TRIPV) lift = Math.min(lift, 0.6 * ang);
     stops.push(path.length);
     for (var i = 0; i <= PER; i++) {
       if (c > 0 && i === 0) continue;
@@ -195,10 +210,10 @@ canvas{display:block;width:100%;height:100%}
     var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), blending: DAY ? THREE.NormalBlending : THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     sp.scale.set(size, size, 1); return sp;
   }
-  var head = glow(0.34 * K, 1); group.add(head);
+  var head = glow(0.34 * K * (TRIPV ? 1.4 : 1), 1); group.add(head);
   var marks = CITIES.map(function (ct) { var m = glow(0.16 * K, 0.9); m.position.copy(vec(ct[0], ct[1], 2.015)); m.visible = false; group.add(m); return m; });
   // Noms des villes du voyage (carte d'itinéraire) : pastilles posées à côté de chaque étape, masquées si elles se chevauchent.
-  var labels = CARD ? CITIES.map(function (ct) {
+  var labels = TRIPV ? CITIES.map(function (ct) {
     if (!ct[2]) return null;
     var el = document.createElement("div"); el.className = "lab"; el.textContent = ct[2];
     el.style.background = DAY ? "rgba(255,253,248,.92)" : "rgba(16,19,21,.85)"; el.style.color = DAY ? "#0E2A35" : "#F4EFE6";
@@ -221,10 +236,10 @@ canvas{display:block;width:100%;height:100%}
 
   // Orientation qui amène un point face à la caméra (lacet puis tangage), avec un léger décalage pour garder du relief.
   // Carte d'itinéraire : la planète reste tournée vers le centre du parcours, sans décalage.
-  function aim(p) { if (CARD) p = mid; var rho = Math.sqrt(p.x * p.x + p.z * p.z); return { y: Math.atan2(-p.x, p.z) + (CARD ? 0 : 0.35), x: Math.atan2(p.y, rho) - (CARD ? 0 : 0.18) }; }
+  function aim(p) { var rho = Math.sqrt(p.x * p.x + p.z * p.z); return { y: Math.atan2(-p.x, p.z) + (TRIPV ? 0 : 0.35), x: Math.atan2(p.y, rho) - (TRIPV ? 0 : 0.18) }; }
   function wrap(d) { while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; }
 
-  var LEG = 2600, PAUSE = 450, END = CARD ? 4000 : 1800, FADE = 900, legs = CITIES.length - 1, cycle = legs * (LEG + PAUSE) + END + FADE, start = performance.now();
+  var LEG = 2600, PAUSE = 450, END = TRIPV ? 5500 : 1800, FADE = 900, legs = CITIES.length - 1, cycle = legs * (LEG + PAUSE) + END + FADE, start = performance.now();
   function setProgress(n, opacity) {
     var idx = Math.max(1, Math.min(path.length, Math.round(n)));
     lineGeo.setDrawRange(0, idx); lineMat.opacity = 0.95 * opacity;
@@ -234,13 +249,13 @@ canvas{display:block;width:100%;height:100%}
   }
 
   if (reduce) {
-    setProgress(path.length, 1); var r0 = aim(path[stops[Math.min(2, stops.length - 1)]]); group.rotation.set(r0.x, r0.y, 0); head.visible = false;
+    setProgress(path.length, 1); var r0 = aim(TRIPV ? mid : path[stops[Math.min(2, stops.length - 1)]]); group.rotation.set(r0.x, r0.y, 0); head.visible = false;
   } else {
     var r1 = aim(path[0]); group.rotation.set(r1.x, r1.y, 0);
   }
 
   // Taille des points en pixels : ~0,02 unité vue à la distance de la caméra (champ de 36°).
-  function draw() { dotMat.uniforms.scale.value = (FINE ? 0.012 : 0.034) * renderer.getPixelRatio() * window.innerHeight; renderer.render(scene, camera); if (labels && labels.length) placeLabels(); }
+  function draw() { dotMat.uniforms.scale.value = (FINE ? 0.009 : 0.034) * renderer.getPixelRatio() * window.innerHeight; renderer.render(scene, camera); if (labels && labels.length) placeLabels(); }
   var last = 0;
   function frame(now) {
     var dt = last ? Math.min(now - last, 100) : 16; last = now;
@@ -255,7 +270,10 @@ canvas{display:block;width:100%;height:100%}
         n = path.length;
         var ft = t - legs * (LEG + PAUSE) - END; if (ft > 0) op = 1 - ft / FADE;
       }
-      var p = setProgress(n, Math.max(0, op)), r = aim(p);
+      // Itinéraire : en fin de trajet, la caméra recule et se tourne vers le centre du parcours (vue d'ensemble).
+      var over = TRIPV && t >= legs * (LEG + PAUSE);
+      var p = setProgress(n, Math.max(0, op)), r = aim(over ? mid : p);
+      if (TRIPV) { zCur += (zFor(over ? VIEW : VIEWF) - zCur) * (1 - Math.exp(-dt / 700)); place(zCur); }
       // Suivi amorti, indépendant de la cadence d'affichage (≈ 0,4 s pour rattraper le point).
       var k = 1 - Math.exp(-dt / 400);
       group.rotation.y += wrap(r.y - group.rotation.y) * k;
