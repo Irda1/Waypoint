@@ -20,3 +20,29 @@ export function airportNear(lat: number, lng: number, maxKm: number = MAX_KM): s
   }
   return best;
 }
+
+/** Aéroport le plus proche d'une ville (à moins de `maxKm`), avec sa distance ; null s'il n'y en a pas. */
+function nearest(lat: number, lng: number, maxKm: number): { iata: string; km: number } | null {
+  let best: { iata: string; km: number } | null = null;
+  for (const [aLat, aLng, iata] of AIRPORTS) {
+    if (Math.abs(aLat - lat) > maxKm / 111 + 0.1) continue;
+    const d = km(lat, lng, aLat, aLng);
+    if (d < (best?.km ?? maxKm)) best = { iata, km: d };
+  }
+  return best;
+}
+
+/**
+ * Villes qui portent l'icône avion : chaque aéroport n'est attribué qu'à la ville affichée la plus proche
+ * (sinon toutes les petites villes autour d'une grande en héritaient).
+ */
+export function airportCities(cities: ReadonlyArray<{ id: number; lat: number; lng: number }>, maxKm: number = MAX_KM): Set<number> {
+  const owner = new Map<string, { id: number; km: number }>();
+  for (const c of cities) {
+    const a = nearest(c.lat, c.lng, maxKm);
+    if (!a) continue;
+    const cur = owner.get(a.iata);
+    if (!cur || a.km < cur.km) owner.set(a.iata, { id: c.id, km: a.km });
+  }
+  return new Set([...owner.values()].map((o) => o.id));
+}

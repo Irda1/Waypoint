@@ -11,7 +11,7 @@ import { fonts, space } from '../../theme/tokens';
 import { StepTitle } from './parts';
 import type { StepProps } from './parts';
 
-export type StepId = 'pays' | 'dates' | 'villes' | 'voyageurs' | 'interets' | 'budget' | 'propositions' | 'recap';
+export type StepId = 'pays' | 'dates' | 'villes' | 'voyageurs' | 'depart' | 'interets' | 'budget' | 'propositions' | 'recap';
 
 function Line({ label, value, onEdit }: { label: string; value: string; onEdit: () => void }) {
   const { colors } = useTheme();
@@ -43,6 +43,7 @@ export function StepRecap({ state, update, goTo }: StepProps<WizardState> & { go
         <Line label="Dates" value={state.start && state.end ? `${state.indicative ? 'Indicatives · ' : ''}${dateRange(state.start, state.end)} · ${days} j / ${nightCount(state)} nuits` : ''} onEdit={() => goTo('dates')} />
         <Line label="Villes" value={state.cities.length ? state.cities.map((c) => `${c.name} (${c.nights})`).join(' → ') : 'Je choisirai sur place'} onEdit={() => goTo('villes')} />
         <Line label="Voyageurs" value={`${party} · ${state.travelers} personne${state.travelers > 1 ? 's' : ''}`} onEdit={() => goTo('voyageurs')} />
+        <Line label="Départ" value={state.home ? state.home.name : 'Pas encore choisi'} onEdit={() => goTo('depart')} />
         <Line label="Envies" value={themes} onEdit={() => goTo('interets')} />
         <Line label="Programme" value={!state.cities.length ? 'À faire depuis le voyage' : state.program ? `Proposé jour par jour${state.excluded.length ? ` · ${state.excluded.length} lieu${state.excluded.length > 1 ? 'x' : ''} retiré${state.excluded.length > 1 ? 's' : ''}` : ''}` : 'Jours vides, à remplir moi-même'} onEdit={() => goTo('propositions')} />
         <Line label="Budget" value={total !== null ? `${level} · ${formatMoney(total, state.budget.currency)}` : ''} onEdit={() => goTo('budget')} />

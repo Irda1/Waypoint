@@ -11,7 +11,8 @@ import type { TripSummary, TrashedTrip } from '../src/data/trips';
 import { formatDay, tripStatusLabel } from '../src/lib/format';
 import { todayIso, tripStatus } from '../src/lib/dates';
 import { Globe } from '../src/features/globe/Globe';
-import { routeGlobeOnScreen } from '../src/domain/routeGlobe.ts';
+import { ROUTE_BG, routeGlobeOnScreen } from '../src/domain/routeGlobe.ts';
+import { COUNTRY_NAME } from '../src/domain/countries.ts';
 import { photoKeyFor } from '../src/lib/photoKey';
 import { photos } from '../src/theme/photos';
 import { fonts, palette, radius, space } from '../src/theme/tokens';
@@ -25,6 +26,8 @@ const ON_PHOTO = '#F4EFE6';
 const ON_PHOTO_SOFT = 'rgba(245, 245, 242, 0.82)';
 // Sable clair pour les petits titres posés sur photo (l'accent du thème clair est trop sombre ici).
 const ON_PHOTO_ACCENT = '#FFD08A';
+// Titre automatique des voyages « juste les lieux » (mode Simple) : remplacé par un badge sur la carte.
+const SIMPLE_PREFIX = 'Lieux · ';
 
 // Idées de destinations (photos d'ambiance déjà dans l'appli) ; d'autres villes suivront avec leurs photos.
 const IDEAS: { key: 'lisbonne' | 'porto' | 'alfama'; name: string; city: string; hint: string }[] = [
@@ -35,10 +38,13 @@ const IDEAS: { key: 'lisbonne' | 'porto' | 'alfama'; name: string; city: string;
 
 export default function Home() {
   const guard = useRequireAuth();
-  const { colors } = useTheme();
+  const { colors, mode } = useTheme();
   const { accent } = useAppearance();
-  // Fond de l'accueil toujours noir : on prend l'accent du thème Nuit, lisible sur le noir.
-  const heroAccent = palette('nuit', accent).accent.slice(1);
+  // Bandeau : planète sur noir étoilé (Nuit) ou sur sable clair (Jour), textes et tracé accordés au fond.
+  const heroAccent = (mode === 'jour' ? colors.accent : palette('nuit', accent).accent).slice(1);
+  const H = mode === 'jour'
+    ? { text: colors.text, soft: colors.text2, eyebrow: colors.accent, glassBg: colors.surface, glassLine: colors.lineStrong }
+    : { text: ON_PHOTO, soft: ON_PHOTO_SOFT, eyebrow: ON_PHOTO_ACCENT, glassBg: 'rgba(7, 9, 11, 0.45)', glassLine: 'rgba(245, 245, 242, 0.25)' };
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
@@ -103,30 +109,32 @@ export default function Home() {
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: zoom }]} />
       <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }} keyboardShouldPersistTaps="handled">
-        <View style={styles.hero} onLayout={(e) => setHeroSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
-          <Animated.View style={[styles.globe, globeMotion]} pointerEvents="none"><Globe mode="route" color={heroAccent} /></Animated.View>
+        <View style={[styles.hero, { backgroundColor: ROUTE_BG[mode] }]} onLayout={(e) => setHeroSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+          <Animated.View style={[styles.globe, globeMotion]} pointerEvents="none"><Globe mode="route" color={heroAccent} theme={mode} /></Animated.View>
           <Animated.View style={[styles.veil, { opacity: fadeOut }]}>
           <SafeAreaView edges={['top']} style={styles.heroInner}>
             <View style={styles.heroBar}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
                 <Image source={require('../assets/logo.png')} accessibilityLabel="Logo Waypoint" style={{ width: 32, height: 32, borderRadius: 8 }} />
-                <RNText style={styles.brand} accessibilityRole="header">Waypoint</RNText>
+                <RNText style={[styles.brand, { color: H.text }]} accessibilityRole="header">Waypoint</RNText>
               </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Paramètres" onPress={() => router.push('/settings')} style={styles.glass}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="settings" size={16} color={ON_PHOTO} /><RNText style={styles.glassLabel}>Paramètres</RNText></View>
+              <Pressable accessibilityRole="button" accessibilityLabel="Paramètres" onPress={() => router.push('/settings')} style={[styles.glass, { backgroundColor: H.glassBg, borderColor: H.glassLine }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="settings" size={16} color={H.text} /><RNText style={[styles.glassLabel, { color: H.text }]}>Paramètres</RNText></View>
               </Pressable>
             </View>
             <View style={styles.heroText}>
-              <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>{next ? `Plus que ${next.inDays} jour${next.inDays > 1 ? 's' : ''} avant ${next.title}` : 'Nouveau voyage'}</RNText>
-              <RNText style={styles.poster} accessibilityRole="header">Où part-on ?</RNText>
-              <RNText style={styles.lead}>Un pays, tes dates, tes envies. Waypoint te propose un programme jour par jour, avec la carte.</RNText>
+              <RNText style={[styles.eyebrow, { color: H.eyebrow }]}>{next ? `Plus que ${next.inDays} jour${next.inDays > 1 ? 's' : ''} avant ${next.title}` : 'Nouveau voyage'}</RNText>
+              <RNText style={[styles.poster, { color: H.text }]} accessibilityRole="header">Où part-on ?</RNText>
+              <RNText style={[styles.lead, { color: H.soft }]}>Un pays, tes dates, tes envies. Waypoint te propose un programme jour par jour, avec la carte.</RNText>
               <Button label="Démarrer un voyage" onPress={() => startTrip()} />
             </View>
           </SafeAreaView>
           </Animated.View>
         </View>
 
-        <Animated.View style={[styles.page, { opacity: fadeOut }]}>
+        {/* La page se pose sur le bandeau comme une feuille arrivée par-dessus la planète. */}
+        <Animated.View style={[styles.sheet, { backgroundColor: colors.bg, opacity: fadeOut }]}>
+        <View style={styles.page}>
           <ErrorNote message={error} />
           {savedAt ? <Text variant="muted">Hors connexion : voyages tels qu'ils étaient {savedLabel(savedAt)}.</Text> : null}
 
@@ -150,16 +158,24 @@ export default function Home() {
           ) : (
             <Columns>
               {trips.map((t) => (
-                <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={`Ouvrir ${t.title}`} onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
+                <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={`Ouvrir ${t.title}${t.cities?.length ? `, ${t.cities.join(', ')}` : ''}`} onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }], opacity: pressed ? 0.92 : 1 })}>
                   <ImageBackground source={t.cover ? { uri: t.cover.small } : photos[photoKeyFor(t.title)]} resizeMode="cover" style={styles.tripCard} imageStyle={{ borderRadius: radius.card }}>
                     <View style={styles.tripVeil} pointerEvents="none" />
-                    <View style={[styles.statusPill, { backgroundColor: colors.accent }]}>
-                      <RNText style={[styles.statusLabel, { color: colors.onAccent }]}>{tripStatusLabel(tripStatus(t.starts_on, t.ends_on, today))}</RNText>
-                    </View>
+                    {t.title.startsWith(SIMPLE_PREFIX) ? (
+                      <View style={[styles.statusPill, { backgroundColor: ON_PHOTO }]}>
+                        <RNText style={[styles.statusLabel, { color: '#0E2A35' }]}>Juste les lieux</RNText>
+                      </View>
+                    ) : (
+                      <View style={[styles.statusPill, { backgroundColor: colors.accent }]}>
+                        <RNText style={[styles.statusLabel, { color: colors.onAccent }]}>{tripStatusLabel(tripStatus(t.starts_on, t.ends_on, today))}</RNText>
+                      </View>
+                    )}
                     <View style={{ gap: 2 }}>
-                      <RNText style={styles.tripTitle} numberOfLines={2}>{t.title}</RNText>
-                      <RNText style={styles.tripDates}>{t.starts_on ? `${formatDay(t.starts_on)}${t.ends_on ? ` → ${formatDay(t.ends_on)}` : ''}` : 'Dates à définir'}</RNText>
+                      <RNText style={styles.tripEyebrow} numberOfLines={1}>
+                        {[t.cities?.length ? (t.country_code ? COUNTRY_NAME[t.country_code] : null) ?? t.title.replace(SIMPLE_PREFIX, '') : null, t.starts_on ? `${formatDay(t.starts_on)}${t.ends_on ? ` → ${formatDay(t.ends_on)}` : ''}` : t.title.startsWith(SIMPLE_PREFIX) ? null : 'Dates à définir'].filter(Boolean).join(' · ')}
+                      </RNText>
+                      <RNText style={styles.tripTitle} numberOfLines={2}>{t.cities?.length ? t.cities.slice(0, 2).join(' · ') + (t.cities.length > 2 ? ` +${t.cities.length - 2}` : '') : t.title.replace(SIMPLE_PREFIX, '')}</RNText>
                     </View>
                   </ImageBackground>
                 </Pressable>
@@ -192,6 +208,7 @@ export default function Home() {
             <Field label="Code d'invitation" value={joinCode} onChangeText={(t) => setJoinCode(t.trim())} placeholder="Ex. AB12CD34" autoCapitalize="characters" autoCorrect={false} />
             <Button label="Rejoindre" disabled={joinCode.length < 4} onPress={() => router.push({ pathname: '/join/[code]', params: { code: joinCode } })} />
           </Card>
+        </View>
         </Animated.View>
       </ScrollView>
     </View>
@@ -202,7 +219,7 @@ const styles = StyleSheet.create({
   hero: { minHeight: 500, width: '100%', backgroundColor: '#000', zIndex: 1 },
   veil: { width: '100%' },
   globe: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
-  heroInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xxl, minHeight: 500, width: '100%', maxWidth: 880, alignSelf: 'center' },
+  heroInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xxl + 28, minHeight: 500, width: '100%', maxWidth: 880, alignSelf: 'center' },
   heroBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingTop: space.sm },
   brand: { fontFamily: fonts.serif, fontSize: 22, color: ON_PHOTO },
   glass: { minHeight: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: 'rgba(7, 9, 11, 0.45)', borderWidth: 1, borderColor: 'rgba(245, 245, 242, 0.25)' },
@@ -219,5 +236,7 @@ const styles = StyleSheet.create({
   statusLabel: { fontFamily: fonts.sansSemi, fontSize: 12.5 },
   tripTitle: { fontFamily: fonts.serif, fontSize: 24, lineHeight: 29, color: ON_PHOTO },
   tripDates: { fontFamily: fonts.sans, fontSize: 14, color: ON_PHOTO_SOFT },
+  tripEyebrow: { fontFamily: fonts.sansSemi, fontSize: 12, letterSpacing: 0.8, textTransform: 'uppercase', color: ON_PHOTO_SOFT },
+  sheet: { marginTop: -28, borderTopLeftRadius: 28, borderTopRightRadius: 28, zIndex: 2, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: -6 }, elevation: 6 },
   page: { width: '100%', maxWidth: 880, alignSelf: 'center', padding: space.lg, paddingTop: space.xl, gap: space.lg },
 });

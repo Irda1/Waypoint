@@ -1,10 +1,11 @@
 import { WEB_BASE } from '../../lib/webBase';
 import React, { useCallback, useEffect, useRef } from 'react';
 import { GLOBE_COLOR } from './types';
+import { ROUTE_BG } from '../../domain/routeGlobe.ts';
 import type { GlobeProps } from './types';
 
 /** Globe 3D sur le web : page publique /globe.html dans un cadre, qui répond par messages. */
-export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick }: GlobeProps) {
+export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick, theme = 'nuit' }: GlobeProps) {
   const frame = useRef<HTMLIFrameElement | null>(null);
   const pick = useRef(onPick);
   pick.current = onPick;
@@ -27,7 +28,7 @@ export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick }: Globe
   }, []);
 
   return React.createElement('iframe', {
-    ref: frame, onLoad: send, src: mode === 'route' ? `${WEB_BASE}/route.html?color=${color}` : `${WEB_BASE}/globe.html?mode=${mode}&color=${color}`, title: 'Globe terrestre',
-    style: { border: 0, width: '100%', height: '100%', background: '#000', pointerEvents: mode === 'pick' ? 'auto' : 'none' },
+    ref: frame, onLoad: send, src: mode === 'route' ? `${WEB_BASE}/route.html?color=${color}&theme=${theme}` : `${WEB_BASE}/globe.html?mode=${mode}&color=${color}`, title: 'Globe terrestre',
+    style: { border: 0, width: '100%', height: '100%', background: mode === 'route' && theme === 'jour' ? ROUTE_BG.jour : '#000', pointerEvents: mode === 'pick' ? 'auto' : 'none' },
   });
 }

@@ -4,11 +4,13 @@
 <style>
 html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;overflow:hidden}
 .city{display:flex;align-items:center;gap:5px;cursor:pointer;transform:translate(0,0);white-space:nowrap}
-.dot{width:12px;height:12px;border-radius:50%;background:#fff;border:2px solid #000;box-shadow:0 0 0 1px rgba(255,255,255,.55);flex:none;display:flex;align-items:center;justify-content:center;font:700 11px system-ui,sans-serif;color:#04201a}
-.lab{color:#fff;font-size:12.5px;font-weight:600;text-shadow:0 1px 3px #000,0 0 8px #000}
-.city.air .dot{width:18px;height:18px;border-width:1.5px}
+.dot{width:11px;height:11px;border-radius:50%;background:#fff;border:2px solid rgba(0,0,0,.85);box-shadow:0 0 0 2px rgba(255,255,255,.35),0 1px 4px rgba(0,0,0,.6);flex:none;display:flex;align-items:center;justify-content:center;font:700 11px system-ui,sans-serif;color:#04201a}
+.lab{color:#fff;font-size:12.5px;font-weight:600;padding:2px 8px;border-radius:999px;background:rgba(6,8,10,.62);backdrop-filter:blur(2px);-webkit-backdrop-filter:blur(2px)}
+.air{display:none;font-size:10px;line-height:1;color:#fff;background:rgba(6,8,10,.62);border-radius:999px;padding:3px 5px;margin-left:-2px}
+.city.has-air .air{display:inline-block}
 .city.on .dot{width:24px;height:24px;background:var(--c);border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.6)}
-.city.on .lab{font-size:13.5px}
+.city.on .lab{font-size:13.5px;background:rgba(6,8,10,.8)}
+.city.on .air{display:none}
 .city.hide .lab{display:none}
 .rl{color:#fff;opacity:.45;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;pointer-events:none;white-space:nowrap;text-shadow:0 1px 4px #000}
 #back{position:fixed;left:10px;top:10px;padding:7px 12px;border-radius:999px;background:rgba(0,0,0,.65);border:1px solid rgba(255,255,255,.3);color:#fff;font-size:13px;font-weight:600;cursor:pointer;display:none;z-index:5}
@@ -74,7 +76,7 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   function build() {
     cities.forEach(function (c) {
       if (c.el) { c.mk.remove(); }
-      var el = document.createElement("div"); el.className = "city"; el.innerHTML = '<div class="dot"></div><div class="lab"></div>'; el.lastChild.textContent = c.n;
+      var el = document.createElement("div"); el.className = "city"; el.innerHTML = '<div class="dot"></div><div class="lab"></div><div class="air" title="Aéroport">\u2708\uFE0E</div>'; el.children[1].textContent = c.n;
       el.addEventListener("click", function (e) { e.stopPropagation(); if (pinching()) return; post({ type: "toggle", id: c.id }); });
       c.el = el; c.mk = new maplibregl.Marker({ element: el, anchor: "left", offset: [-6, 0] }).setLngLat([c.lng, c.lat]).addTo(map);
     });
@@ -90,9 +92,9 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
       if (selRegion >= 0 && !on && c.reg !== selRegion && c.r >= 3) vis = false;
       if (!vis) { c.el.style.display = "none"; return; }
       c.el.style.display = "flex"; c.el.classList.toggle("on", on);
-      c.el.firstChild.textContent = on ? String(selected[c.id]) : c.a ? "\u2708\uFE0E" : "";
-      c.el.classList.toggle("air", !!c.a && !on);
-      var p = map.project([c.lng, c.lat]), w = c.n.length * 7 + 22, box = [p.x - 6, p.y - 10, p.x - 6 + w, p.y + 10], hit = false;
+      c.el.firstChild.textContent = on ? String(selected[c.id]) : "";
+      c.el.classList.toggle("has-air", !!c.a && !on);
+      var p = map.project([c.lng, c.lat]), w = c.n.length * 7 + (c.a && !on ? 48 : 32), box = [p.x - 6, p.y - 10, p.x - 6 + w, p.y + 10], hit = false;
       for (var i = 0; i < boxes.length; i++) { var b = boxes[i]; if (box[0] < b[2] && box[2] > b[0] && box[1] < b[3] && box[3] > b[1]) { hit = true; break; } }
       c.el.classList.toggle("hide", hit && !on); if (!hit || on) boxes.push(box);
       c.el.style.zIndex = on ? 3 : hit ? 1 : 2;

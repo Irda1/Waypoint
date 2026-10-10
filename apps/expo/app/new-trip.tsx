@@ -5,6 +5,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useRequireAuth } from '../src/auth/useRequireAuth';
 import { Button, ErrorNote } from '../src/ui';
 import { createTripFromWizard } from '../src/data/trips';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { HOME_KEY, tripHomeKey } from '../src/features/trip/FlightsCard';
+import { StepDeparture } from '../src/features/wizard/StepDeparture';
 import { MAX_TRIP_DAYS, autoTitle, dayCount, missingSteps, newWizard } from '../src/domain/wizard.ts';
 import type { WizardState } from '../src/domain/wizard.ts';
 import { COUNTRY_NAME } from '../src/domain/countries.ts';
@@ -25,7 +28,7 @@ import { fonts, space } from '../src/theme/tokens';
 import { Icon } from '../src/ui/Icon';
 import { useTheme } from '../src/theme/useTheme';
 
-const ORDER: StepId[] = ['pays', 'dates', 'villes', 'voyageurs', 'interets', 'budget', 'propositions', 'recap'];
+const ORDER: StepId[] = ['pays', 'dates', 'villes', 'voyageurs', 'depart', 'interets', 'budget', 'propositions', 'recap'];
 
 /** Ce qu'il faut avoir choisi pour quitter une étape (null = on peut continuer). */
 function blocker(step: StepId, s: WizardState): string | null {
@@ -86,6 +89,12 @@ function CompleteWizard() {
     const res = await createTripFromWizard(state, categories.rootOf);
     setBusy(false);
     if (!res.id) { setError(res.error ?? 'Création impossible.'); return; }
+    // La ville de départ choisie dans l'assistant pré-remplit la carte Vols du voyage (gardée sur l'appareil).
+    if (state.home) {
+      const h = JSON.stringify(state.home);
+      void AsyncStorage.setItem(tripHomeKey(res.id), h).catch(() => {});
+      void AsyncStorage.setItem(HOME_KEY, h).catch(() => {});
+    }
     router.replace({ pathname: '/trip/[id]', params: { id: res.id } });
   }
 
@@ -113,6 +122,7 @@ function CompleteWizard() {
         {step === 'dates' ? <StepDates {...props} /> : null}
         {step === 'villes' ? <StepCities {...props} preferCity={preCity} /> : null}
         {step === 'voyageurs' ? <StepTravelers {...props} /> : null}
+        {step === 'depart' ? <StepDeparture {...props} /> : null}
         {step === 'interets' ? <StepInterests {...props} /> : null}
         {step === 'budget' ? <StepBudget {...props} /> : null}
         {step === 'propositions' ? <StepProposals {...props} /> : null}

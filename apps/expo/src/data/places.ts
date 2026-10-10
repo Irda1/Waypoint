@@ -1,5 +1,5 @@
 // Recherche de lieux dans la base collectée (lecture publique, voir la migration 0500) et ajout à un jour.
-import { airportNear } from '../domain/airports.ts';
+import { airportCities, airportNear } from '../domain/airports.ts';
 import { supabase } from '../lib/supabase';
 import { accentTolerantTerm, likeTerm } from '../lib/search';
 import type { Place } from '../domain/types.ts';
@@ -118,7 +118,8 @@ export async function listCountryCityPoints(country: string): Promise<{ points: 
   type R = { id: number; name: string; name_fr: string | null; lat: number; lng: number; population: number | null; featured_rank: number | null; is_capital: boolean };
   const rows = (data ?? []) as R[];
   const score = (r: R) => (r.featured_rank != null ? r.featured_rank : 1000) * 1e10 - (r.is_capital ? 5e9 : 0) - (r.population ?? 0);
-  const points = [...rows].sort((a, b) => score(a) - score(b)).map((r, i) => ({ id: r.id, name: r.name_fr ?? r.name, lat: r.lat, lng: r.lng, rank: i, airport: airportNear(r.lat, r.lng) !== null }));
+  const withAirport = airportCities(rows);
+  const points = [...rows].sort((a, b) => score(a) - score(b)).map((r, i) => ({ id: r.id, name: r.name_fr ?? r.name, lat: r.lat, lng: r.lng, rank: i, airport: withAirport.has(r.id) }));
   return { points, error: error?.message ?? null };
 }
 
@@ -131,6 +132,15 @@ export async function cityCollectionStatuses(cityIds: number[]): Promise<{ statu
 }
 
 export interface HomeCity { id: number; name: string; country_code: string; lat: number; lng: number }
+
+/** Coordonnées de quelques villes (par identifiant), dans l'ordre demandé. */
+export async function cityCoords(ids: number[]): Promise<Map<number, { lat: number; lng: number }>> {
+  const out = new Map<number, { lat: number; lng: number }>();
+  if (!ids.length) return out;
+  const { data } = await supabase.from('cities').select('id,lat,lng').in('id', ids);
+  for (const r of (data ?? []) as { id: number; lat: number; lng: number }[]) out.set(r.id, { lat: r.lat, lng: r.lng });
+  return out;
+}
 
 /** Villes dont le nom contient le texte, avec leurs coordonnées (choix de la ville de départ). */
 export async function searchHomeCities(text: string): Promise<HomeCity[]> {
