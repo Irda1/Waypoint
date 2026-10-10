@@ -40,6 +40,7 @@ import { photoKeyFor } from '../../src/lib/photoKey';
 import { checkNewDay, suggestNewDay, todayIso } from '../../src/lib/dates.ts';
 import { cityRuns } from '../../src/domain/dayruns.ts';
 import { pickSource } from '../../src/data/cityCover';
+import { useCityPhotos } from '../../src/data/cityPhoto';
 import { photos } from '../../src/theme/photos';
 import { PlusMenu } from '../../src/features/nav/PlusMenu';
 import type { PlusChoice } from '../../src/features/nav/PlusMenu';
@@ -113,6 +114,8 @@ export default function TripScreen() {
 
   const spots = useMemo(() => (data?.destinations ?? []).map((d) => ({ id: d.city_id, lat: d.lat, lng: d.lng })), [data?.destinations]);
   const weather = useForecasts(spots);
+  // Photos des villes sans photo en base (Wikipédia) ; en attendant, la photo du pays reste affichée.
+  const cityPhotos = useCityPhotos(data?.destinations ?? []);
 
   // Rappels du téléphone : reprogrammés à chaque changement du voyage (sans effet sur le web ni si les rappels sont coupés).
   useEffect(() => {
@@ -140,7 +143,8 @@ export default function TripScreen() {
   const { trip } = data;
   const destNames = destinationOptions.map((d) => d.name).join(' · ');
   // Grande photo : la capitale du pays, sinon la première ville, sinon l'image intégrée à l'appli.
-  const heroPick = pickSource(photos[photoKeyFor(`${data?.trip.title ?? ''} ${destNames}`)], data?.capitalCover, data?.destinations[0]?.cover);
+  const firstCity = data?.destinations[0];
+  const heroPick = pickSource(photos[photoKeyFor(`${data?.trip.title ?? ''} ${destNames}`)], data?.capitalCover, firstCity?.cover ?? (firstCity ? cityPhotos.get(firstCity.city_id) : null));
   const destDetail = data.destinations.map((d) => (d.nights > 0 ? `${d.name} (${d.nights} nuit${d.nights > 1 ? 's' : ''})` : d.name)).join(' → ');
 
   async function changeDestination(action: () => Promise<string | null>) {
@@ -193,7 +197,8 @@ export default function TripScreen() {
   const cityOfDay = (d: { city_id: number | null }) => d.city_id ?? data.destinations[0]?.city_id ?? null;
   const nameOfCity = (id: number | null) => data.destinations.find((x) => x.city_id === id)?.name ?? '';
   const selCity = selDay ? nameOfCity(cityOfDay(selDay)) : '';
-  const dayPick = pickSource(photos[photoKeyFor(`${selCity} ${trip.title}`)], data.destinations.find((x) => x.city_id === (selDay ? cityOfDay(selDay) : null))?.cover, data.capitalCover);
+  const selDest = data.destinations.find((x) => x.city_id === (selDay ? cityOfDay(selDay) : null));
+  const dayPick = pickSource(photos[photoKeyFor(`${selCity} ${trip.title}`)], selDest?.cover ?? (selDest ? cityPhotos.get(selDest.city_id) : null), data.capitalCover);
   const runs = cityRuns(data.days.map(cityOfDay));
   const activitiesLine = data.budgetLines.find((l) => l.poste === 'activites');
   const dailyActivityBudget = activitiesLine && data.days.length ? Number(activitiesLine.amount) / data.days.length : null;
@@ -251,7 +256,7 @@ export default function TripScreen() {
                 {data.days.map((d, i) => {
                   const dest = data.destinations.find((x) => x.city_id === d.city_id);
                   const city = dest?.name ?? destinationOptions[0]?.name ?? '';
-                  const tile = pickSource(photos[photoKeyFor(`${city} ${trip.title}`)], dest?.cover, data.capitalCover);
+                  const tile = pickSource(photos[photoKeyFor(`${city} ${trip.title}`)], dest?.cover ?? (dest ? cityPhotos.get(dest.city_id) : null), data.capitalCover);
                   return (
                     <Pressable key={d.id} accessibilityRole="button" accessibilityLabel={`Ouvrir le jour ${i + 1}`} onPress={() => { setChosenDay(i); setTab('jour'); }}>
                       <ImageBackground source={tile.cover ? { uri: tile.cover.small } : tile.source} resizeMode="cover" style={styles.dayTile} imageStyle={{ borderRadius: radius.card }}>

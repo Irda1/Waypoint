@@ -6,7 +6,7 @@ import { categoryColors, fonts, radius, space } from '../../theme/tokens';
 import { formatDay, isTime } from '../../lib/format';
 import { formatTime, resolveOverlaps, scheduleDay, weekdayOf } from '../../domain/planning.ts';
 import { checkOpening } from '../../domain/openingHours.ts';
-import { organizeTimes } from '../../domain/itinerary.ts';
+import { isArrivalStep, organizeTimes } from '../../domain/itinerary.ts';
 import { applyTimes } from '../../data/itinerary';
 import { amountDue, paymentState, posteForCategory } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
@@ -310,6 +310,10 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                       </View>
                     </View>
                   ) : null}
+                  {/* L'arrivée dans le pays ou la ville reste dans la journée : on peut seulement changer son heure. */}
+                  {isArrivalStep(s.item) ? (
+                    <Text variant="muted" style={{ fontSize: 12.5 }}>Étape fixe : touche l'heure pour la changer.</Text>
+                  ) : (
                   <View style={{ flexDirection: 'row', gap: space.lg, alignItems: 'center' }}>
                     <Pressable
                       accessibilityRole="button"
@@ -321,6 +325,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                       <RNText style={{ fontFamily: fonts.sansMedium, fontSize: 13, color: colors.danger, opacity: 0.85 }}>Retirer</RNText>
                     </Pressable>
                   </View>
+                  )}
                 </View>
                 {state ? (
                   <Pressable accessibilityRole="switch" accessibilityState={{ checked: state === 'paid' }} accessibilityLabel={state === 'paid' ? `${name} : payé (toucher pour annuler)` : `Marquer ${name} comme payé`} hitSlop={10}

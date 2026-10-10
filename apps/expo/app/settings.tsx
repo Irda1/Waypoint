@@ -18,7 +18,7 @@ import { DEFAULT_PREFS, MINUTES_CHOICES } from '../src/domain/reminders.ts';
 import type { NotifPrefs } from '../src/domain/reminders.ts';
 
 const MODE_LABELS: Record<ModePref, string> = { auto: 'Auto', nuit: 'Nuit', jour: 'Jour' };
-const ICON_LABELS: Record<IconStyle, string> = { couleur: 'Couleur', trait: 'Trait', plein: 'Plein' };
+const ICON_LABELS: Record<IconStyle, string> = { couleur: 'Émojis', trait: 'Trait', plein: 'Plein' };
 const ACCENT_LABELS: Record<AccentName, string> = { soleil: 'Soleil', turquoise: 'Turquoise', corail: 'Corail', lavande: 'Lavande' };
 
 export default function Settings() {
@@ -103,7 +103,7 @@ export default function Settings() {
         <View style={{ flexDirection: 'row', gap: space.lg, alignItems: 'center' }}>
           {(['map', 'day', 'budget', 'friends', 'culture', 'gastronomie'] as const).map((g) => <Icon key={g} name={g} size={26} />)}
         </View>
-        <Text variant="muted">Couleur : contour à la couleur d'accent. Trait : contour de la couleur du texte. Plein : silhouette pleine.</Text>
+        <Text variant="muted">Émojis : les icônes colorées du téléphone. Trait et Plein : icônes dessinées, à la couleur d'accent, en contour ou pleines.</Text>
       </Card>
 
       {remindersSupported ? (
