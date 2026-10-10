@@ -24,10 +24,11 @@ canvas{display:block;width:100%;height:100%}
   // Cadrage : sur téléphone la planète occupe le haut du bandeau (le texte de l'accueil est en bas) ;
   // sur grand écran elle se place à droite, le texte reste à gauche.
   function resize() {
-    var w = window.innerWidth, h = window.innerHeight, wide = w / h > 1.1;
+    var w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h, false); camera.aspect = w / h;
-    camera.position.set(0, 0, wide ? 10 : 12.5); camera.lookAt(0, 0, 0);
-    var halfW = Math.tan(18 * Math.PI / 180) * camera.position.z * camera.aspect;
+    // Même calcul que routeFrame() côté appli (constantes partagées).
+    var wide = w / h > 1.1, z = wide ? 10 : 12.5, halfW = Math.tan(18 * Math.PI / 180) * z * (w / h);
+    camera.position.set(0, 0, z); camera.lookAt(0, 0, 0);
     group.position.set(wide ? Math.min(halfW - 2.4, 4.2) : 0.7, wide ? 0 : 1.55, 0);
     camera.updateProjectionMatrix(); draw();
   }

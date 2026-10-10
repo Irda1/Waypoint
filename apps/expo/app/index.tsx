@@ -1,7 +1,7 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Image, ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Easing, Image, ImageBackground, Platform, Pressable, ScrollView, StyleSheet, Text as RNText, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 import { useRequireAuth } from '../src/auth/useRequireAuth';
 import { Button, Card, Columns, ErrorNote, Field, Text } from '../src/ui';
 import { savedLabel } from '../src/domain/offlineSnapshot.ts';
@@ -11,6 +11,7 @@ import type { TripSummary, TrashedTrip } from '../src/data/trips';
 import { formatDay, tripStatusLabel } from '../src/lib/format';
 import { todayIso, tripStatus } from '../src/lib/dates';
 import { Globe } from '../src/features/globe/Globe';
+import { routeGlobeOnScreen } from '../src/domain/routeGlobe.ts';
 import { photoKeyFor } from '../src/lib/photoKey';
 import { photos } from '../src/theme/photos';
 import { fonts, palette, radius, space } from '../src/theme/tokens';
@@ -62,7 +63,35 @@ export default function Home() {
   }, []);
   useEffect(() => { if (!guard) void refresh(); }, [guard, refresh]);
 
+  // Transition « Démarrer un voyage » : l'accueil s'efface en fondu pendant que la planète grossit jusqu'au centre
+  // de l'écran ; l'écran suivant s'ouvre en fondu sur la planète 3D. Rien de tout cela si le téléphone réduit les animations.
+  const win = useWindowDimensions();
+  const [heroSize, setHeroSize] = useState({ w: 0, h: 0 });
+  const zoom = useRef(new Animated.Value(0)).current;
+  const leaving = useRef(false);
+  useFocusEffect(useCallback(() => { leaving.current = false; zoom.setValue(0); }, [zoom]));
+  const startTrip = useCallback((params?: Record<string, string>) => {
+    if (leaving.current) return;
+    leaving.current = true;
+    const go = () => router.push(params ? { pathname: '/new-trip', params } : '/new-trip');
+    void AccessibilityInfo.isReduceMotionEnabled().catch(() => false).then((reduce) => {
+      if (reduce || !heroSize.h) { go(); return; }
+      Animated.timing(zoom, { toValue: 1, duration: 850, easing: Easing.inOut(Easing.cubic), useNativeDriver: Platform.OS !== 'web' }).start(go);
+    });
+  }, [zoom, heroSize.h]);
+
   if (guard) return guard;
+
+  const g = heroSize.h ? routeGlobeOnScreen(heroSize.w, heroSize.h) : { dx: 0, dy: 0, radius: 1 };
+  const scale = Math.min(5, Math.max(1.4, (0.44 * Math.min(win.width, win.height)) / g.radius));
+  const fadeOut = zoom.interpolate({ inputRange: [0, 0.45], outputRange: [1, 0], extrapolate: 'clamp' });
+  const globeMotion = {
+    transform: [
+      { translateX: zoom.interpolate({ inputRange: [0, 1], outputRange: [0, -scale * g.dx] }) },
+      { translateY: zoom.interpolate({ inputRange: [0, 1], outputRange: [0, -scale * g.dy + (win.height - heroSize.h) / 2] }) },
+      { scale: zoom.interpolate({ inputRange: [0, 1], outputRange: [1, scale] }) },
+    ],
+  };
 
   // Prochain départ : le voyage à venir le plus proche.
   const next = (trips ?? [])
@@ -72,10 +101,11 @@ export default function Home() {
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#000', opacity: zoom }]} />
       <ScrollView contentContainerStyle={{ paddingBottom: space.xxl }} keyboardShouldPersistTaps="handled">
-        <View style={styles.hero}>
-          <View style={styles.globe} pointerEvents="none"><Globe mode="route" color={heroAccent} /></View>
-          <View style={styles.veil}>
+        <View style={styles.hero} onLayout={(e) => setHeroSize({ w: e.nativeEvent.layout.width, h: e.nativeEvent.layout.height })}>
+          <Animated.View style={[styles.globe, globeMotion]} pointerEvents="none"><Globe mode="route" color={heroAccent} /></Animated.View>
+          <Animated.View style={[styles.veil, { opacity: fadeOut }]}>
           <SafeAreaView edges={['top']} style={styles.heroInner}>
             <View style={styles.heroBar}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
@@ -90,20 +120,20 @@ export default function Home() {
               <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>{next ? `Plus que ${next.inDays} jour${next.inDays > 1 ? 's' : ''} avant ${next.title}` : 'Nouveau voyage'}</RNText>
               <RNText style={styles.poster} accessibilityRole="header">Où part-on ?</RNText>
               <RNText style={styles.lead}>Un pays, tes dates, tes envies. Waypoint te propose un programme jour par jour, avec la carte.</RNText>
-              <Button label="Démarrer un voyage" onPress={() => router.push('/new-trip')} />
+              <Button label="Démarrer un voyage" onPress={() => startTrip()} />
             </View>
           </SafeAreaView>
-          </View>
+          </Animated.View>
         </View>
 
-        <View style={styles.page}>
+        <Animated.View style={[styles.page, { opacity: fadeOut }]}>
           <ErrorNote message={error} />
           {savedAt ? <Text variant="muted">Hors connexion : voyages tels qu'ils étaient {savedLabel(savedAt)}.</Text> : null}
 
           <Text variant="label">Envie de…</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
             {IDEAS.map((c) => (
-              <Pressable key={c.key} accessibilityRole="button" accessibilityLabel={`Partir à ${c.name}`} onPress={() => router.push({ pathname: '/new-trip', params: { country: 'PT', city: c.city } })}
+              <Pressable key={c.key} accessibilityRole="button" accessibilityLabel={`Partir à ${c.name}`} onPress={() => startTrip({ country: 'PT', city: c.city })}
                 style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.97 : 1 }] })}>
                 <ImageBackground source={photos[c.key]} resizeMode="cover" style={styles.idea} imageStyle={{ borderRadius: radius.card }}>
                   <View style={styles.tripVeil} pointerEvents="none" />
@@ -162,14 +192,14 @@ export default function Home() {
             <Field label="Code d'invitation" value={joinCode} onChangeText={(t) => setJoinCode(t.trim())} placeholder="Ex. AB12CD34" autoCapitalize="characters" autoCorrect={false} />
             <Button label="Rejoindre" disabled={joinCode.length < 4} onPress={() => router.push({ pathname: '/join/[code]', params: { code: joinCode } })} />
           </Card>
-        </View>
+        </Animated.View>
       </ScrollView>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  hero: { minHeight: 500, width: '100%', overflow: 'hidden', backgroundColor: '#000' },
+  hero: { minHeight: 500, width: '100%', backgroundColor: '#000', zIndex: 1 },
   veil: { width: '100%' },
   globe: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   heroInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xxl, minHeight: 500, width: '100%', maxWidth: 880, alignSelf: 'center' },

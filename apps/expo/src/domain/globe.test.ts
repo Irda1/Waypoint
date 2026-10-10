@@ -29,3 +29,11 @@ test('public/route.html est à jour avec le générateur et son script est valid
   const scripts = [...routeHtml().matchAll(/<script>([\s\S]*?)<\/script>/g)];
   assert.doesNotThrow(() => new Function(scripts[scripts.length - 1][1]));
 });
+
+test('cadrage de la planète animée : en haut sur téléphone, à droite sur grand écran', async () => {
+  const { routeGlobeOnScreen } = await import('./routeGlobe.ts');
+  const phone = routeGlobeOnScreen(390, 500);
+  assert.ok(phone.dy < 0 && phone.dx > 0 && phone.radius > 60 && phone.radius < 200);
+  const desk = routeGlobeOnScreen(1280, 500);
+  assert.ok(desk.dx > 300 && desk.dy === 0);
+});

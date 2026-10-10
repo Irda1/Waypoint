@@ -1,16 +1,17 @@
 import React, { useState } from 'react';
 import { Redirect, useLocalSearchParams } from 'expo-router';
-import { ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../src/auth/AuthProvider';
 import { Button, Card, ErrorNote, Field, Text } from '../src/ui';
 import { useBreakpoint } from '../src/ui/useBreakpoint';
+import { Globe } from '../src/features/globe/Globe';
+import { useAppearance } from '../src/theme/store';
 import { isConfigured } from '../src/lib/env';
-import { fonts, space } from '../src/theme/tokens';
+import { fonts, palette, space } from '../src/theme/tokens';
 import { useTheme } from '../src/theme/useTheme';
 
-// Photo d'ambiance de l'accueil : la connexion est la première image de Waypoint, elle doit donner envie de partir.
-const horizon = require('../assets/photos/horizon.jpg');
+// Fond de la connexion : la planète en points et son tracé de voyage (même animation que l'accueil), sur noir.
 const ON_PHOTO = '#F4EFE6';
 const ON_PHOTO_SOFT = 'rgba(245, 245, 242, 0.84)';
 const ON_PHOTO_ACCENT = '#FFD08A';
@@ -25,6 +26,7 @@ export default function SignIn() {
   const { session, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
   const { next } = useLocalSearchParams<{ next?: string }>();
   const { colors } = useTheme();
+  const { accent } = useAppearance();
   const { breakpoint } = useBreakpoint();
   const wide = breakpoint === 'desktop';
   const [mode, setMode] = useState<'in' | 'up'>('in');
@@ -70,8 +72,8 @@ export default function SignIn() {
   );
 
   const hero = (
-    <ImageBackground source={horizon} resizeMode="cover" style={wide ? styles.heroWide : styles.hero}>
-      <View style={styles.veil} pointerEvents="none" />
+    <View style={wide ? styles.heroWide : styles.hero}>
+      <View style={StyleSheet.absoluteFill} pointerEvents="none"><Globe mode="route" color={palette('nuit', accent).accent.slice(1)} /></View>
       <SafeAreaView edges={['top']} style={styles.heroInner}>
         <RNText style={styles.brand} accessibilityRole="header">Waypoint</RNText>
         <View style={{ gap: space.sm }}>
@@ -80,7 +82,7 @@ export default function SignIn() {
           <RNText style={styles.lead}>Programme jour par jour, carte, budget partagé. Même sans connexion.</RNText>
         </View>
       </SafeAreaView>
-    </ImageBackground>
+    </View>
   );
 
   const form = (
@@ -93,8 +95,8 @@ export default function SignIn() {
       ) : null}
 
       <View style={{ gap: space.xs }}>
-        <Text variant="title" style={{ fontSize: 28, lineHeight: 34 }}>{mode === 'in' ? 'Bon retour' : 'Créer un compte'}</Text>
-        <Text variant="muted">{mode === 'in' ? 'Connecte-toi pour retrouver tes voyages.' : 'Gratuit. Tes voyages restent privés, partagés seulement avec qui tu invites.'}</Text>
+        <Text variant="title" style={{ fontSize: 28, lineHeight: 34 }}>{mode === 'in' ? 'Connexion' : 'Créer un compte'}</Text>
+        <Text variant="muted">{mode === 'in' ? 'Connecte-toi pour retrouver tes voyages. Première visite ? Crée ton compte en bas.' : 'Gratuit. Tes voyages restent privés, partagés seulement avec qui tu invites.'}</Text>
       </View>
 
       <View style={{ gap: space.md }}>
@@ -142,9 +144,8 @@ export default function SignIn() {
 }
 
 const styles = StyleSheet.create({
-  hero: { minHeight: 340, width: '100%' },
-  heroWide: { width: '100%', height: '100%', overflow: 'hidden' },
-  veil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(7, 9, 11, 0.38)' },
+  hero: { minHeight: 420, width: '100%', backgroundColor: '#000' },
+  heroWide: { width: '100%', height: '100%', overflow: 'hidden', backgroundColor: '#000' },
   heroInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.xl, paddingTop: space.lg, paddingBottom: space.xxl + space.lg, gap: space.xxl },
   brand: { fontFamily: fonts.serif, fontSize: 22, color: ON_PHOTO },
   eyebrow: { fontFamily: fonts.sansSemi, fontSize: 11.5, letterSpacing: 1.6, textTransform: 'uppercase' },

@@ -14,7 +14,10 @@ export default function RootLayout() {
   return (
     <AuthProvider>
       <StatusBar style={mode === 'nuit' ? 'light' : 'dark'} />
-      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }} />
+      <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
+        {/* Nouveau voyage : s'ouvre en fondu, à la suite du zoom sur la planète de l'accueil. */}
+        <Stack.Screen name="new-trip" options={{ animation: 'fade', contentStyle: { backgroundColor: '#000' } }} />
+      </Stack>
     </AuthProvider>
   );
 }

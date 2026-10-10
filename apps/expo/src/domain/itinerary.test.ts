@@ -129,3 +129,11 @@ test('ranger les horaires : enchaîne les étapes sans heure, garde celles qui e
 test('ranger les horaires : aucune étape sans heure, rien à modifier', () => {
   assert.deepEqual(organizeTimes([{ id: 'x', place: null, root: null, startTime: '10:00', durationMin: 60, position: 1 }]), []);
 });
+
+test('les étapes d’arrivée sont reconnues (on ne peut pas les retirer)', async () => {
+  const { isArrivalStep } = await import('./itinerary.ts');
+  assert.equal(isArrivalStep({ place_id: null, title: 'Arrivée et installation' }), true);
+  assert.equal(isArrivalStep({ place_id: null, title: 'Arrivée dans la ville' }), true);
+  assert.equal(isArrivalStep({ place_id: null, title: 'Déjeuner' }), false);
+  assert.equal(isArrivalStep({ place_id: 12, title: 'Arrivée dans la ville' }), false);
+});

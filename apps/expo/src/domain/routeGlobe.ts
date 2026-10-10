@@ -4,6 +4,27 @@
 // La même page sert sur le web (public/route.html, dans un cadre) et sur mobile (WebView). Fichier pur : testable avec Node.
 // Réglages passés dans l'adresse (?color=FFB95A) ou dans window.__GLOBE__ (mobile).
 
+const FOV_HALF_TAN = Math.tan(18 * Math.PI / 180);
+
+/**
+ * Cadrage de la planète (rayon 2) : distance de la caméra et position du centre, selon la taille du cadre.
+ * Téléphone (cadre étroit) : planète en haut, légèrement à droite ; grand écran : planète à droite.
+ */
+const F = { wideRatio: 1.1, narrowZ: 12.5, narrowX: 0.7, narrowY: 1.55, wideZ: 10, wideMargin: 2.4, wideMaxX: 4.2 } as const;
+export function routeFrame(w: number, h: number): { z: number; x: number; y: number } {
+  const wide = w / h > F.wideRatio;
+  const z = wide ? F.wideZ : F.narrowZ;
+  const halfW = FOV_HALF_TAN * z * (w / h);
+  return { z, x: wide ? Math.min(halfW - F.wideMargin, F.wideMaxX) : F.narrowX, y: wide ? 0 : F.narrowY };
+}
+
+/** Où se trouve la planète dans le cadre, en pixels : centre (décalage depuis le milieu du cadre, y vers le bas) et rayon. */
+export function routeGlobeOnScreen(w: number, h: number): { dx: number; dy: number; radius: number } {
+  const f = routeFrame(w, h);
+  const px = (h / 2) / (FOV_HALF_TAN * f.z);
+  return { dx: f.x * px, dy: -f.y * px, radius: 2 * px };
+}
+
 export function routeHtml(): string {
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Waypoint</title>
@@ -31,11 +52,12 @@ canvas{display:block;width:100%;height:100%}
   // Cadrage : sur téléphone la planète occupe le haut du bandeau (le texte de l'accueil est en bas) ;
   // sur grand écran elle se place à droite, le texte reste à gauche.
   function resize() {
-    var w = window.innerWidth, h = window.innerHeight, wide = w / h > 1.1;
+    var w = window.innerWidth, h = window.innerHeight;
     renderer.setSize(w, h, false); camera.aspect = w / h;
-    camera.position.set(0, 0, wide ? 10 : 12.5); camera.lookAt(0, 0, 0);
-    var halfW = Math.tan(18 * Math.PI / 180) * camera.position.z * camera.aspect;
-    group.position.set(wide ? Math.min(halfW - 2.4, 4.2) : 0.7, wide ? 0 : 1.55, 0);
+    // Même calcul que routeFrame() côté appli (constantes partagées).
+    var wide = w / h > ${F.wideRatio}, z = wide ? ${F.wideZ} : ${F.narrowZ}, halfW = Math.tan(18 * Math.PI / 180) * z * (w / h);
+    camera.position.set(0, 0, z); camera.lookAt(0, 0, 0);
+    group.position.set(wide ? Math.min(halfW - ${F.wideMargin}, ${F.wideMaxX}) : ${F.narrowX}, wide ? 0 : ${F.narrowY}, 0);
     camera.updateProjectionMatrix(); draw();
   }
 

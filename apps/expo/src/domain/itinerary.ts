@@ -18,6 +18,11 @@ export interface PlanDay { date: string; cityId: number | null }
 
 export type SlotKind = 'visit' | 'lunch' | 'dinner' | 'arrival';
 
+/** Étapes d'arrivée posées par le programme automatique : on peut changer leur heure, pas les retirer. */
+export const ARRIVAL_TITLES = ['Arrivée et installation', 'Arrivée dans la ville'] as const;
+export const isArrivalStep = (item: { place_id: number | null; title: string | null }): boolean =>
+  item.place_id == null && (ARRIVAL_TITLES as readonly string[]).includes(item.title ?? '');
+
 export interface PlannedItem {
   kind: SlotKind;
   /** Lieu de la base, ou null pour une étape libre (« Déjeuner », « Arrivée »). */
@@ -120,7 +125,7 @@ export function buildPlan(days: PlanDay[], candidates: Candidate[], opts: PlanOp
     if (!sights.length && !foods.length) return { date: day.date, cityId, items, empty: true, transfer };
 
     let cursor = transfer ? ARRIVAL : DAY_START;
-    if (transfer) items.push({ kind: 'arrival', place: null, title: index === 0 ? 'Arrivée et installation' : 'Arrivée dans la ville', root: null, startMin: ARRIVAL - 30, durationMin: 30, badges: [] });
+    if (transfer) items.push({ kind: 'arrival', place: null, title: index === 0 ? ARRIVAL_TITLES[0] : ARRIVAL_TITLES[1], root: null, startMin: ARRIVAL - 30, durationMin: 30, badges: [] });
     const limit = opts.maxVisits ?? 3;
     const maxVisits = transfer ? Math.min(limit, 2) : limit;
     let budgetLeft = opts.activityBudgetPerDay ?? Infinity;
