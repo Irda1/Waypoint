@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScrollView, View } from 'react-native';
-import { Button, Card, Chip, ErrorNote, Field, Text } from '../../ui';
+import { Button, Chip, ErrorNote, Field, FoldCard, Text } from '../../ui';
 import { space } from '../../theme/tokens';
 import { parseAmount } from '../../lib/format';
 import { POSTES } from '../../domain/types.ts';
@@ -22,6 +22,7 @@ export function AddExpenseCard({ data, userId, onChanged }: { data: TripData; us
   const [poste, setPoste] = useState<Poste>('repas');
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [open, setOpen] = useState(false);
 
   async function submit() {
     const value = parseAmount(amount);
@@ -31,12 +32,11 @@ export function AddExpenseCard({ data, userId, onChanged }: { data: TripData; us
     const err = await addExpense({ tripId, label, poste, amount: value, currency, paidBy: payer, itemId: linked });
     setBusy(false);
     setError(err);
-    if (!err) { setLabel(''); setAmount(''); setLinked(null); onChanged(); }
+    if (!err) { setLabel(''); setAmount(''); setLinked(null); setOpen(false); onChanged(); }
   }
 
   return (
-    <Card>
-      <Text variant="heading">Ajouter une dépense</Text>
+    <FoldCard title="Ajouter une dépense" open={open} onToggle={() => setOpen(!open)}>
       <Text variant="muted">Partagée à parts égales entre les membres.</Text>
       <Field label="Libellé" value={label} onChangeText={setLabel} placeholder="Train Lisbonne → Porto" />
       <Field label={`Montant (${currency})`} value={amount} onChangeText={setAmount} placeholder="75" keyboardType="decimal-pad" />
@@ -62,6 +62,6 @@ export function AddExpenseCard({ data, userId, onChanged }: { data: TripData; us
       ) : null}
       <ErrorNote message={error} />
       <Button label="Enregistrer" onPress={submit} loading={busy} />
-    </Card>
+    </FoldCard>
   );
 }

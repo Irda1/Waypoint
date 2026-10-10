@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { Pressable, View } from 'react-native';
-import { Button, Card, Chip, ErrorNote, Field, Text } from '../../ui';
+import { Button, Card, Chip, ChevronBadge, ErrorNote, Field, Text } from '../../ui';
+import { Icon } from '../../ui/Icon';
+import type { IconName } from '../../ui/Icon';
 import { setBudgetLine } from '../../data/trips';
 import { fonts, radius, space } from '../../theme/tokens';
 import { useTheme } from '../../theme/useTheme';
@@ -8,11 +10,12 @@ import { formatMoney } from '../../lib/format';
 import { shortDate, todayIso, diffDays } from '../../lib/dates.ts';
 import { useLocalMoney } from '../../data/rates';
 import { convert, formatApprox } from '../../domain/currency.ts';
-import { budgetSummary, posteDetail, savingSuggestions, share } from '../../domain/budget.ts';
+import { budgetSummary, posteDetail, posteShares, savingSuggestions, share } from '../../domain/budget.ts';
 import { POSTES } from '../../domain/types.ts';
 import type { Poste } from '../../domain/types.ts';
 import type { TripData } from '../../data/useTrip';
 
+const ICONE: Record<Poste, IconName> = { hebergement: 'bed', transports: 'train', repas: 'gastronomie', activites: 'ticket', shopping: 'shopping' };
 const NOMS: Record<Poste, string> = { hebergement: 'Hébergement', transports: 'Transports', repas: 'Repas', activites: 'Activités', shopping: 'Shopping' };
 
 export function BudgetCard({ data, onChanged, activitiesPanel }: { data: TripData; onChanged?: () => void; activitiesPanel?: React.ReactNode }) {
@@ -29,6 +32,7 @@ export function BudgetCard({ data, onChanged, activitiesPanel }: { data: TripDat
   const summary = budgetSummary({ expenses, items, places, envelopes, travelers: Math.max(1, active.length) });
   const travelers = Math.max(1, active.length);
   const savings = savingSuggestions({ expenses, items, places, envelopes, travelers });
+  const pct = posteShares(summary);
   const paidAll = POSTES.reduce((n, p) => n + summary[p].paid, 0);
   const forecastAll = POSTES.reduce((n, p) => n + summary[p].forecast, 0);
   const envelopeAll = POSTES.reduce((n, p) => n + summary[p].envelope, 0) || Number(trip.budget_total ?? 0);
@@ -59,7 +63,7 @@ export function BudgetCard({ data, onChanged, activitiesPanel }: { data: TripDat
       ) : null}
       <View style={{ gap: space.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm, flexWrap: 'wrap' }}>
-          <Text variant="title" style={{ fontVariant: ['tabular-nums'] }}>{fm(spentAll)}</Text>
+          <Text variant="title" style={{ fontVariant: ['tabular-nums'], fontFamily: fonts.serif, fontSize: 40, lineHeight: 44 }}>{fm(spentAll)}</Text>
           {envelopeAll > 0 ? <Text variant="mono" style={{ color: colors.text3 }}>/ {fm(envelopeAll)}</Text> : null}
         </View>
         {envelopeAll > 0 ? (
@@ -87,6 +91,7 @@ export function BudgetCard({ data, onChanged, activitiesPanel }: { data: TripDat
           <Text variant="muted">Payé en monnaie locale : <Text variant="mono">{formatApprox(share(localTotal, div), local)}</Text> (taux BCE du {(rates.date ?? '').split('-').reverse().join('/')})</Text>
         ) : null}
       </View>
+      <Text variant="label" style={{ marginTop: space.sm }}>Postes de dépenses · touche pour ouvrir le détail</Text>
       {POSTES.map((p) => {
         const s = summary[p];
         if (!s.paid && !s.forecast && !s.envelope) return null;
@@ -97,13 +102,20 @@ export function BudgetCard({ data, onChanged, activitiesPanel }: { data: TripDat
         return (
           <View key={p} style={{ gap: space.xs }}>
             <Pressable accessibilityRole="button" accessibilityState={{ expanded: open === p }} accessibilityLabel={`Détail du poste ${NOMS[p]}`} onPress={() => { setOpen(open === p ? null : p); setEditing(false); setError(null); }}
-              style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>
-              <Text variant="body">{NOMS[p]}</Text>
-              <Text variant="mono" style={{ flexShrink: 1, textAlign: 'right' }}>
-                {fm(s.paid)}
-                {s.forecast ? ` + ≈ ${fm(s.forecast)} prévus` : ''}
-                {s.envelope ? ` / ${fm(s.envelope)}` : ''}
-              </Text>
+              style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md, minHeight: 44 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
+                <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: colors.surface2, alignItems: 'center', justifyContent: 'center' }}><Icon name={ICONE[p]} size={18} tone="text" /></View>
+                <Text variant="body" style={{ fontFamily: fonts.sansBold }}>{NOMS[p]}</Text>
+                <Text variant="muted" style={{ fontFamily: fonts.sansBold, color: colors.text }}>{pct[p]} %</Text>
+              </View>
+              <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: space.sm }}>
+                <Text variant="mono" style={{ flexShrink: 1, textAlign: 'right' }}>
+                  {fm(s.paid)}
+                  {s.forecast ? ` + ≈ ${fm(s.forecast)} prévus` : ''}
+                  {s.envelope ? ` / ${fm(s.envelope)}` : ''}
+                </Text>
+                <ChevronBadge open={open === p} />
+              </View>
             </Pressable>
             {s.envelope ? (
               <View accessible accessibilityRole="progressbar" accessibilityLabel={`${NOMS[p]} : ${Math.round((spent / s.envelope) * 100)} % du budget prévu`}
