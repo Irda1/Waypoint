@@ -27,7 +27,7 @@ export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick }: Globe
   }, []);
 
   return React.createElement('iframe', {
-    ref: frame, onLoad: send, src: `${WEB_BASE}/globe.html?mode=${mode}&color=${color}`, title: 'Globe terrestre',
-    style: { border: 0, width: '100%', height: '100%', background: '#000', pointerEvents: mode === 'hero' ? 'none' : 'auto' },
+    ref: frame, onLoad: send, src: mode === 'route' ? `${WEB_BASE}/route.html?color=${color}` : `${WEB_BASE}/globe.html?mode=${mode}&color=${color}`, title: 'Globe terrestre',
+    style: { border: 0, width: '100%', height: '100%', background: '#000', pointerEvents: mode === 'pick' ? 'auto' : 'none' },
   });
 }

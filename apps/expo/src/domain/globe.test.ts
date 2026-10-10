@@ -21,3 +21,11 @@ test('public/regions.html est à jour avec le générateur', async () => {
   const scripts = [...regionsHtml().matchAll(/<script>([\s\S]*?)<\/script>/g)];
   assert.doesNotThrow(() => new Function(scripts[scripts.length - 1][1]));
 });
+
+test('public/route.html est à jour avec le générateur et son script est valide', async () => {
+  const { routeHtml } = await import('./routeGlobe.ts');
+  const file = readFileSync(new URL('../../public/route.html', import.meta.url), 'utf8');
+  assert.equal(file, routeHtml());
+  const scripts = [...routeHtml().matchAll(/<script>([\s\S]*?)<\/script>/g)];
+  assert.doesNotThrow(() => new Function(scripts[scripts.length - 1][1]));
+});

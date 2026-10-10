@@ -1,0 +1,174 @@
+// Page 3D du fond de l'accueil (Three.js) : fond noir, planète minimaliste faite de points (les terres),
+// et un point lumineux qui voyage de ville en ville en laissant un tracé ; la planète tourne pour le suivre.
+// « Réduire les animations » : le trajet complet est dessiné d'un coup, rien ne bouge.
+// La même page sert sur le web (public/route.html, dans un cadre) et sur mobile (WebView). Fichier pur : testable avec Node.
+// Réglages passés dans l'adresse (?color=FFB95A) ou dans window.__GLOBE__ (mobile).
+
+export function routeHtml(): string {
+  return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+<title>Waypoint</title>
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+canvas{display:block;width:100%;height:100%}
+</style></head><body>
+<canvas id="c"></canvas>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
+<script>
+(function () {
+  "use strict";
+  var q = new URLSearchParams(location.search), G = window.__GLOBE__ || {};
+  var COLOR = "#" + String(G.color || q.get("color") || "FFB95A").replace("#", "");
+  if (!window.THREE) return;
+  var reduce = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var canvas = document.getElementById("c");
+  var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+  var scene = new THREE.Scene(); scene.background = new THREE.Color(0x000000);
+  var camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+  var group = new THREE.Group(); scene.add(group);
+  // Cadrage : sur téléphone la planète occupe le haut du bandeau (le texte de l'accueil est en bas) ;
+  // sur grand écran elle se place à droite, le texte reste à gauche.
+  function resize() {
+    var w = window.innerWidth, h = window.innerHeight, wide = w / h > 1.1;
+    renderer.setSize(w, h, false); camera.aspect = w / h;
+    camera.position.set(0, 0, wide ? 10 : 12.5); camera.lookAt(0, 0, 0);
+    var halfW = Math.tan(18 * Math.PI / 180) * camera.position.z * camera.aspect;
+    group.position.set(wide ? Math.min(halfW - 2.4, 4.2) : 0.7, wide ? 0 : 1.55, 0);
+    camera.updateProjectionMatrix(); draw();
+  }
+
+  function vec(lon, lat, r) { var phi = (90 - lat) * Math.PI / 180, th = (lon + 180) * Math.PI / 180; return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(th), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(th)); }
+
+  // Sphère sombre : cache les points de la face arrière (profondeur) et donne le volume.
+  group.add(new THREE.Mesh(new THREE.SphereGeometry(1.985, 96, 64), new THREE.MeshBasicMaterial({ color: 0x07090b })));
+  // Liseré discret sur le bord de la planète, couleur d'accent.
+  var accent = new THREE.Color(COLOR);
+  group.add(new THREE.Mesh(new THREE.SphereGeometry(2.06, 96, 64), new THREE.ShaderMaterial({
+    uniforms: { col: { value: accent } }, side: THREE.BackSide, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false,
+    vertexShader: "varying vec3 vN; void main(){ vN = normalize(normalMatrix * normal); gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }",
+    fragmentShader: "uniform vec3 col; varying vec3 vN; void main(){ float i = pow(max(0.0, 0.58 - dot(normalize(vN), vec3(0.0, 0.0, 1.0))), 5.0); gl_FragColor = vec4(col * i * 0.9, 1.0); }"
+  })));
+
+  // Terres en points : les continents sont rasterisés sur une petite carte, puis échantillonnés sur une grille régulière.
+  var dotMat = new THREE.ShaderMaterial({
+    uniforms: { scale: { value: 1 } }, transparent: true, depthWrite: false,
+    vertexShader: "uniform float scale; varying float vF; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vF = dot(normalize(normalMatrix * position), vec3(0.0, 0.0, 1.0)); gl_PointSize = scale / -mv.z; gl_Position = projectionMatrix * mv; }",
+    fragmentShader: "varying float vF; void main(){ vec2 p = gl_PointCoord - 0.5; if (dot(p, p) > 0.25) discard; float a = mix(0.18, 0.62, smoothstep(0.0, 0.8, vF)); gl_FragColor = vec4(vec3(0.62, 0.66, 0.68), a); }"
+  });
+  function addLand(topo) {
+    var W = 1024, H = 512, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
+    var x = cv.getContext("2d"); x.fillStyle = "#fff";
+    var land = topojson.feature(topo, topo.objects.land);
+    var polys = land.geometry ? (land.geometry.type === "Polygon" ? [land.geometry.coordinates] : land.geometry.coordinates) : [];
+    land.features && land.features.forEach(function (f) { polys = polys.concat(f.geometry.type === "Polygon" ? [f.geometry.coordinates] : f.geometry.coordinates); });
+    [-360, 0, 360].forEach(function (shift) {
+      x.beginPath();
+      polys.forEach(function (poly) {
+        poly.forEach(function (ring) {
+          var prev = null;
+          ring.forEach(function (p, i) {
+            var lon = p[0];
+            if (prev !== null) { while (lon - prev > 180) lon -= 360; while (prev - lon > 180) lon += 360; }
+            prev = lon;
+            var px = (lon + shift + 180) / 360 * W, py = (90 - p[1]) / 180 * H;
+            if (i === 0) x.moveTo(px, py); else x.lineTo(px, py);
+          });
+          x.closePath();
+        });
+      });
+      x.fill("evenodd");
+    });
+    var img = x.getImageData(0, 0, W, H).data, pts = [], step = 1.35;
+    for (var lat = -56; lat <= 80; lat += step) {
+      var dl = step / Math.max(Math.cos(lat * Math.PI / 180), 0.2);
+      for (var lon = -180; lon < 180; lon += dl) {
+        var px = Math.floor((lon + 180) / 360 * W), py = Math.floor((90 - lat) / 180 * H);
+        if (img[(py * W + px) * 4 + 3] > 128) { var v = vec(lon, lat, 2); pts.push(v.x, v.y, v.z); }
+      }
+    }
+    var g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
+    group.add(new THREE.Points(g, dotMat)); draw();
+  }
+
+  // Trajet : arcs en grand cercle entre des villes, légèrement surélevés au milieu.
+  var CITIES = [[2.35, 48.86], [-9.14, 38.72], [-73.99, 40.73], [-43.2, -22.9], [18.42, -33.92], [55.27, 25.2], [100.5, 13.75], [139.69, 35.69], [151.21, -33.87]];
+  var PER = 90, path = [], stops = [];
+  for (var c = 0; c < CITIES.length - 1; c++) {
+    var a = vec(CITIES[c][0], CITIES[c][1], 1).normalize(), b = vec(CITIES[c + 1][0], CITIES[c + 1][1], 1).normalize();
+    var ang = a.angleTo(b), lift = 0.08 + 0.32 * ang / Math.PI;
+    stops.push(path.length);
+    for (var i = 0; i <= PER; i++) {
+      if (c > 0 && i === 0) continue;
+      var t = i / PER, s = Math.sin(ang), wa = Math.sin((1 - t) * ang) / s, wb = Math.sin(t * ang) / s;
+      var p = a.clone().multiplyScalar(wa).add(b.clone().multiplyScalar(wb)).normalize().multiplyScalar(2.012 + lift * Math.sin(Math.PI * t));
+      path.push(p);
+    }
+  }
+  stops.push(path.length - 1);
+  var lineGeo = new THREE.BufferGeometry().setFromPoints(path);
+  var lineMat = new THREE.LineBasicMaterial({ color: accent, transparent: true, opacity: 0.95 });
+  var line = new THREE.Line(lineGeo, lineMat); group.add(line);
+
+  function glow(size, alpha) {
+    var cv = document.createElement("canvas"); cv.width = cv.height = 128; var x = cv.getContext("2d");
+    var gr = x.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, "rgba(255,255,255," + alpha + ")"); gr.addColorStop(0.25, COLOR); gr.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = gr; x.fillRect(0, 0, 128, 128);
+    var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    sp.scale.set(size, size, 1); return sp;
+  }
+  var head = glow(0.34, 1); group.add(head);
+  var marks = CITIES.map(function (ct) { var m = glow(0.16, 0.9); m.position.copy(vec(ct[0], ct[1], 2.015)); m.visible = false; group.add(m); return m; });
+
+  // Orientation qui amène un point face à la caméra (lacet puis tangage), avec un léger décalage pour garder du relief.
+  function aim(p) { var rho = Math.sqrt(p.x * p.x + p.z * p.z); return { y: Math.atan2(-p.x, p.z) + 0.35, x: Math.atan2(p.y, rho) - 0.18 }; }
+  function wrap(d) { while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; }
+
+  var LEG = 2600, PAUSE = 450, END = 1800, FADE = 900, legs = CITIES.length - 1, cycle = legs * (LEG + PAUSE) + END + FADE, start = performance.now();
+  function setProgress(n, opacity) {
+    var idx = Math.max(1, Math.min(path.length, Math.round(n)));
+    lineGeo.setDrawRange(0, idx); lineMat.opacity = 0.95 * opacity;
+    head.position.copy(path[idx - 1]); head.material.opacity = opacity;
+    marks.forEach(function (m, k) { m.visible = stops[k] < idx; m.material.opacity = opacity; });
+    return path[idx - 1];
+  }
+
+  if (reduce) {
+    setProgress(path.length, 1); var r0 = aim(path[stops[2]]); group.rotation.set(r0.x, r0.y, 0); head.visible = false;
+  } else {
+    var r1 = aim(path[0]); group.rotation.set(r1.x, r1.y, 0);
+  }
+
+  // Taille des points en pixels : ~0,02 unité vue à la distance de la caméra (champ de 36°).
+  function draw() { dotMat.uniforms.scale.value = 0.034 * renderer.getPixelRatio() * window.innerHeight; renderer.render(scene, camera); }
+  var last = 0;
+  function frame(now) {
+    var dt = last ? Math.min(now - last, 100) : 16; last = now;
+    if (!document.hidden) {
+      // La première image peut arriver avec une heure antérieure au départ : on part de 0.
+      var t = Math.max(0, now - start) % cycle, n, op = 1;
+      if (t < legs * (LEG + PAUSE)) {
+        var leg = Math.floor(t / (LEG + PAUSE)), lt = Math.min(1, (t - leg * (LEG + PAUSE)) / LEG);
+        var e = lt < 0.5 ? 2 * lt * lt : 1 - Math.pow(-2 * lt + 2, 2) / 2;
+        n = stops[leg] + 1 + e * (stops[leg + 1] - stops[leg]);
+      } else {
+        n = path.length;
+        var ft = t - legs * (LEG + PAUSE) - END; if (ft > 0) op = 1 - ft / FADE;
+      }
+      var p = setProgress(n, Math.max(0, op)), r = aim(p);
+      // Suivi amorti, indépendant de la cadence d'affichage (≈ 0,4 s pour rattraper le point).
+      var k = 1 - Math.exp(-dt / 400);
+      group.rotation.y += wrap(r.y - group.rotation.y) * k;
+      group.rotation.x += (r.x - group.rotation.x) * k;
+      draw();
+    }
+    requestAnimationFrame(frame);
+  }
+  window.addEventListener("resize", resize); resize();
+  if (!reduce) requestAnimationFrame(frame);
+  if (window.topojson) fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json").then(function (r) { return r.json(); }).then(addLand).catch(function () {});
+})();
+</script></body></html>
+`;
+}

@@ -17,7 +17,7 @@ Racine : `node --test pipeline/test/*.test.mjs` (collecte) · `bash supabase/tes
 
 ## Structure
 - `apps/expo/app` écrans · `src/features` UI · `src/data` Supabase/hors ligne · `src/domain` logique pure testée. `*.web.ts(x)` = version web.
-- `public/globe.html` et `public/map.html` sont **générés** (`domain/globe.ts`, `domain/map.ts`) : les regénérer après modif, un test vérifie la cohérence.
+- `public/globe.html`, `public/route.html` (fond animé de l'accueil) et `public/map.html` sont **générés** (`domain/globe.ts`, `domain/routeGlobe.ts`, `domain/map.ts`) : les regénérer après modif, un test vérifie la cohérence.
 - `supabase/migrations/` migrations ; `supabase/all-migrations.sql` est **généré**, ne pas l'éditer. Skill : `supabase-migrations`.
 - `.github/workflows/apk-app.yml` APK Android. Skill : `apk-build`.
 - L'ancienne maquette (`web/`, Capacitor, v0.9) a été retirée ; elle reste dans l'historique git (commit `86fbf9b`).
