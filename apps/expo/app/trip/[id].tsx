@@ -11,6 +11,7 @@ import { addDay, addDestination, createInvite, removeDestination } from '../../s
 import type { CityOption } from '../../src/data/places';
 import { MiniCalendar } from '../../src/features/trip/MiniCalendar';
 import { DestinationsCard } from '../../src/features/trip/DestinationsCard';
+import { TripRouteCard } from '../../src/features/trip/TripRouteCard';
 import { DayCard } from '../../src/features/trip/DayCard';
 import { WeatherCard } from '../../src/features/trip/WeatherCard';
 import { useForecasts } from '../../src/data/weather';
@@ -248,6 +249,7 @@ export default function TripScreen() {
         )}
 
         {tab === 'voyage' ? (
+        <View style={[styles.sheet, { backgroundColor: colors.bg }]}>
         <View style={styles.page}>
           {data.days.length > 0 ? (
             <View style={{ gap: space.sm }}>
@@ -274,6 +276,7 @@ export default function TripScreen() {
           <MemoCard tripId={trip.id} memo={trip.memo ?? ''} onChanged={reload} startEditing={pendingMemo} onStarted={() => setPendingMemo(false)} />
 
           <Section title="Itinéraire" icon="map">
+            <TripRouteCard tripId={trip.id} destinations={data.destinations} />
             <DestinationsCard data={data} onChanged={reload} />
             <HoursCard data={data} onOpen={(i, itemId) => { setChosenDay(i); setFocusItem(itemId); setTab('jour'); }} />
             <ProgramCard data={data} onApplied={reload} />
@@ -292,9 +295,11 @@ export default function TripScreen() {
             <ExportCard data={data} />
           </Section>
         </View>
+        </View>
         ) : null}
 
         {tab === 'jour' ? (
+        <View style={data.days.length > 0 ? [styles.sheet, { backgroundColor: colors.bg }] : undefined}>
         <View style={styles.page}>
           {data.days.length === 0 ? <Card><Text variant="muted">Aucun jour pour l'instant. Ajoute le premier ci-dessous.</Text></Card> : (
             <>
@@ -346,6 +351,7 @@ export default function TripScreen() {
           ) : (
             <Button label="+ Ajouter un jour" variant="ghost" onPress={() => { setNewDay(suggestNewDay(data.days.map((d) => d.day_date), trip.starts_on, trip.ends_on)); setAddingDay(true); }} />
           )}
+        </View>
         </View>
         ) : null}
 
@@ -416,10 +422,14 @@ export default function TripScreen() {
   );
 }
 
+// La page se pose sur la photo comme une feuille (même geste que l'accueil).
+const SHEET_OVERLAP = 28;
+
 const styles = StyleSheet.create({
+  sheet: { marginTop: -SHEET_OVERLAP, borderTopLeftRadius: SHEET_OVERLAP, borderTopRightRadius: SHEET_OVERLAP, zIndex: 2, shadowColor: '#000', shadowOpacity: 0.12, shadowRadius: 18, shadowOffset: { width: 0, height: -6 }, elevation: 6 },
   cover: { minHeight: 400, width: '100%' },
   veil: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(7, 9, 11, 0.5)' },
-  coverInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xl, minHeight: 400, width: '100%', maxWidth: 880, alignSelf: 'center' },
+  coverInner: { flex: 1, justifyContent: 'space-between', paddingHorizontal: space.lg, paddingBottom: space.xl + SHEET_OVERLAP, minHeight: 400, width: '100%', maxWidth: 880, alignSelf: 'center' },
   coverBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.sm, paddingTop: space.sm },
   glass: { minHeight: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: 'rgba(7, 9, 11, 0.45)', borderWidth: 1, borderColor: 'rgba(245, 245, 242, 0.25)' },
   glassLabel: { fontFamily: fonts.sansSemi, fontSize: 13, color: ON_PHOTO },
@@ -429,7 +439,7 @@ const styles = StyleSheet.create({
   lead: { fontFamily: fonts.sans, fontSize: 16, lineHeight: 23, color: ON_PHOTO_SOFT },
   page: { width: '100%', maxWidth: 880, alignSelf: 'center', padding: space.lg, paddingTop: space.xl, gap: space.lg },
   dayHero: { minHeight: 230, width: '100%' },
-  dayHeroInner: { justifyContent: 'flex-end', gap: 4, paddingHorizontal: space.lg, paddingTop: space.xl, paddingBottom: space.lg, minHeight: 230, width: '100%', maxWidth: 880, alignSelf: 'center' },
+  dayHeroInner: { justifyContent: 'flex-end', gap: 4, paddingHorizontal: space.lg, paddingTop: space.xl, paddingBottom: space.lg + SHEET_OVERLAP, minHeight: 230, width: '100%', maxWidth: 880, alignSelf: 'center' },
   runLabel: { fontFamily: fonts.sansBold, fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.6 },
   slimHead: { width: '100%', maxWidth: 880, alignSelf: 'center', paddingHorizontal: space.lg, paddingTop: space.lg, gap: 4 },
   slimTitle: { fontFamily: fonts.serif, fontSize: 30, lineHeight: 34 },

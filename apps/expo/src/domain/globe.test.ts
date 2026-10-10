@@ -37,3 +37,10 @@ test('cadrage de la planète animée : en haut sur téléphone, à droite sur gr
   const desk = routeGlobeOnScreen(1280, 500);
   assert.ok(desk.dx > 300 && desk.dy === 0);
 });
+
+test('itinéraire passé à la planète : lng,lat,Nom par ville, séparateurs retirés des noms', async () => {
+  const { routeParam } = await import('./routeGlobe.ts');
+  assert.equal(routeParam([{ lat: 48.8566, lng: 2.3522, name: 'Paris' }, { lat: 41.39, lng: 2.17, name: 'Saint-Denis, La Réunion; x' }]),
+    '2.352,48.857,Paris;2.170,41.390,Saint-Denis  La Réunion  x');
+  assert.equal(routeParam([]), '');
+});

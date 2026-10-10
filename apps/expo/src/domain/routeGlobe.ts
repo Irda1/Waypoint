@@ -4,6 +4,8 @@
 // La même page sert sur le web (public/route.html, dans un cadre) et sur mobile (WebView). Fichier pur : testable avec Node.
 // Réglages passés dans l'adresse (?color=FFB95A&theme=nuit|jour) ou dans window.__GLOBE__ (mobile).
 // Nuit : fond noir étoilé, halo de soleil dans le coin haut droit. Jour : fond sable, planète claire aux points gris-bleu.
+// Itinéraire d'un voyage (&route=lng,lat;lng,lat… et &fit=card) : la planète se centre et zoome sur les villes du voyage,
+// le tracé va de ville en ville ; autour du parcours, les terres sont plus finement pointillées.
 
 /** Couleur de fond de la page selon le thème (l'appli peint son bandeau de la même couleur). */
 export const ROUTE_BG = { nuit: '#000000', jour: '#F1E4CC' } as const;
@@ -29,12 +31,18 @@ export function routeGlobeOnScreen(w: number, h: number): { dx: number; dy: numb
   return { dx: f.x * px, dy: -f.y * px, radius: 2 * px };
 }
 
+/** Paramètre « route » de la page : « lng,lat,Nom » par ville, séparées par « ; » (virgules et points-virgules retirés des noms). */
+export function routeParam(cities: { lat: number; lng: number; name: string }[]): string {
+  return cities.slice(0, 30).map((c) => `${c.lng.toFixed(3)},${c.lat.toFixed(3)},${c.name.replace(/[,;]/g, ' ').trim().slice(0, 40)}`).join(';');
+}
+
 export function routeHtml(): string {
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
 <title>Waypoint</title>
 <style>
 html,body{margin:0;height:100%;background:var(--bg,#000);overflow:hidden}
 canvas{display:block;width:100%;height:100%}
+.lab{position:absolute;left:0;top:0;padding:3px 8px;border-radius:999px;font:600 12px/1.2 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;white-space:nowrap;pointer-events:none;opacity:0;transition:opacity .4s}
 </style></head><body>
 <canvas id="c"></canvas>
 <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
@@ -45,6 +53,8 @@ canvas{display:block;width:100%;height:100%}
   var q = new URLSearchParams(location.search), G = window.__GLOBE__ || {};
   var COLOR = "#" + String(G.color || q.get("color") || "FFB95A").replace("#", "");
   var DAY = (G.theme || q.get("theme")) === "jour";
+  var CARD = (G.fit || q.get("fit")) === "card";
+  var TRIP = String(G.route || q.get("route") || "").split(";").map(function (s) { var f = s.split(","), v = [Number(f[0]), Number(f[1])]; return f.length >= 2 && isFinite(v[0]) && isFinite(v[1]) && Math.abs(v[1]) <= 90 ? [v[0], v[1], (f[2] || "").slice(0, 40)] : null; }).filter(Boolean).slice(0, 30);
   var BG = DAY ? "${ROUTE_BG.jour}" : "${ROUTE_BG.nuit}";
   document.documentElement.style.setProperty("--bg", BG);
   if (!window.THREE) return;
@@ -63,13 +73,27 @@ canvas{display:block;width:100%;height:100%}
     renderer.setSize(w, h, false); camera.aspect = w / h;
     // Même calcul que routeFrame() côté appli (constantes partagées).
     var wide = w / h > ${F.wideRatio}, z = wide ? ${F.wideZ} : ${F.narrowZ}, halfW = Math.tan(18 * Math.PI / 180) * z * (w / h);
+    // Carte d'itinéraire : planète centrée, assez près pour que le parcours remplisse le cadre (le plus étroit des deux côtés).
+    if (CARD) z = Math.min(8.5, 2 + VIEW / (Math.tan(18 * Math.PI / 180) * Math.min(1, w / h)));
     camera.position.set(0, 0, z); camera.lookAt(0, 0, 0);
-    group.position.set(wide ? Math.min(halfW - ${F.wideMargin}, ${F.wideMaxX}) : ${F.narrowX}, wide ? 0 : ${F.narrowY}, 0);
+    if (CARD) group.position.set(0, 0, 0);
+    else group.position.set(wide ? Math.min(halfW - ${F.wideMargin}, ${F.wideMaxX}) : ${F.narrowX}, wide ? 0 : ${F.narrowY}, 0);
     if (sun) { var hh = Math.tan(18 * Math.PI / 180) * (z + 30); sun.position.set(hh * (w / h) * 0.92, hh * 0.86, -30); }
     camera.updateProjectionMatrix(); draw();
   }
 
   function vec(lon, lat, r) { var phi = (90 - lat) * Math.PI / 180, th = (lon + 180) * Math.PI / 180; return new THREE.Vector3(-r * Math.sin(phi) * Math.cos(th), r * Math.cos(phi), r * Math.sin(phi) * Math.sin(th)); }
+
+  // Villes du tracé : celles du voyage, sinon un tour du monde de démonstration (accueil).
+  var CITIES = TRIP.length ? TRIP : [[2.35, 48.86], [-9.14, 38.72], [-73.99, 40.73], [-43.2, -22.9], [18.42, -33.92], [55.27, 25.2], [100.5, 13.75], [139.69, 35.69], [151.21, -33.87]];
+  // Centre du parcours et son étendue (angle max depuis le centre) : servent au cadrage et au zoom de la carte d'itinéraire.
+  var mid = new THREE.Vector3(); CITIES.forEach(function (c) { mid.add(vec(c[0], c[1], 1)); });
+  if (mid.lengthSq() < 1e-6) mid.set(0, 0, 1); mid.normalize();
+  var SPAN = CITIES.reduce(function (m, c) { return Math.max(m, vec(c[0], c[1], 1).angleTo(mid)); }, 0);
+  // Demi-hauteur de vue utile (en unités, planète de rayon 2) et taille relative des repères lumineux.
+  var VIEW = CARD ? Math.max(2 * Math.sin(Math.min(SPAN, 1.2)) * 2.2, 0.2) : 2, K = CARD ? Math.max(0.2, Math.min(1, VIEW / 1.8)) : 1;
+  // Terres plus finement pointillées autour d'un parcours régional (pas de 0,35° au lieu de 1,35°).
+  var FINE = CARD && SPAN < 0.35;
 
   // Nuit : ciel étoilé et halo de soleil discret dans le coin haut droit (placé au redimensionnement).
   var sun = null;
@@ -124,24 +148,31 @@ canvas{display:block;width:100%;height:100%}
       });
       x.fill("evenodd");
     });
-    var img = x.getImageData(0, 0, W, H).data, pts = [], step = 1.35;
-    for (var lat = -56; lat <= 80; lat += step) {
-      var dl = step / Math.max(Math.cos(lat * Math.PI / 180), 0.2);
-      for (var lon = -180; lon < 180; lon += dl) {
-        var px = Math.floor((lon + 180) / 360 * W), py = Math.floor((90 - lat) / 180 * H);
-        if (img[(py * W + px) * 4 + 3] > 128) { var v = vec(lon, lat, 2); pts.push(v.x, v.y, v.z); }
+    var img = x.getImageData(0, 0, W, H).data, pts = [];
+    function sample(step, la0, la1, keep) {
+      for (var lat = la0; lat <= la1; lat += step) {
+        var dl = step / Math.max(Math.cos(lat * Math.PI / 180), 0.2);
+        for (var lon = -180; lon < 180; lon += dl) {
+          var px = Math.floor((lon + 180) / 360 * W), py = Math.floor((90 - lat) / 180 * H);
+          if (img[(py * W + px) * 4 + 3] > 128) { var v = vec(lon, lat, 2); if (keep(v)) pts.push(v.x, v.y, v.z); }
+        }
       }
     }
+    // Zone fine : calotte autour du centre du parcours (rayon angulaire « R »), le reste au pas normal.
+    var R = SPAN + 0.6, c2 = mid.clone().multiplyScalar(2);
+    var inCap = function (v) { return v.angleTo(c2) < R; };
+    sample(1.35, -56, 80, function (v) { return !FINE || !inCap(v); });
+    if (FINE) sample(0.35, -56, 80, inCap);
     var g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
     group.add(new THREE.Points(g, dotMat)); draw();
   }
 
   // Trajet : arcs en grand cercle entre des villes, légèrement surélevés au milieu.
-  var CITIES = [[2.35, 48.86], [-9.14, 38.72], [-73.99, 40.73], [-43.2, -22.9], [18.42, -33.92], [55.27, 25.2], [100.5, 13.75], [139.69, 35.69], [151.21, -33.87]];
   var PER = 90, path = [], stops = [];
   for (var c = 0; c < CITIES.length - 1; c++) {
     var a = vec(CITIES[c][0], CITIES[c][1], 1).normalize(), b = vec(CITIES[c + 1][0], CITIES[c + 1][1], 1).normalize();
     var ang = a.angleTo(b), lift = 0.08 + 0.32 * ang / Math.PI;
+    if (CARD) lift = Math.min(lift, 0.6 * ang);
     stops.push(path.length);
     for (var i = 0; i <= PER; i++) {
       if (c > 0 && i === 0) continue;
@@ -150,7 +181,9 @@ canvas{display:block;width:100%;height:100%}
       path.push(p);
     }
   }
-  stops.push(path.length - 1);
+  stops.push(Math.max(0, path.length - 1));
+  // Une seule ville : un point, pas de trajet.
+  if (!path.length) { path.push(vec(CITIES[0][0], CITIES[0][1], 2.012)); stops = [0]; }
   var lineGeo = new THREE.BufferGeometry().setFromPoints(path);
   var lineMat = new THREE.LineBasicMaterial({ color: accent, transparent: true, opacity: 0.95 });
   var line = new THREE.Line(lineGeo, lineMat); group.add(line);
@@ -162,14 +195,36 @@ canvas{display:block;width:100%;height:100%}
     var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), blending: DAY ? THREE.NormalBlending : THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     sp.scale.set(size, size, 1); return sp;
   }
-  var head = glow(0.34, 1); group.add(head);
-  var marks = CITIES.map(function (ct) { var m = glow(0.16, 0.9); m.position.copy(vec(ct[0], ct[1], 2.015)); m.visible = false; group.add(m); return m; });
+  var head = glow(0.34 * K, 1); group.add(head);
+  var marks = CITIES.map(function (ct) { var m = glow(0.16 * K, 0.9); m.position.copy(vec(ct[0], ct[1], 2.015)); m.visible = false; group.add(m); return m; });
+  // Noms des villes du voyage (carte d'itinéraire) : pastilles posées à côté de chaque étape, masquées si elles se chevauchent.
+  var labels = CARD ? CITIES.map(function (ct) {
+    if (!ct[2]) return null;
+    var el = document.createElement("div"); el.className = "lab"; el.textContent = ct[2];
+    el.style.background = DAY ? "rgba(255,253,248,.92)" : "rgba(16,19,21,.85)"; el.style.color = DAY ? "#0E2A35" : "#F4EFE6";
+    el.style.border = "1px solid " + (DAY ? "#D5C7A9" : "rgba(245,245,242,.18)");
+    document.body.appendChild(el); return el;
+  }) : [];
+  var tmp = new THREE.Vector3();
+  function placeLabels() {
+    var w = window.innerWidth, h = window.innerHeight, boxes = [];
+    labels.forEach(function (el, k) {
+      if (!el) return;
+      tmp.copy(marks[k].position); group.localToWorld(tmp); tmp.project(camera);
+      var x = (tmp.x + 1) / 2 * w + 8, y = (1 - tmp.y) / 2 * h - 10, bw = el.offsetWidth, bh = el.offsetHeight;
+      var hit = boxes.some(function (b) { return x < b[2] && x + bw > b[0] && y < b[3] && y + bh > b[1]; });
+      var show = marks[k].visible && !hit && x > 0 && x + bw < w && y > 0 && y + bh < h;
+      el.style.transform = "translate(" + Math.round(x) + "px," + Math.round(y) + "px)"; el.style.opacity = show ? "1" : "0";
+      if (show) boxes.push([x, y, x + bw, y + bh]);
+    });
+  }
 
   // Orientation qui amène un point face à la caméra (lacet puis tangage), avec un léger décalage pour garder du relief.
-  function aim(p) { var rho = Math.sqrt(p.x * p.x + p.z * p.z); return { y: Math.atan2(-p.x, p.z) + 0.35, x: Math.atan2(p.y, rho) - 0.18 }; }
+  // Carte d'itinéraire : la planète reste tournée vers le centre du parcours, sans décalage.
+  function aim(p) { if (CARD) p = mid; var rho = Math.sqrt(p.x * p.x + p.z * p.z); return { y: Math.atan2(-p.x, p.z) + (CARD ? 0 : 0.35), x: Math.atan2(p.y, rho) - (CARD ? 0 : 0.18) }; }
   function wrap(d) { while (d > Math.PI) d -= 2 * Math.PI; while (d < -Math.PI) d += 2 * Math.PI; return d; }
 
-  var LEG = 2600, PAUSE = 450, END = 1800, FADE = 900, legs = CITIES.length - 1, cycle = legs * (LEG + PAUSE) + END + FADE, start = performance.now();
+  var LEG = 2600, PAUSE = 450, END = CARD ? 4000 : 1800, FADE = 900, legs = CITIES.length - 1, cycle = legs * (LEG + PAUSE) + END + FADE, start = performance.now();
   function setProgress(n, opacity) {
     var idx = Math.max(1, Math.min(path.length, Math.round(n)));
     lineGeo.setDrawRange(0, idx); lineMat.opacity = 0.95 * opacity;
@@ -179,13 +234,13 @@ canvas{display:block;width:100%;height:100%}
   }
 
   if (reduce) {
-    setProgress(path.length, 1); var r0 = aim(path[stops[2]]); group.rotation.set(r0.x, r0.y, 0); head.visible = false;
+    setProgress(path.length, 1); var r0 = aim(path[stops[Math.min(2, stops.length - 1)]]); group.rotation.set(r0.x, r0.y, 0); head.visible = false;
   } else {
     var r1 = aim(path[0]); group.rotation.set(r1.x, r1.y, 0);
   }
 
   // Taille des points en pixels : ~0,02 unité vue à la distance de la caméra (champ de 36°).
-  function draw() { dotMat.uniforms.scale.value = 0.034 * renderer.getPixelRatio() * window.innerHeight; renderer.render(scene, camera); }
+  function draw() { dotMat.uniforms.scale.value = (FINE ? 0.012 : 0.034) * renderer.getPixelRatio() * window.innerHeight; renderer.render(scene, camera); if (labels && labels.length) placeLabels(); }
   var last = 0;
   function frame(now) {
     var dt = last ? Math.min(now - last, 100) : 16; last = now;
