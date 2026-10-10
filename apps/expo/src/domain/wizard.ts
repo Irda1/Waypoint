@@ -20,6 +20,8 @@ export interface WizardState {
   indicative: boolean;
   cities: WizardCity[];
   party: PartyType | null;
+  /** Ville de départ (facultative) : sert aux estimations et aux liens de vols. */
+  home: { name: string; country_code: string; lat: number; lng: number } | null;
   travelers: number;
   interests: string[];
   budget: { level: BudgetLevelId | 'montant' | null; amount: number | null; currency: string };
@@ -32,7 +34,7 @@ export interface WizardState {
 }
 
 export const newWizard = (): WizardState => ({
-  country: null, start: null, end: null, indicative: false, cities: [], party: null, travelers: 1,
+  country: null, start: null, end: null, indicative: false, cities: [], party: null, home: null, travelers: 1,
   interests: [], budget: { level: null, amount: null, currency: 'EUR' }, title: '', titleEdited: false, program: true, excluded: [],
 });
 

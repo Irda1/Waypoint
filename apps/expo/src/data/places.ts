@@ -133,6 +133,15 @@ export async function cityCollectionStatuses(cityIds: number[]): Promise<{ statu
 
 export interface HomeCity { id: number; name: string; country_code: string; lat: number; lng: number }
 
+/** Coordonnées de quelques villes (par identifiant), dans l'ordre demandé. */
+export async function cityCoords(ids: number[]): Promise<Map<number, { lat: number; lng: number }>> {
+  const out = new Map<number, { lat: number; lng: number }>();
+  if (!ids.length) return out;
+  const { data } = await supabase.from('cities').select('id,lat,lng').in('id', ids);
+  for (const r of (data ?? []) as { id: number; lat: number; lng: number }[]) out.set(r.id, { lat: r.lat, lng: r.lng });
+  return out;
+}
+
 /** Villes dont le nom contient le texte, avec leurs coordonnées (choix de la ville de départ). */
 export async function searchHomeCities(text: string): Promise<HomeCity[]> {
   const term = likeTerm(text);

@@ -6,7 +6,8 @@ import { searchHomeCities } from '../../data/places';
 import type { HomeCity } from '../../data/places';
 import type { TripData } from '../../data/useTrip';
 import { airportNear } from '../../domain/airports.ts';
-import { estimateFlight, flightLinks } from '../../domain/flights.ts';
+import { estimateFlight, flightLinks, flightMinutes } from '../../domain/flights.ts';
+import { formatDuration } from '../../lib/search';
 import { distanceKm } from '../../domain/planning.ts';
 import { formatMoney } from '../../lib/format';
 import { COUNTRY_NAME } from '../../domain/countries.ts';
@@ -14,7 +15,9 @@ import { useTheme } from '../../theme/useTheme';
 import { space } from '../../theme/tokens';
 import { Icon } from '../../ui/Icon';
 
-const KEY = 'waypoint.home';
+/** Ville de départ : celle choisie pour ce voyage (assistant ou carte Vols), sinon la dernière choisie sur l'appareil. */
+export const HOME_KEY = 'waypoint.home';
+export const tripHomeKey = (tripId: string) => `waypoint.home.${tripId}`;
 interface Home { name: string; country_code: string; lat: number; lng: number }
 
 /** Aéroport d'une ville : le plus proche à moins de 40 km, sinon le plus proche à moins de 150 km. */
@@ -29,7 +32,12 @@ export function FlightsCard({ data }: { data: TripData }) {
   const [hits, setHits] = useState<HomeCity[]>([]);
   const [searching, setSearching] = useState(false);
 
-  useEffect(() => { void AsyncStorage.getItem(KEY).then((v) => { if (v) { try { setHome(JSON.parse(v) as Home); } catch { /* ignoré */ } } }).catch(() => {}); }, []);
+  useEffect(() => {
+    void (async () => {
+      const v = (await AsyncStorage.getItem(tripHomeKey(data.trip.id)).catch(() => null)) ?? (await AsyncStorage.getItem(HOME_KEY).catch(() => null));
+      if (v) { try { setHome(JSON.parse(v) as Home); } catch { /* ignoré */ } }
+    })();
+  }, [data.trip.id]);
   useEffect(() => {
     // On cherche tant qu'aucune ville de départ n'est choisie, ou quand on veut la changer.
     if (!(changing || !home) || text.trim().length < 2) { setHits([]); return; }
@@ -51,17 +59,20 @@ export function FlightsCard({ data }: { data: TripData }) {
   if (!first) return null;
   const homeIata = home ? airportFor(home.lat, home.lng) : null;
   // Google Flights comprend les noms de villes (et choisit les aéroports de l'agglomération) : on lui passe les noms.
-  const links = home && homeIata ? flightLinks({ home: home.name, arrive: airportFor(first.lat, first.lng) ? first.name : null, leave: last && airportFor(last.lat, last.lng) ? last.name : null, start: data.trip.starts_on, end: data.trip.ends_on }) : [];
+  const arriveIata = airportFor(first.lat, first.lng), leaveIata = last ? airportFor(last.lat, last.lng) : null;
+  const links = home && homeIata ? flightLinks({ home: home.name, homeIata, arrive: arriveIata ? { name: first.name, iata: arriveIata } : null, leave: last && leaveIata ? { name: last.name, iata: leaveIata } : null, start: data.trip.starts_on, end: data.trip.ends_on, adults: Math.max(1, data.trip.travelers) }) : [];
 
   const arriveHasAirport = airportFor(first.lat, first.lng) !== null;
   const leaveHasAirport = last ? airportFor(last.lat, last.lng) !== null : false;
-  const estimate = home && homeIata && arriveHasAirport ? estimateFlight(distanceKm(home, first)) : null;
+  const km = home ? distanceKm(home, first) : 0;
+  const estimate = home && homeIata && arriveHasAirport ? estimateFlight(km) : null;
   const eur = (n: number) => formatMoney(n, 'EUR');
 
   function pick(c: HomeCity) {
     const h = { name: c.name, country_code: c.country_code, lat: c.lat, lng: c.lng };
     setHome(h); setChanging(false); setText(''); setHits([]);
-    void AsyncStorage.setItem(KEY, JSON.stringify(h)).catch(() => {});
+    void AsyncStorage.setItem(HOME_KEY, JSON.stringify(h)).catch(() => {});
+    void AsyncStorage.setItem(tripHomeKey(data.trip.id), JSON.stringify(h)).catch(() => {});
   }
 
   return (
@@ -77,7 +88,8 @@ export function FlightsCard({ data }: { data: TripData }) {
               {links.map((l) => <Button key={l.url} label={l.label} onPress={() => void Linking.openURL(l.url)} />)}
               {estimate ? (
                 <View style={{ gap: 2 }}>
-                  <Text variant="muted" style={{ fontSize: 12.5 }}>{estimate.stopover ? `Le moins cher : ≈ ${eur(estimate.cheapest)} · escale probable` : `≈ ${eur(estimate.cheapest)} · vol direct`}</Text>
+                  <Text variant="muted" style={{ fontSize: 12.5 }}>Durée ≈ {formatDuration(flightMinutes(km, false))} en direct{estimate.stopover ? ` · ≈ ${formatDuration(flightMinutes(km, true))} avec escale` : ''}</Text>
+                  <Text variant="muted" style={{ fontSize: 12.5 }}>{estimate.stopover ? `Le moins cher : ≈ ${eur(estimate.cheapest)} par personne · escale probable` : `≈ ${eur(estimate.cheapest)} par personne · vol direct`}</Text>
                   {estimate.stopover ? <Text variant="muted" style={{ fontSize: 12.5 }}>Sans escale : ≈ {eur(estimate.direct)}</Text> : null}
                   <Text variant="muted" style={{ fontSize: 11.5 }}>Estimation indicative d'après la distance (aller simple, éco), pas un prix réel : vérifie sur Google Flights.</Text>
                 </View>
