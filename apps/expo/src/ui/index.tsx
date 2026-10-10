@@ -100,6 +100,33 @@ export function Columns({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Flèche ronde « on peut déplier » : se retourne et prend la couleur d'accent quand l'élément est ouvert. */
+export function ChevronBadge({ open }: { open: boolean }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: open ? colors.accent : colors.surface2, transform: [{ rotate: open ? '180deg' : '0deg' }] }}>
+      <Icon name="chevronDown" size={16} tone={open ? 'onAccent' : 'muted'} />
+    </View>
+  );
+}
+
+/** Carte repliable : le titre et la flèche ronde se touchent pour ouvrir ou fermer. Contrôlée avec `open` + `onToggle`, sinon elle gère son état. */
+export function FoldCard({ title, defaultOpen = false, open, onToggle, children }: { title: string; defaultOpen?: boolean; open?: boolean; onToggle?: () => void; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  const [inner, setInner] = React.useState(defaultOpen);
+  const isOpen = open ?? inner;
+  return (
+    <Card>
+      <Pressable accessibilityRole="button" accessibilityState={{ expanded: isOpen }} aria-expanded={isOpen} accessibilityLabel={title} onPress={() => (onToggle ? onToggle() : setInner(!inner))}
+        style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: space.md, minHeight: 44 }}>
+        <RNText accessibilityRole="header" style={{ fontFamily: fonts.sansBold, fontSize: 18, color: colors.text }}>{title}</RNText>
+        <ChevronBadge open={isOpen} />
+      </Pressable>
+      {isOpen ? <FadeIn>{children}</FadeIn> : null}
+    </Card>
+  );
+}
+
 /** Pastille de paiement : dollar plein vert = payé, contour vert = acompte, gris = pas encore payé. */
 export function PayBadge({ state }: { state: 'paid' | 'partial' | 'unpaid' | null }) {
   const { colors } = useTheme();

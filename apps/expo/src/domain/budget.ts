@@ -83,6 +83,17 @@ export function settlements(balances: Balance[]): Transfer[] {
   return out;
 }
 
+/** Virements regroupés par bénéficiaire (plus gros d'abord) : qui doit combien à chacun, pour la barre empilée de l'onglet Amis. */
+export function groupByCreditor(transfers: Transfer[]): { to: string; total: number; from: { id: string; amount: number }[] }[] {
+  const by = new Map<string, { to: string; total: number; from: { id: string; amount: number }[] }>();
+  for (const t of transfers) {
+    const g = by.get(t.to) ?? { to: t.to, total: 0, from: [] };
+    g.total += t.amount; g.from.push({ id: t.from, amount: t.amount });
+    by.set(t.to, g);
+  }
+  return [...by.values()].sort((a, b) => b.total - a.total);
+}
+
 export type PaymentState = 'paid' | 'partial' | 'unpaid' | null;
 
 /**
@@ -113,6 +124,12 @@ export const posteForCategory = (category: string | null | undefined): Poste =>
   category === 'gastronomie' || category === 'nocturne' || category === 'restaurant' || category === 'cafe'
   || category === 'street_food' || category === 'bar' || category === 'club' || category === 'marche'
     ? 'repas' : 'activites';
+
+/** Part de chaque poste dans le total payé + prévu, en % entier (0 partout s'il n'y a rien). */
+export function posteShares(summary: Record<Poste, { paid: number; forecast: number }>): Record<Poste, number> {
+  const total = POSTES.reduce((n, p) => n + summary[p].paid + summary[p].forecast, 0);
+  return Object.fromEntries(POSTES.map((p) => [p, total > 0 ? Math.round(((summary[p].paid + summary[p].forecast) / total) * 100) : 0])) as Record<Poste, number>;
+}
 
 export interface PosteSummary {
   paid: number;      // dépenses saisies

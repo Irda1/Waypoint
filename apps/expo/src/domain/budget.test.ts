@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { computeBalances, settlements, paymentState, budgetSummary, posteForCategory, toCents } from './budget.ts';
+import { computeBalances, groupByCreditor, posteShares, settlements, paymentState, budgetSummary, posteForCategory, toCents } from './budget.ts';
 
 // Jeu d'essai de la maquette : 3 amis, 7 dépenses (Lisbonne / Porto)
 const exp = (amount: number, paid_by: string | null, extra: object = {}) => ({ amount, paid_by, ...extra });
@@ -185,4 +185,18 @@ test('activités : coût total, déjà payé et reste à payer', async () => {
     travelers: 2,
   });
   assert.deepEqual(lines.map((l) => [l.name, l.day, l.total, l.paid, l.due]), [['Musée', 1, 20, 0, 20], ['Tour', 2, 40, 40, 0]]);
+});
+
+test('postes : part de chaque poste dans le total, 0 partout sans dépense', () => {
+  const zero = { paid: 0, forecast: 0 };
+  assert.deepEqual(posteShares({ hebergement: zero, transports: zero, repas: zero, activites: zero, shopping: zero }), { hebergement: 0, transports: 0, repas: 0, activites: 0, shopping: 0 });
+  const sh = posteShares({ hebergement: { paid: 540, forecast: 0 }, transports: { paid: 208, forecast: 0 }, repas: { paid: 84, forecast: 0 }, activites: { paid: 0, forecast: 324 }, shopping: { paid: 62, forecast: 0 } });
+  assert.deepEqual(sh, { hebergement: 44, transports: 17, repas: 7, activites: 27, shopping: 5 });
+});
+
+test('virements : regroupés par bénéficiaire, le plus gros d\'abord', () => {
+  const g = groupByCreditor([{ from: 'tom', to: 'lea', amount: 152 }, { from: 'toi', to: 'lea', amount: 90 }, { from: 'tom', to: 'max', amount: 10 }]);
+  assert.deepEqual(g.map((x) => [x.to, x.total]), [['lea', 242], ['max', 10]]);
+  assert.deepEqual(g[0].from, [{ id: 'tom', amount: 152 }, { id: 'toi', amount: 90 }]);
+  assert.deepEqual(groupByCreditor([]), []);
 });
