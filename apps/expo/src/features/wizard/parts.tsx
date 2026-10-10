@@ -3,6 +3,7 @@ import { Pressable, Text as RNText, View } from 'react-native';
 import { Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, radius, space } from '../../theme/tokens';
+import { Icon } from '../../ui/Icon';
 
 export interface StepProps<S> { state: S; update: (next: S) => void }
 
@@ -18,7 +19,7 @@ export function Choice({ title, detail, selected, onPress, right, lead }: { titl
         {detail ? <Text variant="muted">{detail}</Text> : null}
       </View>
       {right}
-      {selected ? <RNText style={{ color: colors.accent, fontFamily: fonts.sansBold, fontSize: 18 }}>✓</RNText> : null}
+      {selected ? <Icon name="check" size={20} filled /> : null}
     </Pressable>
   );
 }

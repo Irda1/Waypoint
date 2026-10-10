@@ -12,6 +12,7 @@ import { formatMoney } from '../../lib/format';
 import { COUNTRY_NAME } from '../../domain/countries.ts';
 import { useTheme } from '../../theme/useTheme';
 import { space } from '../../theme/tokens';
+import { Icon } from '../../ui/Icon';
 
 const KEY = 'waypoint.home';
 interface Home { name: string; country_code: string; lat: number; lng: number }
@@ -65,7 +66,7 @@ export function FlightsCard({ data }: { data: TripData }) {
 
   return (
     <Card>
-      <Text variant="heading">✈ Vols</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}><Icon name="plane" size={20} /><Text variant="heading">Vols</Text></View>
       {home && !changing ? (
         <View style={{ gap: space.sm }}>
           <Text variant="muted">Départ : {home.name}{homeIata ? ` (${homeIata})` : ''}</Text>

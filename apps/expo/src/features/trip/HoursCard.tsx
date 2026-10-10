@@ -5,6 +5,7 @@ import { tripHoursProblems } from '../../domain/hoursCheck.ts';
 import type { TripData } from '../../data/useTrip';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
+import { Icon } from '../../ui/Icon';
 import { formatDay } from '../../lib/format';
 
 /**
@@ -22,14 +23,14 @@ export function HoursCard({ data, onOpen }: { data: TripData; onOpen: (dayIndex:
       <Text variant="label">Horaires des activités</Text>
       {n === 0 ? (
         <Text variant="body" style={{ color: colors.accent, fontFamily: fonts.sansSemi }}>
-          ✓ Tout est cohérent{report.checked ? ` (${report.checked} activité${report.checked > 1 ? 's' : ''} vérifiée${report.checked > 1 ? 's' : ''})` : ''}
+          Tout est cohérent{report.checked ? ` (${report.checked} activité${report.checked > 1 ? 's' : ''} vérifiée${report.checked > 1 ? 's' : ''})` : ''}
         </Text>
       ) : (
         <Pressable accessibilityRole="button" accessibilityLabel={`${n} problème${n > 1 ? 's' : ''} d'horaires, voir la liste`} onPress={() => setOpen(true)}
           style={{ minHeight: 48, borderRadius: 14, borderWidth: 1, borderColor: colors.warm, paddingHorizontal: space.md, flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
-          <RNText style={{ fontSize: 18 }}>⚠️</RNText>
+          <Icon name="warning" size={20} color={colors.warm} />
           <RNText style={{ flex: 1, fontFamily: fonts.sansSemi, fontSize: 15, color: colors.warm }}>{n} activité{n > 1 ? 's' : ''} à vérifier</RNText>
-          <RNText style={{ fontSize: 18, color: colors.text3 }}>›</RNText>
+          <Icon name="chevronRight" size={18} tone="muted" filled />
         </Pressable>
       )}
       {report.unknown > 0 ? <Text variant="muted">{report.unknown} activité{report.unknown > 1 ? 's' : ''} sans horaires connus : à vérifier avant d'y aller.</Text> : null}

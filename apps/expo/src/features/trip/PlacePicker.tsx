@@ -1,7 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, Text as RNText, View } from 'react-native';
 import { Button, Chip, ErrorNote, Field, Text } from '../../ui';
-import { glyphFor } from '../../theme/categoryIcons';
+import { iconFor } from '../../theme/categoryIcons';
+import { Icon } from '../../ui/Icon';
 import { useTheme } from '../../theme/useTheme';
 import { categoryColors, fonts, space } from '../../theme/tokens';
 import { formatMoney } from '../../lib/format';
@@ -161,7 +162,7 @@ export function PlacePicker({ tripId, dayId, tripTitle, destinations, defaultCit
             return (
               <View key={h.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, paddingVertical: space.xs }}>
                 <View accessible={false} style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: `${dot}33`, alignItems: 'center', justifyContent: 'center' }}>
-                  <RNText style={{ fontSize: 17 }}>{glyphFor(categories.rootOf(h.category_code))}</RNText>
+                  <Icon name={iconFor(categories.rootOf(h.category_code))} size={17} color={dot} />
                 </View>
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{h.name}</Text>

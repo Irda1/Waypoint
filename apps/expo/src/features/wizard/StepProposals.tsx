@@ -10,7 +10,8 @@ import { loadCandidates } from '../../data/itinerary';
 import { ensureCitiesCollected } from '../../data/cityCollection';
 import type { CollectionProgress } from '../../domain/collection.ts';
 import { useCategories } from '../../data/categories';
-import { glyphFor } from '../../theme/categoryIcons';
+import { iconFor } from '../../theme/categoryIcons';
+import { Icon } from '../../ui/Icon';
 import { useTheme } from '../../theme/useTheme';
 import { categoryColors, fonts, space } from '../../theme/tokens';
 import { StepTitle } from './parts';
@@ -75,7 +76,7 @@ export function StepProposals({ state, update }: StepProps<WizardState>) {
                   <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}>
                     <Text variant="mono" style={{ width: 48, color: colors.text2, fontSize: 14 }}>{formatTime(i.startMin)}</Text>
                     <View accessible={false} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${dot}33`, alignItems: 'center', justifyContent: 'center' }}>
-                      <RNText style={{ fontSize: 15 }}>{i.place ? glyphFor(i.root ?? '') : '🧳'}</RNText>
+                      <Icon name={i.place ? iconFor(i.root ?? '') : 'trip'} size={15} color={dot} />
                     </View>
                     {/* Toucher une étape ouvre le lieu dans Google Maps ; une étape sans lieu ne fait rien. */}
                     <Pressable disabled={!i.place} accessibilityRole={i.place ? 'link' : undefined} accessibilityLabel={i.place ? `Ouvrir ${name} dans Google Maps` : name}
@@ -96,7 +97,7 @@ export function StepProposals({ state, update }: StepProps<WizardState>) {
             <View style={{ gap: space.xs }}>
               <Text variant="label">Retirés</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
-                {removed.map((c) => <Chip key={c.place.id} label={`↺ ${c.place.name}`} onPress={() => update(toggleExcluded(state, c.place.id))} />)}
+                {removed.map((c) => <Chip key={c.place.id} label={`Remettre ${c.place.name}`} onPress={() => update(toggleExcluded(state, c.place.id))} />)}
               </View>
             </View>
           ) : null}

@@ -5,6 +5,7 @@ import { cleanLabel, missingSuggestions, orderItems, progress } from '../../doma
 import { addItems, removeItem, setDone, useChecklist } from '../../data/checklist';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
+import { Icon } from '../../ui/Icon';
 
 /** « À ne pas oublier » : bagages, papiers, démarches ; coché pour tous les voyageurs du voyage. */
 export function ChecklistCard({ tripId }: { tripId: string }) {
@@ -48,12 +49,12 @@ export function ChecklistCard({ tripId }: { tripId: string }) {
               <Pressable accessibilityRole="checkbox" accessibilityState={{ checked: i.done }} accessibilityLabel={i.label} onPress={() => { void toggle(i.id, !i.done); }}
                 style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}>
                 <View style={{ width: 24, height: 24, borderRadius: 7, borderWidth: 2, borderColor: i.done ? colors.accent : colors.lineStrong, backgroundColor: i.done ? colors.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-                  {i.done ? <RNText style={{ color: colors.onAccent, fontFamily: fonts.sansBold, fontSize: 14 }}>✓</RNText> : null}
+                  {i.done ? <Icon name="check" size={16} tone="onAccent" filled /> : null}
                 </View>
                 <Text variant="body" style={{ flex: 1, textDecorationLine: i.done ? 'line-through' : 'none', color: i.done ? colors.text3 : colors.text }}>{i.label}</Text>
               </Pressable>
               <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${i.label}`} onPress={() => { void remove(i.id); }} style={{ minWidth: 44, minHeight: 44, alignItems: 'center', justifyContent: 'center' }}>
-                <RNText style={{ color: colors.text3, fontSize: 18 }}>✕</RNText>
+                <Icon name="close" size={20} tone="muted" />
               </Pressable>
             </View>
           ))}

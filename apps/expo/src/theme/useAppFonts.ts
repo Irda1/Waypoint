@@ -7,9 +7,10 @@ import {
   PlusJakartaSans_600SemiBold,
   PlusJakartaSans_700Bold,
 } from '@expo-google-fonts/plus-jakarta-sans';
+import Ionicons from '@expo/vector-icons/Ionicons';
 
 /**
- * Charge les polices de la maquette. Renvoie `true` dès qu'on peut afficher l'appli :
+ * Charge les polices de la maquette et celle des icônes (Ionicons). Renvoie `true` dès qu'on peut afficher l'appli :
  * polices prêtes, échec de chargement, ou 2,5 s écoulées (réseau lent). L'appli ne reste
  * donc jamais bloquée sur un écran vide ; sans les polices, le système les remplace.
  */
@@ -20,6 +21,7 @@ export function useAppFonts(): boolean {
     PlusJakartaSans_500Medium,
     PlusJakartaSans_600SemiBold,
     PlusJakartaSans_700Bold,
+    ...Ionicons.font,
   });
   const [timedOut, setTimedOut] = useState(false);
   useEffect(() => {

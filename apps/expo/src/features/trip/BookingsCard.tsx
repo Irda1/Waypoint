@@ -7,8 +7,9 @@ import { removeBooking, saveBooking, useBookings } from '../../data/bookings';
 import { formatDay } from '../../lib/format';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
+import { Icon } from '../../ui/Icon';
 
-const glyph = (k: Booking['kind']) => BOOKING_KINDS.find((x) => x.kind === k)?.glyph ?? '📌';
+const icon = (k: Booking['kind']) => BOOKING_KINDS.find((x) => x.kind === k)?.icon ?? 'pin';
 
 /** Réservations du voyage : vols, trains, hébergements, billets, avec numéro de confirmation et lien. */
 export function BookingsCard({ tripId }: { tripId: string }) {
@@ -49,7 +50,7 @@ export function BookingsCard({ tripId }: { tripId: string }) {
       {bookings.map((b) => (
         <Pressable key={b.id} accessibilityRole="button" accessibilityLabel={`Modifier ${b.title}`} onPress={() => startEdit(b)}
           style={{ flexDirection: 'row', gap: space.md, padding: space.md, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface2 }}>
-          <RNText style={{ fontSize: 22 }}>{glyph(b.kind)}</RNText>
+          <Icon name={icon(b.kind)} size={22} />
           <View style={{ flex: 1, gap: 2 }}>
             <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{b.title}</Text>
             <Text variant="muted">{[b.starts_on ? formatDay(b.starts_on) : null, b.start_time, b.reference ? `N° ${b.reference}` : null].filter(Boolean).join(' · ') || 'Sans date'}</Text>
@@ -62,7 +63,7 @@ export function BookingsCard({ tripId }: { tripId: string }) {
       {draft ? (
         <View style={{ gap: space.sm }}>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }} accessibilityRole="radiogroup">
-            {BOOKING_KINDS.map((k) => <Chip key={k.kind} label={`${k.glyph} ${k.label}`} selected={draft.kind === k.kind} onPress={() => set({ kind: k.kind })} />)}
+            {BOOKING_KINDS.map((k) => <Chip key={k.kind} label={k.label} icon={k.icon} selected={draft.kind === k.kind} onPress={() => set({ kind: k.kind })} />)}
           </View>
           <Field label="Titre" value={draft.title} onChangeText={(t) => set({ title: t })} placeholder="Ex. Vol Paris → Lisbonne" />
           <Field label="N° de confirmation" value={draft.reference} onChangeText={(t) => set({ reference: t })} autoCapitalize="characters" autoCorrect={false} />

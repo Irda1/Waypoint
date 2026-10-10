@@ -41,7 +41,7 @@ export function StepCountry({ state, update }: StepProps<WizardState>) {
         <View style={{ gap: space.md }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: space.sm }}>
             <View style={{ flex: 1 }}><Field label="Rechercher un pays" value={query} onChangeText={setQuery} placeholder="Ex. Japon, Portugal…" autoCorrect={false} /></View>
-            <ViewToggle inline showing="list" onPress={() => setShowList(false)} listLabel="Afficher la liste des pays" backLabel="Revenir à la planète" backIcon="🌍" />
+            <ViewToggle inline showing="list" onPress={() => setShowList(false)} listLabel="Afficher la liste des pays" backLabel="Revenir à la planète" backIcon="globe" />
           </View>
           {chosenLine}
           {results ? (
@@ -67,7 +67,7 @@ export function StepCountry({ state, update }: StepProps<WizardState>) {
         <>
           <View style={{ flex: 1, minHeight: 280, borderRadius: radius.card, overflow: 'hidden', backgroundColor: '#000' }}>
             <Globe mode="pick" focus={state.country} onPick={(code) => { if (COUNTRY_NAME[code]) pick(code); }} />
-            <ViewToggle showing="visual" onPress={() => setShowList(true)} listLabel="Afficher la liste des pays" backLabel="Revenir à la planète" backIcon="🌍" />
+            <ViewToggle showing="visual" onPress={() => setShowList(true)} listLabel="Afficher la liste des pays" backLabel="Revenir à la planète" backIcon="globe" />
           </View>
           {chosenLine}
         </>

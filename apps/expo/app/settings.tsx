@@ -64,7 +64,7 @@ export default function Settings() {
 
   return (
     <Screen>
-      <Button label="← Retour" variant="ghost" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
+      <Button label="Retour" icon="back" variant="ghost" onPress={() => (router.canGoBack() ? router.back() : router.replace('/'))} />
       <Text variant="title" accessibilityRole="header">Paramètres</Text>
 
       <Card>
@@ -101,9 +101,9 @@ export default function Settings() {
           ))}
         </View>
         <View style={{ flexDirection: 'row', gap: space.lg, alignItems: 'center' }}>
-          {['🗺️', '☀️', '💶', '👥'].map((g) => <Icon key={g} glyph={g} size={26} />)}
+          {(['map', 'day', 'budget', 'friends', 'culture', 'gastronomie'] as const).map((g) => <Icon key={g} name={g} size={26} />)}
         </View>
-        <Text variant="muted">Couleur : icônes d'origine. Trait : contour fin. Plein : silhouette à la couleur d'accent.</Text>
+        <Text variant="muted">Couleur : contour à la couleur d'accent. Trait : contour de la couleur du texte. Plein : silhouette pleine.</Text>
       </Card>
 
       {remindersSupported ? (
@@ -113,9 +113,9 @@ export default function Settings() {
           <Button label={remind ? 'Notifications activées : désactiver' : 'Activer les notifications'} variant={remind ? 'ghost' : 'primary'} onPress={toggleReminders} />
           {remind ? (
             <View style={{ gap: space.sm }}>
-              <Chip label={prefs.eve ? '✓ La veille du départ (18 h)' : 'La veille du départ (18 h)'} selected={prefs.eve} onPress={() => changePrefs({ ...prefs, eve: !prefs.eve })} />
-              <Chip label={prefs.bookings ? '✓ Jour J : activités à réserver ou payer (8 h)' : 'Jour J : activités à réserver ou payer (8 h)'} selected={prefs.bookings} onPress={() => changePrefs({ ...prefs, bookings: !prefs.bookings })} />
-              <Chip label={prefs.next ? '✓ Prochaine activité dans X minutes' : 'Prochaine activité dans X minutes'} selected={prefs.next} onPress={() => changePrefs({ ...prefs, next: !prefs.next })} />
+              <Chip label="La veille du départ (18 h)" icon={prefs.eve ? 'check' : undefined} selected={prefs.eve} onPress={() => changePrefs({ ...prefs, eve: !prefs.eve })} />
+              <Chip label="Jour J : activités à réserver ou payer (8 h)" icon={prefs.bookings ? 'check' : undefined} selected={prefs.bookings} onPress={() => changePrefs({ ...prefs, bookings: !prefs.bookings })} />
+              <Chip label="Prochaine activité dans X minutes" icon={prefs.next ? 'check' : undefined} selected={prefs.next} onPress={() => changePrefs({ ...prefs, next: !prefs.next })} />
               {prefs.next ? (
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' }}>
                   <Text variant="label">Prévenir</Text>

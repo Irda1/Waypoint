@@ -6,6 +6,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { fonts, radius, space } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { useBreakpoint } from './useBreakpoint';
+import { Icon } from './Icon';
+import type { IconName } from './Icon';
 
 export function Screen({ children, scroll = true }: { children: React.ReactNode; scroll?: boolean }) {
   const { colors } = useTheme();
@@ -33,7 +35,7 @@ export function Text({ variant = 'body', style, children, ...rest }: { variant?:
   return <RNText style={[variants[variant], style]} {...rest}>{children}</RNText>;
 }
 
-export function Button({ label, onPress, variant = 'primary', disabled, loading }: { label: string; onPress: () => void; variant?: 'primary' | 'ghost'; disabled?: boolean; loading?: boolean }) {
+export function Button({ label, onPress, variant = 'primary', disabled, loading, icon }: { label: string; onPress: () => void; variant?: 'primary' | 'ghost'; disabled?: boolean; loading?: boolean; icon?: IconName }) {
   const { colors } = useTheme();
   const primary = variant === 'primary';
   return (
@@ -46,10 +48,10 @@ export function Button({ label, onPress, variant = 'primary', disabled, loading 
       style={({ pressed }) => ({
         minHeight: 48, paddingHorizontal: space.xl, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: space.sm,
         backgroundColor: primary ? colors.accent : 'transparent', borderWidth: primary ? 0 : 1, borderColor: colors.lineStrong,
-        opacity: disabled ? 0.5 : pressed ? 0.85 : 1,
+        opacity: disabled ? 0.5 : pressed ? 0.85 : 1, transform: [{ scale: pressed && !disabled ? 0.98 : 1 }],
       })}
     >
-      {loading ? <ActivityIndicator color={primary ? colors.onAccent : colors.text} /> : null}
+      {loading ? <ActivityIndicator color={primary ? colors.onAccent : colors.text} /> : icon ? <Icon name={icon} size={18} tone={primary ? 'onAccent' : 'text'} /> : null}
       <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 16, color: primary ? colors.onAccent : colors.text }}>{label}</RNText>
     </Pressable>
   );
@@ -60,11 +62,12 @@ export function Card({ children, style }: { children: React.ReactNode; style?: S
   return <View style={[{ backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, padding: space.lg, gap: space.md }, style]}>{children}</View>;
 }
 
-export function Chip({ label, selected, onPress }: { label: string; selected?: boolean; onPress?: () => void }) {
+export function Chip({ label, selected, onPress, icon }: { label: string; selected?: boolean; onPress?: () => void; icon?: IconName }) {
   const { colors } = useTheme();
   return (
     <Pressable accessibilityRole="button" accessibilityState={{ selected: !!selected }} onPress={onPress}
-      style={{ minHeight: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: selected ? colors.accent : colors.surface2 }}>
+      style={{ minHeight: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: selected ? colors.accent : colors.surface2 }}>
+      {icon ? <Icon name={icon} size={16} tone={selected ? 'onAccent' : 'text'} filled={selected} /> : null}
       <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: selected ? colors.onAccent : colors.text }}>{label}</RNText>
     </Pressable>
   );
@@ -107,6 +110,20 @@ export function PayBadge({ state }: { state: 'paid' | 'partial' | 'unpaid' | nul
     <View accessible accessibilityRole="image" accessibilityLabel={label}
       style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: filled ? colors.paid : 'transparent', borderWidth: filled ? 0 : 1.5, borderColor: color }}>
       <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: filled ? colors.onPaid : color }}>$</RNText>
+    </View>
+  );
+}
+
+/** Section d'un écran long : un titre (icône + nom) puis ses cartes. Aide à se repérer sans tout dérouler. */
+export function Section({ title, icon, children }: { title: string; icon: IconName; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <View style={{ gap: space.md }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingTop: space.md, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line }}>
+        <Icon name={icon} size={18} />
+        <RNText accessibilityRole="header" style={{ fontFamily: fonts.serif, fontSize: 22, lineHeight: 28, color: colors.text }}>{title}</RNText>
+      </View>
+      {children}
     </View>
   );
 }

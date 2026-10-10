@@ -86,7 +86,7 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
   const map = (
     <View style={{ flex: 1, minHeight: 280, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' }}>
       <RegionMap country={country} cities={points} selected={selected} onToggle={toggleById} />
-      <ViewToggle showing="visual" onPress={() => setShowList(true)} listLabel="Afficher la liste des villes" backLabel="Revenir à la carte" backIcon="🗺" />
+      <ViewToggle showing="visual" onPress={() => setShowList(true)} listLabel="Afficher la liste des villes" backLabel="Revenir à la carte" backIcon="map" />
     </View>
   );
   const route = (
@@ -143,7 +143,7 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
       {showList ? (
         <View style={{ gap: space.md }}>
           <View style={{ minHeight: 56, justifyContent: 'center' }}>
-            <ViewToggle showing="list" onPress={() => setShowList(false)} listLabel="Afficher la liste des villes" backLabel="Revenir à la carte" backIcon="🗺" />
+            <ViewToggle showing="list" onPress={() => setShowList(false)} listLabel="Afficher la liste des villes" backLabel="Revenir à la carte" backIcon="map" />
           </View>
           {search}
         </View>
