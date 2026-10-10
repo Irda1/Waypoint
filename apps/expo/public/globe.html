@@ -56,8 +56,8 @@ canvas{display:block;width:100%;height:100%}
   //   relief = pentes calculées d'après l'altitude GEBCO (rouge/vert) + masque des mers (bleu, Natural Earth 1:50m).
   // Le jour/nuit vient d'une lumière fixe (en haut à droite, vers l'avant) ; le relief accroche la lumière, surtout près
   // de la ligne du crépuscule ; le soleil se reflète sur les océans ; les nuages dérivent et ombrent le sol.
-  // « pick » : on regarde la face nuit (villes allumées) avec une fine bande d'aube à gauche ; ailleurs, la face jour.
-  var SUN = (MODE === "pick" ? new THREE.Vector3(-0.85, 0.25, -0.45) : new THREE.Vector3(0.8, 0.3, 0.45)).normalize();
+  // Jour au centre et à droite, nuit (villes allumées) qui s'estompe sur le côté gauche.
+  var SUN = new THREE.Vector3(0.8, 0.3, 0.45).normalize();
   var BASE = String(G.base || q.get("base") || location.origin).replace(/\/+$/, "") + "/tex/";
   var OLD_TEX = "https://cdn.jsdelivr.net/gh/mrdoob/three.js@r160/examples/textures/planets/earth_atmos_4096.jpg";
   var loader = new THREE.TextureLoader(); loader.setCrossOrigin("anonymous");
