@@ -8,7 +8,7 @@ import { createTripFromWizard } from '../src/data/trips';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { HOME_KEY, tripHomeKey } from '../src/features/trip/FlightsCard';
 import { StepDeparture } from '../src/features/wizard/StepDeparture';
-import { MAX_TRIP_DAYS, autoTitle, dayCount, missingSteps, newWizard } from '../src/domain/wizard.ts';
+import { MAX_TRIP_DAYS, autoTitle, dayCount, missingSteps, newWizard, sameCity } from '../src/domain/wizard.ts';
 import type { WizardState } from '../src/domain/wizard.ts';
 import { COUNTRY_NAME } from '../src/domain/countries.ts';
 import { StepCountry } from '../src/features/wizard/StepCountry';
@@ -38,6 +38,7 @@ function blocker(step: StepId, s: WizardState): string | null {
     if (dayCount(s) > MAX_TRIP_DAYS) return `Un voyage dure au plus ${MAX_TRIP_DAYS} jours.`;
   }
   if (step === 'voyageurs' && !s.party) return 'Dis-nous qui voyage.';
+  if (step === 'depart' && s.home && s.cities[0] && sameCity(s.home.name, s.cities[0].name)) return `Tu pars déjà de ${s.cities[0].name} : touche « Changer la ville de départ » et choisis-en une autre.`;
   if (step === 'interets' && !s.interests.length) return 'Choisis au moins un thème.';
   if (step === 'budget' && missingSteps(s).includes('budget')) return 'Choisis un niveau de budget ou un montant.';
   return null;

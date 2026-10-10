@@ -175,6 +175,12 @@ export function autoTitle(s: Pick<WizardState, 'country' | 'party'>): string {
 }
 
 /** Les étapes qu'il reste à remplir avant de créer le voyage (vide = prêt). */
+/** Même ville (accents, majuscules et tirets ignorés) : sert à refuser un départ identique à la première ville du voyage. */
+export function sameCity(a: string, b: string): boolean {
+  const norm = (x: string) => x.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  return !!a && !!b && norm(a) === norm(b);
+}
+
 export function missingSteps(s: WizardState): ('pays' | 'dates' | 'voyageurs' | 'interets' | 'budget')[] {
   const out: ('pays' | 'dates' | 'voyageurs' | 'interets' | 'budget')[] = [];
   if (!s.country) out.push('pays');

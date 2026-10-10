@@ -8,11 +8,11 @@ import { Icon } from '../../ui/Icon';
 export interface StepProps<S> { state: S; update: (next: S) => void }
 
 /** Ligne de choix : titre, détail, coche à droite. */
-export function Choice({ title, detail, selected, onPress, right, lead }: { title: string; detail?: string; selected?: boolean; onPress: () => void; right?: React.ReactNode; lead?: React.ReactNode }) {
+export function Choice({ title, detail, selected, onPress, right, lead, disabled }: { title: string; detail?: string; selected?: boolean; onPress: () => void; right?: React.ReactNode; lead?: React.ReactNode; disabled?: boolean }) {
   const { colors } = useTheme();
   return (
-    <Pressable accessibilityRole="button" accessibilityState={{ selected: !!selected }} accessibilityLabel={detail ? `${title}. ${detail}` : title} onPress={onPress}
-      style={{ minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.field, borderWidth: selected ? 2 : 1, borderColor: selected ? colors.accent : colors.line, backgroundColor: colors.surface }}>
+    <Pressable accessibilityRole="button" accessibilityState={{ selected: !!selected, disabled: !!disabled }} accessibilityLabel={detail ? `${title}. ${detail}` : title} onPress={onPress} disabled={disabled}
+      style={{ opacity: disabled ? 0.45 : 1, minHeight: 56, flexDirection: 'row', alignItems: 'center', gap: space.md, padding: space.md, borderRadius: radius.field, borderWidth: selected ? 2 : 1, borderColor: selected ? colors.accent : colors.line, backgroundColor: colors.surface }}>
       {lead}
       <View style={{ flex: 1, gap: 2 }}>
         <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{title}</Text>

@@ -4,6 +4,7 @@ import { Button, Card, Field, Text } from '../../ui';
 import { cityCoords, searchHomeCities } from '../../data/places';
 import type { HomeCity } from '../../data/places';
 import type { WizardState } from '../../domain/wizard.ts';
+import { sameCity } from '../../domain/wizard.ts';
 import { airportNear } from '../../domain/airports.ts';
 import { estimateFlight, flightLinks, flightMinutes } from '../../domain/flights.ts';
 import { distanceKm } from '../../domain/planning.ts';
@@ -60,6 +61,9 @@ export function StepDeparture({ state, update }: StepProps<WizardState>) {
     return () => clearTimeout(id);
   }, [home?.name]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  // La première ville du voyage ne peut pas être la ville de départ : elle est grisée dans les listes.
+  const isFirst = (name: string) => !!first && sameCity(name, first.name);
+  const firstNote = first ? `Première ville du voyage : choisis une autre ville de départ` : '';
   const pick = (h: Home) => { update({ ...state, home: { name: h.name, country_code: h.country_code, lat: h.lat, lng: h.lng } }); setText(''); setHits([]); };
 
   const firstAt = first ? coords.get(first.id) : undefined, lastAt = last ? coords.get(last.id) : undefined;
@@ -77,7 +81,8 @@ export function StepDeparture({ state, update }: StepProps<WizardState>) {
       {home ? (
         <Card>
           <Text variant="label">Départ · {home.name}{homeIata ? ` (${homeIata})` : ''}</Text>
-          {!first ? <Text variant="muted">Choisis des villes à l'étape précédente pour estimer le vol.</Text>
+          {first && isFirst(home.name) ? <Text variant="body" style={{ color: colors.warm }} accessibilityRole="alert">{home.name} est la première ville de ton voyage : on ne peut pas en partir. Touche « Changer la ville de départ » ci-dessous.</Text>
+            : !first ? <Text variant="muted">Choisis des villes à l'étape précédente pour estimer le vol.</Text>
             : searching || !firstAt ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }} accessibilityLiveRegion="polite">
                 <ActivityIndicator color={colors.accent} />
@@ -98,11 +103,11 @@ export function StepDeparture({ state, update }: StepProps<WizardState>) {
       ) : (
         <>
           <Field label="Chercher une ville" value={text} onChangeText={setText} placeholder="Ex. Strasbourg, Rennes…" autoCorrect={false} />
-          {hits.map((c) => <Choice key={c.id} title={c.name} detail={COUNTRY_NAME[c.country_code] ?? c.country_code} onPress={() => pick(c)} />)}
+          {hits.map((c) => <Choice key={c.id} title={c.name} detail={isFirst(c.name) ? firstNote : COUNTRY_NAME[c.country_code] ?? c.country_code} disabled={isFirst(c.name)} onPress={() => pick(c)} />)}
           {!hits.length ? (
             <>
               <Text variant="label">Départs les plus courants</Text>
-              {POPULAR.map((p) => <Choice key={p.name} title={p.name} detail={`${COUNTRY_NAME[p.country_code] ?? p.country_code} · ${p.iata}`} onPress={() => pick(p)} />)}
+              {POPULAR.map((p) => <Choice key={p.name} title={p.name} detail={isFirst(p.name) ? firstNote : `${COUNTRY_NAME[p.country_code] ?? p.country_code} · ${p.iata}`} disabled={isFirst(p.name)} onPress={() => pick(p)} />)}
             </>
           ) : null}
         </>
