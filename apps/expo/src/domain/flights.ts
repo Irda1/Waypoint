@@ -12,7 +12,12 @@ export interface FlightPlan {
   end: string | null;
   /** Nombre de voyageurs (adultes) : pré-rempli dans Google Flights. */
   adults: number;
+  /** Aller simple : pas de vol retour. */
+  oneWay?: boolean;
 }
+
+/** Choix de vol gardés avec la ville de départ : aller simple ou aller-retour, et les aéroports (codes IATA). */
+export interface AirPrefs { oneWay?: boolean; from?: string; to?: string; back?: string }
 
 export interface FlightLink { label: string; url: string }
 
@@ -38,15 +43,16 @@ export function googleFlightsUrl(legs: Leg[], adults: number): string {
 
 /** Un aller-retour si on repart de l'aéroport d'arrivée ; sinon deux allers simples (voyage « open jaw »). */
 export function flightLinks(p: FlightPlan): FlightLink[] {
-  const { home, homeIata, arrive, leave, start, end, adults } = p;
+  const { home, homeIata, arrive, leave, start, end, adults, oneWay = false } = p;
   if (!arrive) return [];
   const back = leave ?? arrive;
   const who = adults > 1 ? ` · ${adults} voyageurs` : '';
-  if (back.iata === arrive.iata && start && end) {
-    return [{ label: `Aller-retour ${home} ⇄ ${arrive.name}${who}`, url: googleFlightsUrl([{ date: start, from: homeIata, to: arrive.iata }, { date: end, from: arrive.iata, to: homeIata }], adults) }];
+  const at = (name: string, iata: string) => `${name} (${iata})`;
+  if (!oneWay && back.iata === arrive.iata && start && end) {
+    return [{ label: `Aller-retour ${at(home, homeIata)} ⇄ ${at(arrive.name, arrive.iata)}${who}`, url: googleFlightsUrl([{ date: start, from: homeIata, to: arrive.iata }, { date: end, from: arrive.iata, to: homeIata }], adults) }];
   }
-  const out: FlightLink[] = [{ label: `Aller ${home} → ${arrive.name}${who}`, url: googleFlightsUrl([{ date: start, from: homeIata, to: arrive.iata }], adults) }];
-  if (end) out.push({ label: `Retour ${back.name} → ${home}${who}`, url: googleFlightsUrl([{ date: end, from: back.iata, to: homeIata }], adults) });
+  const out: FlightLink[] = [{ label: `Aller ${at(home, homeIata)} → ${at(arrive.name, arrive.iata)}${who}`, url: googleFlightsUrl([{ date: start, from: homeIata, to: arrive.iata }], adults) }];
+  if (end && !oneWay) out.push({ label: `Retour ${at(back.name, back.iata)} → ${at(home, homeIata)}${who}`, url: googleFlightsUrl([{ date: end, from: back.iata, to: homeIata }], adults) });
   return out;
 }
 

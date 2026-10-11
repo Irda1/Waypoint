@@ -23,6 +23,12 @@ test('deux allers simples si on repart d\'ailleurs', () => {
   const t = tfsOf(l[1].url);
   assert.ok(t.includes('KIX') && t.includes('CDG') && t.includes('2026-11-02'));
 });
+test('aller simple : un seul vol, même si on repart du même aéroport', () => {
+  const l = flightLinks({ ...plan, oneWay: true, arrive: { name: 'Lisbonne', iata: 'LIS' }, leave: { name: 'Lisbonne', iata: 'LIS' } });
+  assert.equal(l.length, 1);
+  assert.match(l[0].label, /^Aller Paris \(CDG\) → Lisbonne \(LIS\)/);
+  assert.ok(!tfsOf(l[0].url).includes('2026-11-02'));
+});
 test('rien sans aéroport d\'arrivée', () => {
   assert.deepEqual(flightLinks({ ...plan, arrive: null, leave: null }), []);
 });
