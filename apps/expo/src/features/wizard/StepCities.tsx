@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Text as RNText, View, useWindowDimensions } from 'react-native';
-import { Button, ErrorNote, Field, Text } from '../../ui';
+import { Pressable, Text as RNText, View, useWindowDimensions } from 'react-native';
+import { Button, ChevronBadge, ErrorNote, Field, Text } from '../../ui';
 import { RegionMap } from '../regions/RegionMap';
 import { listCountryCities, listCountryCityPoints } from '../../data/places';
 import { warmCity } from '../../data/cityCollection';
@@ -19,13 +19,14 @@ import { ViewToggle } from './ViewToggle';
 
 type Row = CityOption & { featured_rank: number | null };
 
-export function StepCities({ state, update, preferCity }: StepProps<WizardState> & { preferCity?: string | null }) {
+export function StepCities({ state, update, preferCity, onMapGrab }: StepProps<WizardState> & { preferCity?: string | null; onMapGrab?: (on: boolean) => void }) {
   const { colors } = useTheme();
   const [query, setQuery] = useState('');
   const [list, setList] = useState<Row[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [warn, setWarn] = useState<string | null>(null);
   const [showList, setShowList] = useState(false);
+  const [routeOpen, setRouteOpen] = useState(false);
   const [points, setPoints] = useState<CityPoint[]>([]);
   const nights = nightCount(state);
   const country = state.country ?? '';
@@ -83,11 +84,11 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
     if (p) toggle({ id: p.id, name: p.name } as Row);
   }
 
-  const { width } = useWindowDimensions();
+  const { width, height } = useWindowDimensions();
   const wide = width >= 900;
   const map = (
-    <View style={{ flex: 1, minHeight: 280, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' }}>
-      <RegionMap country={country} cities={points} selected={selected} onToggle={toggleById} />
+    <View style={wide ? { flex: 1, minHeight: 280, borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' } : { height: Math.max(440, Math.round(height * 0.62)), borderRadius: 18, overflow: 'hidden', backgroundColor: '#000' }}>
+      <RegionMap country={country} cities={points} selected={selected} onToggle={toggleById} onGrab={onMapGrab} />
       <ViewToggle showing="visual" onPress={() => setShowList(true)} listLabel="Afficher la liste des villes" backLabel="Revenir à la carte" backIcon="map" />
     </View>
   );
@@ -95,8 +96,17 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
     <>
       {state.cities.length > 0 ? (
         <View style={{ gap: space.xs }}>
-          <Text variant="label">Ton parcours{state.cities.length > 1 ? ' · glisse ⠿ pour changer l\'ordre' : ''}</Text>
-          <DragList count={state.cities.length} mode="insert" orderKey={state.cities.map((c) => c.id).join(',')} onMove={(from, to) => update({ ...state, cities: moveCity(state.cities, from, to) })} renderRow={(i, handle) => {
+          {wide ? <Text variant="label">Ton parcours{state.cities.length > 1 ? ' · glisse ⠿ pour changer l\'ordre' : ''}</Text> : (
+            <Pressable accessibilityRole="button" accessibilityState={{ expanded: routeOpen }} accessibilityLabel="Ton parcours : afficher ou masquer la liste des villes" onPress={() => setRouteOpen(!routeOpen)}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 56, padding: space.md, borderRadius: 16, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface }}>
+              <View style={{ flex: 1 }}>
+                <Text variant="body" style={{ fontFamily: fonts.sansBold }}>Ton parcours · {state.cities.length} ville{state.cities.length > 1 ? 's' : ''}</Text>
+                <Text variant="muted" numberOfLines={1}>{routeOpen ? (state.cities.length > 1 ? 'Glisse ⠿ pour changer l\'ordre, − et + pour les nuits' : 'Ajuste les nuits avec − et +') : state.cities.map((c, i) => `${i + 1}. ${c.name}`).join('  ') + ' · touche pour modifier'}</Text>
+              </View>
+              <ChevronBadge open={routeOpen} />
+            </Pressable>
+          )}
+          {wide || routeOpen ? <DragList count={state.cities.length} mode="insert" orderKey={state.cities.map((c) => c.id).join(',')} onMove={(from, to) => update({ ...state, cities: moveCity(state.cities, from, to) })} renderRow={(i, handle) => {
             const c = state.cities[i];
             return (
             <View style={{ paddingBottom: space.sm }}>
@@ -118,7 +128,7 @@ export function StepCities({ state, update, preferCity }: StepProps<WizardState>
             </View>
             </View>
             );
-          }} />
+          }} /> : null}
         </View>
       ) : (
         <Text variant="muted">Tu peux aussi continuer sans choisir : « Je choisirai sur place ».</Text>

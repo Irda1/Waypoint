@@ -118,7 +118,8 @@ canvas{display:block;width:100%;height:100%}
     var sgeo = new THREE.BufferGeometry(); sgeo.setAttribute("position", new THREE.BufferAttribute(sp, 3));
     scene.add(new THREE.Points(sgeo, new THREE.PointsMaterial({ color: 0xffffff, size: 0.16, sizeAttenuation: true, transparent: true, opacity: 0.7, depthWrite: false })));
     var hc = document.createElement("canvas"); hc.width = hc.height = 256; var hx = hc.getContext("2d");
-    var hg = hx.createRadialGradient(128, 128, 0, 128, 128, 128); hg.addColorStop(0, "rgba(255,240,205,.95)"); hg.addColorStop(0.07, "rgba(255,214,150,.75)"); hg.addColorStop(0.3, "rgba(255,160,90,.18)"); hg.addColorStop(1, "rgba(255,140,60,0)");
+    var hg = hx.createRadialGradient(128, 128, 0, 128, 128, 128); var ac = new THREE.Color(COLOR), tint = function (k, al) { return "rgba(" + Math.round((1 + (ac.r - 1) * k) * 255) + "," + Math.round((1 + (ac.g - 1) * k) * 255) + "," + Math.round((1 + (ac.b - 1) * k) * 255) + "," + al + ")"; };
+    hg.addColorStop(0, tint(0.12, 0.95)); hg.addColorStop(0.07, tint(0.45, 0.75)); hg.addColorStop(0.3, tint(0.9, 0.18)); hg.addColorStop(1, tint(1, 0));
     hx.fillStyle = hg; hx.fillRect(0, 0, 256, 256);
     sun = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(hc), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
     sun.scale.set(16, 16, 1); scene.add(sun);

@@ -8,7 +8,7 @@ import type { RegionMapProps } from './types';
 const WebViewView = WebView as unknown as React.ComponentType<Record<string, unknown>>;
 
 /** Carte des régions sur Android et iOS : la même page MapLibre dans une WebView. */
-export function RegionMap({ country, cities, selected, onToggle }: RegionMapProps) {
+export function RegionMap({ country, cities, selected, onToggle, onGrab }: RegionMapProps) {
   const view = useRef<{ injectJavaScript: (script: string) => void } | null>(null);
   const [ready, setReady] = useState(false);
   const html = useMemo(() => regionsHtml(), []);
@@ -25,12 +25,13 @@ export function RegionMap({ country, cities, selected, onToggle }: RegionMapProp
 
   function onMessage(e: WebViewMessageEvent) {
     try {
-      const m = JSON.parse(e.nativeEvent.data) as { type: string; id?: number };
+      const m = JSON.parse(e.nativeEvent.data) as { type: string; id?: number; on?: boolean };
       if (m.type === 'ready') setReady(true);
+      if (m.type === 'grab') onGrab?.(!!m.on);
       if (m.type === 'toggle' && typeof m.id === 'number') onToggle(m.id);
     } catch { /* message étranger : ignoré */ }
   }
 
-  return <WebViewView key={country} ref={view} originWhitelist={['*']} source={{ html, baseUrl: 'https://waypoint.local' }} javaScriptEnabled domStorageEnabled
+  return <WebViewView key={country} ref={view} originWhitelist={['*']} source={{ html, baseUrl: 'https://waypoint.local' }} javaScriptEnabled domStorageEnabled nestedScrollEnabled
     injectedJavaScriptBeforeContentLoaded={before} onLoadStart={() => setReady(false)} onMessage={onMessage} style={{ flex: 1, backgroundColor: '#000' }} />;
 }

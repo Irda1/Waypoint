@@ -32,10 +32,12 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   if (!window.maplibregl) { msg.textContent = "Carte indisponible : connexion requise."; post({ type: "ready" }); return; }
 
   // Vue inclinée : le pays paraît plus petit qu'à plat, on rapproche un peu la caméra.
-  var TILT_ZOOM = 0.1;
+  var TILT_ZOOM = 0;
   var map = new maplibregl.Map({ container: "map", style: { version: 8, sources: { sat0: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 6 }, sat: { type: "raster", tiles: ["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless-2020_3857/default/g/{z}/{y}/{x}.jpg"], tileSize: 256, maxzoom: 13, attribution: "Sentinel-2 cloudless © EOX" } }, layers: [{ id: "bg", type: "background", paint: { "background-color": "#000" } }, { id: "sat0", type: "raster", source: "sat0", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }, { id: "sat", type: "raster", source: "sat", paint: { "raster-saturation": 0.1, "raster-contrast": 0.08 } }]},
-    center: [0, 20], zoom: 1.5, pitch: 42, maxPitch: 60, attributionControl: false, dragRotate: false, pitchWithRotate: false, renderWorldCopies: false, maxZoom: 14 });
+    center: [0, 20], zoom: 1.5, pitch: 30, maxPitch: 60, attributionControl: false, dragRotate: false, pitchWithRotate: false, renderWorldCopies: false, maxZoom: 14 });
   map.touchZoomRotate.disableRotation();
+  // Doigt posé sur la carte : l'appli bloque le défilement de la page pour que la carte se déplace seule.
+  ["touchstart", "touchend", "touchcancel"].forEach(function (t) { document.addEventListener(t, function (e) { post({ type: "grab", on: t === "touchstart" || (e.touches && e.touches.length > 0) }); }, true); });
   // Pendant un zoom à deux doigts (et juste après), aucun toucher ne compte comme un choix.
   var pinchUntil = 0, pinching = function () { return Date.now() < pinchUntil; };
   ["touchstart", "touchend"].forEach(function (t) { document.addEventListener(t, function (e) { var n = e.touches.length; if (n > 1) pinchUntil = Infinity; else if (pinchUntil === Infinity && n === 0) pinchUntil = Date.now() + 350; }, true); });
@@ -57,11 +59,21 @@ html,body,#map{margin:0;height:100%;width:100%;background:#000;font-family:syste
   var countryBox = null;
   // Zone principale du pays (ou d'une région) : on ignore les îles lointaines (Açores, Canaries, Alaska, îles d'Ogasawara pour Tokyo…) pour cadrer sur l'essentiel.
   function mainBox(list, extra) {
-    var parts = []; list.forEach(function (f) { polysOf(f.geometry).forEach(function (p) { var b = [1e9, 1e9, -1e9, -1e9]; p[0].forEach(function (c) { if (c[0] < b[0]) b[0] = c[0]; if (c[1] < b[1]) b[1] = c[1]; if (c[0] > b[2]) b[2] = c[0]; if (c[1] > b[3]) b[3] = c[1]; }); parts.push(b); }); });
+    var parts = []; list.forEach(function (f) { polysOf(f.geometry).forEach(function (p) { var b = [1e9, 1e9, -1e9, -1e9]; p[0].forEach(function (c) { if (c[0] < b[0]) b[0] = c[0]; if (c[1] < b[1]) b[1] = c[1]; if (c[0] > b[2]) b[2] = c[0]; if (c[1] > b[3]) b[3] = c[1]; }); b.a = (b[2] - b[0]) * (b[3] - b[1]); parts.push(b); }); });
     if (!parts.length) return null;
-    var big = parts.reduce(function (a, b) { return (b[2] - b[0]) * (b[3] - b[1]) > (a[2] - a[0]) * (a[3] - a[1]) ? b : a; });
-    var bc = [(big[0] + big[2]) / 2, (big[1] + big[3]) / 2], reach = 1.5 * Math.hypot(big[2] - big[0], big[3] - big[1]) + (extra == null ? 3 : extra);
-    return union(parts.filter(function (b) { return Math.hypot((b[0] + b[2]) / 2 - bc[0], (b[1] + b[3]) / 2 - bc[1]) < reach; }));
+    // On part des morceaux qui comptent (au moins 10 % du plus grand), puis on ajoute ceux d'au moins 1,5 % qui les touchent (à « gap » degrés près, 1° par défaut) : les îles lointaines restent dehors, la Corse ou Kyushu restent dedans.
+    var max = Math.max.apply(null, parts.map(function (b) { return b.a; })), gap = extra == null ? 1 : extra;
+    var inc = parts.filter(function (b) { return b.a >= 0.1 * max; }), rest = parts.filter(function (b) { return b.a < 0.1 * max; }), grew = true;
+    while (grew) {
+      grew = false;
+      rest = rest.filter(function (b) {
+        if (b.a < 0.015 * max) return true;
+        var near = inc.some(function (o) { return b[0] - gap <= o[2] && b[2] + gap >= o[0] && b[1] - gap <= o[3] && b[3] + gap >= o[1]; });
+        if (near) { inc.push(b); grew = true; }
+        return !near;
+      });
+    }
+    return union(inc);
   }
   function zoomFor(b) { var c = map.cameraForBounds([[b[0], b[1]], [b[2], b[3]]], { padding: pad(), maxZoom: 10 }); return c ? Math.min(10, c.zoom + TILT_ZOOM) : map.getZoom(); }
 

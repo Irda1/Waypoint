@@ -77,7 +77,6 @@ const STATUS = { connecting: 'Connexion en direct…', live: 'Synchronisé en di
 const ON_PHOTO = '#F4EFE6';
 const ON_PHOTO_SOFT = 'rgba(245, 245, 242, 0.82)';
 // Sable clair pour les petits titres posés sur photo (l'accent du thème clair est trop sombre ici).
-const ON_PHOTO_ACCENT = '#FFD08A';
 
 function lodgingOf(stayId: string | null, stays: { id: string; name: string; address: string | null; lat: number | null; lng: number | null }[]) {
   const st = stayId ? stays.find((x) => x.id === stayId) : undefined;
@@ -149,7 +148,7 @@ export default function TripScreen() {
   // Bandeau du haut (onglet Voyage) : mêmes couleurs que l'accueil selon le mode.
   const H = mode === 'jour'
     ? { text: colors.text, soft: colors.text2, eyebrow: colors.accent, glassBg: colors.surface, glassLine: colors.lineStrong }
-    : { text: ON_PHOTO, soft: ON_PHOTO_SOFT, eyebrow: ON_PHOTO_ACCENT, glassBg: 'rgba(7, 9, 11, 0.45)', glassLine: 'rgba(245, 245, 242, 0.25)' };
+    : { text: ON_PHOTO, soft: ON_PHOTO_SOFT, eyebrow: palette('nuit', accent).accent2, glassBg: 'rgba(7, 9, 11, 0.45)', glassLine: 'rgba(245, 245, 242, 0.25)' };
   const destDetail = data.destinations.map((d) => (d.nights > 0 ? `${d.name} (${d.nights} nuit${d.nights > 1 ? 's' : ''})` : d.name)).join(' → ');
 
   async function changeDestination(action: () => Promise<string | null>) {
@@ -243,7 +242,7 @@ export default function TripScreen() {
           <ImageBackground source={dayPick.source} resizeMode="cover" style={styles.dayHero}>
             <View style={styles.veil} pointerEvents="none" />
             <SafeAreaView edges={['top']} style={styles.dayHeroInner}>
-              <RNText style={[styles.eyebrow, { color: ON_PHOTO_ACCENT }]}>Jour {selIdx + 1} sur {data.days.length} · {formatDay(selDay.day_date)}</RNText>
+              <RNText style={[styles.eyebrow, { color: palette('nuit', accent).accent2 }]}>Jour {selIdx + 1} sur {data.days.length} · {formatDay(selDay.day_date)}</RNText>
               <RNText style={styles.poster} accessibilityRole="header">{selCity || trip.title}</RNText>
               <RNText style={styles.lead}>{selCity ? trip.title : dates}</RNText>
               {dayPick.cover?.credit ? <RNText style={{ fontFamily: fonts.sans, fontSize: 10, color: ON_PHOTO_SOFT }}>{dayPick.cover.credit}</RNText> : null}

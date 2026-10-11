@@ -60,6 +60,8 @@ function CompleteWizard() {
   // Sens du dernier changement d'étape : 1 en avançant, -1 en reculant (l'étape glisse depuis ce côté).
   const [dir, setDir] = useState<1 | -1>(1);
   const scroll = useRef<ScrollView>(null);
+  // Doigt posé sur la carte des villes : la page ne défile plus (sinon elle remonte au lieu de déplacer la carte).
+  const [mapGrab, setMapGrab] = useState(false);
   useEffect(() => { scroll.current?.scrollTo({ y: 0, animated: false }); }, [step]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -147,11 +149,11 @@ function CompleteWizard() {
         </View>
       </SafeAreaView>
 
-      <ScrollView ref={scroll} contentContainerStyle={{ flexGrow: 1, padding: space.lg, paddingBottom: step === 'villes' || step === 'pays' ? space.md : space.xxl * 2, width: '100%', maxWidth: step === 'villes' ? 1320 : 880, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
+      <ScrollView ref={scroll} scrollEnabled={!mapGrab} contentContainerStyle={{ flexGrow: 1, padding: space.lg, paddingBottom: step === 'villes' || step === 'pays' ? space.md : space.xxl * 2, width: '100%', maxWidth: step === 'villes' ? 1320 : 880, alignSelf: 'center' }} keyboardShouldPersistTaps="handled">
         <FadeIn key={step} dx={24 * dir} dy={0} fill>
         {step === 'pays' ? <StepCountry {...props} /> : null}
         {step === 'dates' ? <StepDates {...props} /> : null}
-        {step === 'villes' ? <StepCities {...props} preferCity={preCity} /> : null}
+        {step === 'villes' ? <StepCities {...props} preferCity={preCity} onMapGrab={setMapGrab} /> : null}
         {step === 'voyageurs' ? <StepTravelers {...props} /> : null}
         {step === 'depart' ? <StepDeparture {...props} /> : null}
         {step === 'interets' ? <StepInterests {...props} /> : null}
