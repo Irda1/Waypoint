@@ -6,7 +6,7 @@ import { formatTime } from '../../domain/planning.ts';
 import { toggleExcluded, wizardPlan } from '../../domain/wizard.ts';
 import type { WizardState } from '../../domain/wizard.ts';
 import type { Candidate } from '../../domain/itinerary.ts';
-import { loadCandidates } from '../../data/itinerary';
+import { loadWizardCandidates, wizardCityIds } from '../../data/itinerary';
 import { ensureCitiesCollected } from '../../data/cityCollection';
 import type { CollectionProgress } from '../../domain/collection.ts';
 import { useCategories } from '../../data/categories';
@@ -24,19 +24,19 @@ export function StepProposals({ state, update }: StepProps<WizardState>) {
   const [candidates, setCandidates] = useState<Candidate[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [progress, setProgress] = useState<CollectionProgress | null>(null);
-  const cityKey = state.cities.map((c) => c.id).join(',');
+  const cityKey = wizardCityIds(state.cities).join(',');
 
-  // Les lieux ne sont lus que pour les villes choisies : celles qui ne sont pas prêtes sont collectées tout de suite
+  // Les lieux ne sont lus que pour les villes choisies (et leurs quartiers à explorer) : celles qui ne sont pas prêtes sont collectées tout de suite
   // depuis l'appli (pourcentage réel), ou confiées au robot si ça échoue, avant d'afficher les propositions.
   useEffect(() => {
     if (!state.cities.length || categories.byCode.size === 0) return;
     let alive = true;
-    const ids = state.cities.map((c) => c.id);
+    const ids = wizardCityIds(state.cities);
     setCandidates(null); setProgress(null);
     void (async () => {
       const r = await ensureCitiesCollected(ids, (p) => { if (alive) setProgress(p); }, () => alive);
       if (!alive) return;
-      const loaded = await loadCandidates(ids, categories.rootOf);
+      const loaded = await loadWizardCandidates(state.cities, categories.rootOf);
       if (!alive) return;
       setCandidates(loaded.candidates); setError(loaded.error ?? r.error);
     })();
@@ -68,7 +68,7 @@ export function StepProposals({ state, update }: StepProps<WizardState>) {
           {plan.every((p) => p.empty) ? <Text variant="muted">Aucun lieu disponible pour ces villes : les jours resteront vides et tu pourras les remplir ensuite.</Text> : null}
           {plan.map((d) => (
             <Card key={d.date}>
-              <Text variant="label" style={{ textTransform: 'capitalize' }}>{formatDay(d.date)}</Text>
+              <Text variant="label" style={{ textTransform: 'capitalize' }}>{formatDay(d.date)}{d.focus ? ` · ${d.focus}` : ''}</Text>
               {d.empty ? <Text variant="muted">Rien à proposer ce jour-là.</Text> : d.items.map((i, k) => {
                 const name = i.place?.name ?? i.title ?? 'Étape';
                 const dot = categoryColors[mode][i.root ?? ''] ?? colors.text3;

@@ -14,7 +14,8 @@ export interface Candidate {
   popularity: number;
 }
 
-export interface PlanDay { date: string; cityId: number | null }
+/** `focus` : journée consacrée à un quartier (les visites et repas sont pris autour de lui quand il y en a assez). */
+export interface PlanDay { date: string; cityId: number | null; focus?: { name: string; lat: number; lng: number } | null }
 
 export type SlotKind = 'visit' | 'lunch' | 'dinner' | 'arrival';
 
@@ -43,6 +44,8 @@ export interface PlannedDay {
   empty: boolean;
   /** Jour d'arrivée ou de changement de ville : la journée commence l'après-midi. */
   transfer: boolean;
+  /** Quartier du jour (« Asakusa »), si la journée lui est consacrée. */
+  focus?: string;
 }
 
 export interface PlanOptions {
@@ -66,6 +69,8 @@ const DEFAULT_VISIT_MIN = 60;
 const VISIT_LIMIT = 19 * 60 + 15;   // on n'enchaîne plus de visite qui finirait après 19 h 15
 
 const FOOD = 'gastronomie';
+/** Rayon d'un quartier : lieux à moins de 2,5 km de son centre. */
+const FOCUS_KM = 2.5;
 const NIGHT = 'nocturne';
 
 const durationOf = (p: Place): number => p.visit_duration_min && p.visit_duration_min > 0 ? p.visit_duration_min : DEFAULT_VISIT_MIN;
@@ -115,14 +120,19 @@ export function buildPlan(days: PlanDay[], candidates: Candidate[], opts: PlanOp
     const cityId = cities[index];
     const transfer = index === 0 || (index > 0 && cityId !== cities[index - 1]);
     const pool = cityId != null ? byCity.get(cityId) ?? [] : [];
-    const open = pool.filter((c) => !used.has(c.place.id) && isOpen(c.place, day.date));
+    const openAll = pool.filter((c) => !used.has(c.place.id) && isOpen(c.place, day.date));
+    // Journée de quartier : seulement les lieux autour de lui, s'il y a au moins deux visites possibles.
+    const near = day.focus ? openAll.filter((c) => distanceKm(day.focus!, c.place) <= FOCUS_KM) : [];
+    const focused = near.filter((c) => c.root !== FOOD && c.root !== NIGHT).length >= 2;
+    const open = focused ? near : openAll;
+    const focus = focused ? day.focus!.name : undefined;
     const foods = open.filter((c) => c.root === FOOD);
     const sights = open.filter((c) => c.root !== FOOD && c.root !== NIGHT);
     const items: PlannedItem[] = [];
     const taken = new Set<number>();
     const take = (c: Scored) => { used.add(c.place.id); taken.add(c.place.id); };
 
-    if (!sights.length && !foods.length) return { date: day.date, cityId, items, empty: true, transfer };
+    if (!sights.length && !foods.length) return { date: day.date, cityId, items, empty: true, transfer, focus };
 
     let cursor = transfer ? ARRIVAL : DAY_START;
     if (transfer) items.push({ kind: 'arrival', place: null, title: index === 0 ? ARRIVAL_TITLES[0] : ARRIVAL_TITLES[1], root: null, startMin: ARRIVAL - 30, durationMin: 30, badges: [] });
@@ -191,7 +201,7 @@ export function buildPlan(days: PlanDay[], candidates: Candidate[], opts: PlanOp
       if (night) { take(night); items.push({ kind: 'visit', place: night.place, title: null, root: NIGHT, startMin: roundUp5(Math.max(cursor + 15, 21 * 60 + 45)), durationMin: durationOf(night.place), badges: badgesOf(night, opts.interests) }); }
     }
     items.sort((a, b) => a.startMin - b.startMin);
-    return { date: day.date, cityId, items, empty: false, transfer };
+    return { date: day.date, cityId, items, empty: false, transfer, focus };
   });
 }
 

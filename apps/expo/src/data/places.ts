@@ -96,25 +96,69 @@ export async function requestCityCollection(cityId: number): Promise<{ status: s
   return { status: (data as string | null) ?? null, error: error?.message ?? null };
 }
 
-/** Villes d'un pays pour le parcours de création : les villes phares d'abord (rang), puis les plus peuplées. */
-export async function listCountryCities(country: string, query = ''): Promise<{ cities: (CityOption & { featured_rank: number | null })[]; error: string | null }> {
+/** Quartier trouvé par la recherche : on le propose avec sa ville (« Shibuya · quartier de Tokyo »). */
+export type CountryCity = CityOption & { featured_rank: number | null; lat?: number; lng?: number; parent?: { id: number; name: string } };
+
+/**
+ * Villes d'un pays pour le parcours de création : les villes phares d'abord (rang), puis les plus peuplées.
+ * Sans texte, les quartiers sont écartés ; avec un texte, ils sont proposés avec leur ville (migration 2200).
+ */
+export async function listCountryCities(country: string, query = ''): Promise<{ cities: CountryCity[]; error: string | null }> {
   const term = likeTerm(query);
-  let q = supabase.from('cities').select(`${CITY_COLUMNS},featured_rank`).eq('country_code', country);
-  if (term) q = q.or(`name.ilike.%${term}%,name_fr.ilike.%${term}%,name_ascii.ilike.%${term}%`);
-  const { data, error } = await q
-    .order('featured_rank', { ascending: true, nullsFirst: false })
-    .order('population', { ascending: false, nullsFirst: false })
-    .limit(40);
-  const rows = (data ?? []) as (CityRow & { featured_rank: number | null })[];
-  return { cities: rows.map((r) => ({ ...toOption(r), featured_rank: r.featured_rank })), error: error?.message ?? null };
+  const run = (withDistricts: boolean) => {
+    let q = supabase.from('cities').select(`${CITY_COLUMNS},featured_rank,lat,lng${withDistricts ? ',parent_geonames_id' : ''}`).eq('country_code', country);
+    if (term) q = q.or(`name.ilike.%${term}%,name_fr.ilike.%${term}%,name_ascii.ilike.%${term}%`);
+    else if (withDistricts) q = q.is('parent_geonames_id', null);
+    return q.order('featured_rank', { ascending: true, nullsFirst: false }).order('population', { ascending: false, nullsFirst: false }).limit(40);
+  };
+  // Sans la migration 2200 (colonne absente), on relit comme avant.
+  let { data, error } = await run(true);
+  if (error) ({ data, error } = await run(false));
+  const rows = (data ?? []) as unknown as (CityRow & { featured_rank: number | null; lat: number; lng: number; parent_geonames_id?: number | null })[];
+  const parentIds = [...new Set(rows.map((r) => r.parent_geonames_id).filter((g): g is number => g != null))];
+  const parents = new Map<number, { id: number; name: string }>();
+  if (parentIds.length) {
+    const { data: ps } = await supabase.from('cities').select('id,name,name_fr,geonames_id').in('geonames_id', parentIds);
+    for (const p of (ps ?? []) as { id: number; name: string; name_fr: string | null; geonames_id: number }[]) parents.set(p.geonames_id, { id: p.id, name: p.name_fr ?? p.name });
+  }
+  const cities = rows.map((r) => {
+    const parent = r.parent_geonames_id != null ? parents.get(r.parent_geonames_id) : undefined;
+    return { ...toOption(r), featured_rank: r.featured_rank, lat: r.lat, lng: r.lng, ...(parent ? { parent } : {}) };
+  });
+  return { cities, error: error?.message ?? null };
+}
+
+export interface Quartier { id: number; name: string; lat: number; lng: number }
+
+/** « Quartiers à explorer » de chaque ville (les plus peuplés d'abord, 12 au plus). Vide sans la migration 2200. */
+export async function listQuartiers(cityIds: number[]): Promise<Map<number, Quartier[]>> {
+  const out = new Map<number, Quartier[]>();
+  if (!cityIds.length) return out;
+  const { data: cs } = await supabase.from('cities').select('id,geonames_id').in('id', cityIds);
+  const byGeo = new Map(((cs ?? []) as { id: number; geonames_id: number | null }[]).filter((c) => c.geonames_id != null).map((c) => [c.geonames_id!, c.id]));
+  if (!byGeo.size) return out;
+  const { data, error } = await supabase.from('cities').select('id,name,name_fr,lat,lng,parent_geonames_id')
+    .in('parent_geonames_id', [...byGeo.keys()]).order('population', { ascending: false, nullsFirst: false }).limit(12 * byGeo.size);
+  if (error) return out;
+  for (const r of (data ?? []) as { id: number; name: string; name_fr: string | null; lat: number; lng: number; parent_geonames_id: number }[]) {
+    const city = byGeo.get(r.parent_geonames_id)!;
+    const list = out.get(city) ?? [];
+    if (list.length < 12) out.set(city, [...list, { id: r.id, name: r.name_fr ?? r.name, lat: r.lat, lng: r.lng }]);
+  }
+  return out;
 }
 
 export interface CityPoint { id: number; name: string; lat: number; lng: number; /** Importance : 0 = la plus importante (ville phare, capitale, puis population). */ rank: number; /** Desservie par un aéroport à vols réguliers (moins de 40 km). */ airport: boolean }
 
-/** Villes d'un pays avec coordonnées, pour la carte de l'étape Villes (jusqu'à 400, classées par importance). */
+/** Villes d'un pays avec coordonnées, pour la carte de l'étape Villes (jusqu'à 400, classées par importance, sans les quartiers). */
 export async function listCountryCityPoints(country: string): Promise<{ points: CityPoint[]; error: string | null }> {
-  const { data, error } = await supabase.from('cities').select('id,name,name_fr,lat,lng,population,featured_rank,is_capital')
-    .eq('country_code', country).order('population', { ascending: false, nullsFirst: false }).limit(400);
+  const run = (skipDistricts: boolean) => {
+    const q = supabase.from('cities').select('id,name,name_fr,lat,lng,population,featured_rank,is_capital').eq('country_code', country);
+    return (skipDistricts ? q.is('parent_geonames_id', null) : q).order('population', { ascending: false, nullsFirst: false }).limit(400);
+  };
+  // Sans la migration 2200 (colonne absente), on relit comme avant.
+  let { data, error } = await run(true);
+  if (error) ({ data, error } = await run(false));
   type R = { id: number; name: string; name_fr: string | null; lat: number; lng: number; population: number | null; featured_rank: number | null; is_capital: boolean };
   const rows = (data ?? []) as R[];
   const score = (r: R) => (r.featured_rank != null ? r.featured_rank : 1000) * 1e10 - (r.is_capital ? 5e9 : 0) - (r.population ?? 0);
