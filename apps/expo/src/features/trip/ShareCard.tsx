@@ -3,11 +3,14 @@ import { Platform, View } from 'react-native';
 import { Button, Card, ErrorNote, Text } from '../../ui';
 import { createShare, getShareToken, revokeShare } from '../../data/trips';
 import { WEB_URL } from '../../lib/env';
+import { WEB_BASE } from '../../lib/webBase';
 import { shareText } from '../../lib/share';
 import { space } from '../../theme/tokens';
 
 function shareUrl(token: string): string {
-  const origin = Platform.OS === 'web' ? (globalThis as { location?: { origin: string } }).location?.origin ?? WEB_URL : WEB_URL;
+  // Sur le web, l'adresse du site courant (avec son dossier, ex. /Waypoint sur GitHub Pages) ; sur téléphone, le site public.
+  const here = (globalThis as { location?: { origin: string } }).location?.origin;
+  const origin = Platform.OS === 'web' && here ? here + WEB_BASE : WEB_URL;
   return `${origin}/share/${token}`;
 }
 

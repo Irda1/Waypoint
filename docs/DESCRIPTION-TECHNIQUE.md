@@ -2,7 +2,9 @@
 
 Ce document sépare trois choses : **ce qui existe aujourd'hui** (la maquette), **ce qui est proposé** pour l'application réelle, et **ce qui reste à vérifier**. Une donnée ou une API n'est jamais présentée comme disponible sans avoir été contrôlée (règle du projet).
 
-## 1. Ce qui existe aujourd'hui : une maquette sans backend ni API
+## 1. Point de départ (historique) : la maquette v0.9, sans backend ni API
+
+> Cette maquette a été retirée du dépôt (elle reste dans l'historique git, commit `86fbf9b`). L'application réelle est `apps/expo` (section 3, `docs/BACKEND.md`, `docs/CONTEXT-CLAUDE-CODE.md`), publiée sur GitHub Pages (https://irda1.github.io/Waypoint/) et en APK.
 
 ### Langages et format
 - **HTML / CSS / JavaScript « vanilla »**, sans framework ni bibliothèque, dans **un seul fichier** : `web/index.html` (≈ 3 700 lignes, 1,2 Mo, photos incluses en base64).
@@ -53,7 +55,7 @@ Les choix ci-dessous ont été tranchés ; leur mise en route est décrite dans 
 | Voyages partagés | Membres tous égaux (aucun rôle), modifications en direct, dernier écrit gagne champ par champ, numéro de version par ligne, journal des modifications | tables `trips`, `trip_members`, `trip_days`, `trip_items`, `expenses`, `trip_activity_log`… |
 | IA | Couche au-dessus de données structurées (l'IA propose, l'utilisateur décide) | Phase 3 ; non commencée |
 
-La maquette (`web/`, Capacitor) reste la référence d'écrans et de logique ; elle continue d'être publiée sur GitHub Pages et en APK.
+La maquette (`web/`, Capacitor) a servi de référence d'écrans et de logique ; elle a été retirée du dépôt une fois l'application Expo publiée à sa place.
 
 ## 4. Sources de données possibles (avec ce qui a été vérifié)
 

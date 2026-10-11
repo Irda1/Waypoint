@@ -11,15 +11,17 @@ Compagnon de voyage collaboratif (Expo + Supabase). Contexte complet : `docs/CON
 ## Commandes
 Appli (`apps/expo`) :
 - `npm install` · `npm test` (tests du domaine) · `npm run typecheck` (doit rester propre)
-- `npx expo start --web` (local, http://localhost:8081) · `npm run export:web` (dossier `dist` pour Netlify)
+- `npx expo start --web` (local, http://localhost:8081) · `npm run export:web` (dossier `dist`, même build que le site)
 
 Racine : `node --test pipeline/test/*.test.mjs` (collecte) · `bash supabase/tests/run-local.sh` (schéma + RLS, PostgreSQL jetable) · `node scripts/bundle-sql.mjs [--check]`.
 
+Ces vérifications tournent seules sur chaque PR et chaque fusion (`.github/workflows/verifications.yml`) : une PR rouge ne se fusionne pas.
+
 ## Structure
 - `apps/expo/app` écrans · `src/features` UI · `src/data` Supabase/hors ligne · `src/domain` logique pure testée. `*.web.ts(x)` = version web.
-- `public/globe.html`, `public/route.html` (fond animé de l'accueil) et `public/map.html` sont **générés** (`domain/globe.ts`, `domain/routeGlobe.ts`, `domain/map.ts`) : les regénérer après modif, un test vérifie la cohérence.
+- `public/globe.html`, `public/route.html` (fond animé de l'accueil), `public/regions.html` (carte des villes) et `public/map.html` sont **générés** (`domain/globe.ts`, `domain/routeGlobe.ts`, `domain/regionsMap.ts`, `domain/map.ts`) : les regénérer après modif, un test vérifie la cohérence. Images de la Terre : `public/tex` (2K chargées d'abord, 4K quand la planète est grande à l'écran).
 - `supabase/migrations/` migrations ; `supabase/all-migrations.sql` est **généré**, ne pas l'éditer. Skill : `supabase-migrations`.
-- `.github/workflows/apk-app.yml` APK Android. Skill : `apk-build`.
+- `.github/workflows/apk-app.yml` APK Android. Skill : `apk-build`. `.github/workflows/web-app.yml` site web.
 - L'ancienne maquette (`web/`, Capacitor, v0.9) a été retirée ; elle reste dans l'historique git (commit `86fbf9b`).
 
 ## Carte du code (Graphify)
@@ -29,4 +31,4 @@ Racine : `node --test pipeline/test/*.test.mjs` (collecte) · `bash supabase/tes
 - Le cloud n'a que la clé anon : il ne peut pas exécuter de migration (Adrien les lance dans le SQL Editor).
 - Dans le template de `globeHtml()`, écrire `\\n` pour un retour à la ligne dans le JS de la page.
 - Un seul canal Realtime par écran ; relancer `expo start` après ajout de dépendance.
-- Netlify ne se met pas à jour seul : redéposer un `dist` neuf.
+- Site : https://irda1.github.io/Waypoint/ (GitHub Pages), republié seul à chaque fusion dans main (Netlify n'est plus utilisé). Il vit sous `/Waypoint` : toute adresse du site passe par `WEB_BASE` (`src/lib/webBase.ts`).

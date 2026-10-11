@@ -51,7 +51,7 @@ canvas{display:block;width:100%;height:100%}
   var rim = halo(6.4, [[0.62, "rgba(0,0,0,0)"], [0.8, "rgba(120,190,255,.10)"], [1, "rgba(120,190,255,0)"]]);
   scene.add(rim);
 
-  // planète : images NASA en 4K (domaine public), servies avec l'appli (public/tex) :
+  // planète : images NASA en 2K et 4K (domaine public), servies avec l'appli (public/tex) :
   //   jour = Blue Marble Next Generation (juillet), nuit = Black Marble 2016, nuages = Blue Marble Clouds,
   //   relief = pentes calculées d'après l'altitude GEBCO (rouge/vert) + masque des mers (bleu, Natural Earth 1:50m).
   // Le jour/nuit vient d'une lumière fixe (en haut à droite, vers l'avant) ; le relief accroche la lumière, surtout près
@@ -65,11 +65,23 @@ canvas{display:block;width:100%;height:100%}
   function plain(r, g, b) { var t = new THREE.DataTexture(new Uint8Array([r, g, b, 255]), 1, 1); t.needsUpdate = true; return t; }
   // Une image manquante (hors ligne, adresse pas encore publiée) ne casse rien : jour = ancienne image, sinon couleur neutre.
   function tex(name, srgb, uniform, fallback) {
-    loader.load(BASE + name, function (t) { if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso; uniform.value = t; },
-      undefined, function () { if (typeof fallback === "string") loader.load(fallback, function (t) { t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso; uniform.value = t; }); });
+    var hd = name.indexOf("_4k") > 0;
+    function use(t) {
+      if (uniform.hd && !hd) { t.dispose(); return; }   // une 2K arrivée après la 4K ne la remplace pas
+      if (srgb) t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = aniso;
+      var old = uniform.value; uniform.value = t; uniform.hd = hd; if (old) old.dispose();
+    }
+    loader.load(BASE + name, use, undefined, function () { if (fallback) loader.load(fallback, use); });
   }
   var U = { day: { value: plain(10, 20, 40) }, night: { value: plain(0, 0, 0) }, relief: { value: plain(128, 128, 0) }, clouds: { value: plain(0, 0, 0) }, sun: { value: SUN }, drift: { value: 0 }, cloudy: { value: 1 } };
-  tex("earth_day_4k.jpg", true, U.day, OLD_TEX); tex("earth_night_4k.jpg", true, U.night); tex("earth_relief_4k.jpg", false, U.relief); tex("earth_clouds_4k.jpg", false, U.clouds);
+  // Images 2K d'abord (4 fois plus légères, nettes sur téléphone) ; les 4K seulement quand la planète devient grande
+  // à l'écran (grand écran, zoom sur un pays). Pas de retour à la 2K ensuite.
+  var res = "";
+  function textures(r) {
+    if (res === r || res === "4k") return;
+    var first = !res; res = r;
+    tex("earth_day_" + r + ".jpg", true, U.day, first ? OLD_TEX : null); tex("earth_night_" + r + ".jpg", true, U.night); tex("earth_relief_" + r + ".jpg", false, U.relief); tex("earth_clouds_" + r + ".jpg", false, U.clouds);
+  }
   // repère local de chaque point (est, nord) pour orienter les pentes du relief
   var FRAME_VS = "varying vec2 vUv; varying vec3 vN; varying vec3 vE; varying vec3 vNo;" +
     "void main(){ vUv = uv; vec3 p = normalize(position); vec3 e = normalize(vec3(p.z, 0.0, -p.x) + vec3(1e-5, 0.0, 0.0)); vN = normalize(normalMatrix * p); vE = normalize(normalMatrix * e); vNo = normalize(normalMatrix * cross(p, e));" +
@@ -268,7 +280,7 @@ canvas{display:block;width:100%;height:100%}
   // zoome sur un pays. On charge alors les tuiles Sentinel-2 sans nuages (EOX, CC BY-NC 4.0, niveau 6 ≈ 2,4 km
   // par pixel) de la zone regardée et on les pose sur une portion de sphère juste au-dessus de la Terre, avec
   // le même éclairage jour/nuit ; les nuages s'effacent en même temps. Tant qu'une tuile n'est pas arrivée, sa place reste
-  // transparente et l'image 4K de la Terre se voit dessous.
+  // transparente et l'image de la Terre se voit dessous.
   var DZ = 6, NX = 8, NY = 6, N2 = Math.pow(2, DZ), detail = null, detailKey = "", detailAt = 0;
   var patchMat = new THREE.ShaderMaterial({
     uniforms: { map: { value: null }, sun: { value: SUN }, fade: { value: 0 } }, transparent: true, depthWrite: false,
@@ -314,6 +326,8 @@ canvas{display:block;width:100%;height:100%}
 
   function frame(now) {
     var k = Math.min(1, (now - t0) / 2600), ease = 1 - Math.pow(1 - k, 3);
+    // rayon de la planète à l'écran, en pixels : au-delà de ~420, la 2K deviendrait floue
+    textures(renderer.domElement.height / 2 / Math.tan(camera.fov * Math.PI / 360) / Math.sqrt(target * target - 1) > 420 ? "4k" : "2k");
     if (MODE === "pick") {
       var near = Math.max(0, Math.min(1, (4.4 - dist) / 0.9));
       U.cloudy.value = 1 - near;

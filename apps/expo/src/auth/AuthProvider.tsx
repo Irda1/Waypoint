@@ -6,6 +6,7 @@ import type { Session } from '@supabase/supabase-js';
 import { clearOffline } from '../data/offline';
 import { clearAllReminders } from '../lib/reminders';
 import { supabase } from '../lib/supabase';
+import { WEB_BASE } from '../lib/webBase';
 
 // Termine proprement la fenêtre de connexion Google sur le web.
 WebBrowser.maybeCompleteAuthSession();
@@ -80,7 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const signInWithGoogle = useCallback(async () => {
     if (Platform.OS === 'web') {
-      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin } });
+      const { error } = await supabase.auth.signInWithOAuth({ provider: 'google', options: { redirectTo: window.location.origin + WEB_BASE } });
       return error ? friendly(error.message) : null;
     }
     const redirectTo = Linking.createURL('auth-callback');
@@ -94,7 +95,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signOut = useCallback(async () => { await supabase.auth.signOut(); await clearOffline(); await clearAllReminders(); }, []);
 
   const resetPassword = useCallback(async (email: string) => {
-    const redirectTo = Platform.OS === 'web' ? window.location.origin : undefined;
+    const redirectTo = Platform.OS === 'web' ? window.location.origin + WEB_BASE : undefined;
     const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), redirectTo ? { redirectTo } : undefined);
     return error ? friendly(error.message) : null;
   }, []);
