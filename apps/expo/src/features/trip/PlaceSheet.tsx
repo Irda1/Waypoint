@@ -10,6 +10,7 @@ import { fastest, googleDirectionsUrl, googlePlaceUrl, travelOptions } from '../
 import type { Point } from '../../domain/routes.ts';
 import { useFavorites } from '../../data/favorites';
 import { usePlaceInfo } from '../../data/placeInfo';
+import { Pop } from '../../ui/motion';
 
 interface Props {
   visible: boolean;
@@ -77,7 +78,7 @@ export function PlaceSheet({ visible, tripId, placeId, name, category, dot, plac
               ) : <Row k="Paiement" v={`Payé · ${formatMoney(price * travelers, currency)}`} />
             ) : null}
             <Text variant="muted" style={{ fontSize: 12.5 }}>Durées et prix : valeurs indicatives, à vérifier avant d'y aller.</Text>
-            {placeId != null ? <Button label={isFav ? 'Dans mes favoris' : 'Ajouter aux favoris'} icon="heart" variant="ghost" onPress={() => { void fav.toggle(placeId); }} /> : null}
+            {placeId != null ? <Pop on={isFav}><Button label={isFav ? 'Dans mes favoris' : 'Ajouter aux favoris'} icon="heart" variant="ghost" onPress={() => { void fav.toggle(placeId); }} /></Pop> : null}
             {trip && from && place ? (
               <View style={{ gap: 2 }}>
                 <Button label={`Y aller · ≈ ${formatDuration(trip.minutes)} ${trip.mode === 'walk' ? 'à pied' : trip.mode === 'bike' ? 'à vélo' : trip.mode === 'transit' ? 'en transports' : 'en voiture'}`}

@@ -10,7 +10,7 @@ export type PlusChoice = 'activite' | 'depense' | 'memo';
 
 const CHOICES: { key: PlusChoice; icon: IconName; title: string; hint: string }[] = [
   { key: 'activite', icon: 'places', title: 'Une activité', hint: 'Ajouter une étape à la journée en cours' },
-  { key: 'depense', icon: 'expense', title: 'Une dépense', hint: 'Partagée entre les voyageurs' },
+  { key: 'depense', icon: 'expense', title: 'Une dépense', hint: 'En trois touches, partagée entre les voyageurs' },
   { key: 'memo', icon: 'note', title: 'Une note', hint: 'Dans le mémo du voyage' },
 ];
 

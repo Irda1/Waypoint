@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Platform, Pressable, Text as RNText, View } from 'react-native';
+import { Linking, Platform, Pressable, Text as RNText, View } from 'react-native';
 import { Button, Card, Chip, ErrorNote, Field, PayBadge, Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
 import { categoryColors, fonts, radius, space } from '../../theme/tokens';
@@ -213,22 +213,46 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
           </Pressable>
         </View>
       ))}
-      {live && schedule.length > 0 ? (
-        <View style={{ gap: 2, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }} accessibilityLabel="En ce moment">
-          <Text variant="label" style={{ color: colors.accent }}>En ce moment</Text>
-          {live.current ? (
-            <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>
-              {schedule[live.current.index].place?.name ?? schedule[live.current.index].item.title ?? 'Étape'} · il reste {formatDuration(live.current.remainingMin)}
-            </Text>
-          ) : <Text variant="body">{live.next ? 'Pas d\'étape en cours.' : 'Journée terminée.'}</Text>}
-          {live.next ? (
-            <Text variant="muted">
-              Ensuite : {schedule[live.next.index].place?.name ?? schedule[live.next.index].item.title ?? 'Étape'} à {formatTime(live.next.startMin)}
-              {live.next.travelMin ? ` · ${live.next.travelMin} min de trajet` : ''}
-            </Text>
-          ) : null}
-        </View>
-      ) : null}
+      {live && schedule.length > 0 ? (() => {
+        // Aujourd'hui : l'étape en cours, sinon la prochaine, avec trajet, météo et « Y aller ».
+        const nowMin = now.getHours() * 60 + now.getMinutes();
+        const idx = live.current?.index ?? live.next?.index ?? null;
+        const target = idx != null ? schedule[idx] : null;
+        const done = live.states.filter((st) => st === 'past').length;
+        const lastEnd = schedule.reduce<number | null>((m, x) => (x.endMin != null && (m == null || x.endMin > m) ? x.endMin : m), null);
+        const wait = live.next ? live.next.startMin - nowMin : 0;
+        const when = live.current ? `En cours · il reste ${formatDuration(live.current.remainingMin)}`
+          : live.next ? `Prochaine étape · ${wait < 60 ? `dans ${Math.max(1, wait)} min` : `à ${formatTime(live.next.startMin)}`}` : 'Journée terminée';
+        const targetName = target ? target.place?.name ?? target.item.title ?? 'Étape' : null;
+        return (
+          <View style={{ gap: space.md, padding: space.lg, borderRadius: radius.card, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.lineStrong }} accessibilityLabel={when}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: space.sm }}>
+              <Text variant="label" style={{ color: colors.accent, flexShrink: 1 }}>{when}</Text>
+              {weather ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Icon name={describeCode(weather.day.code).icon} size={16} />{weather.day.max != null ? <Text variant="muted" style={{ fontSize: 13 }}>{Math.round(weather.day.max)}°</Text> : null}</View> : null}
+            </View>
+            {target && targetName ? (
+              <>
+                <RNText style={{ fontFamily: fonts.serif, fontSize: 26, lineHeight: 31, color: colors.text }}>{targetName}</RNText>
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.md }}>
+                  {target.startMin != null ? <Text variant="muted">{formatTime(target.startMin)}{target.endMin != null ? ` → ${formatTime(target.endMin)}` : ''}</Text> : null}
+                  {live.next && !live.current && live.next.travelMin ? <Text variant="muted">{live.next.travelMin} min de trajet</Text> : null}
+                  {target.place?.price_amount != null ? <Text variant="muted">{target.place.price_amount === 0 ? 'Gratuit' : `≈ ${formatMoney(target.place.price_amount * travelers, currency)}`}</Text> : null}
+                </View>
+                <View style={{ flexDirection: 'row', gap: space.sm }}>
+                  {target.place ? <View style={{ flex: 1 }}><Button label="Y aller" icon="pin" onPress={() => void Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${target.place!.lat},${target.place!.lng}`)} /></View> : null}
+                  <Button label="Fiche" variant="ghost" onPress={() => setSheetId(target.item.id)} />
+                </View>
+              </>
+            ) : <Text variant="body">Bonne soirée ! Le programme de demain est dans la frise.</Text>}
+            <View style={{ gap: space.xs }}>
+              <View style={{ height: 6, borderRadius: radius.pill, backgroundColor: colors.line, overflow: 'hidden' }}>
+                <View style={{ height: 6, width: `${Math.round((done / schedule.length) * 100)}%`, backgroundColor: colors.accent, borderRadius: radius.pill }} />
+              </View>
+              <Text variant="muted" style={{ fontSize: 12.5 }}>{done} étape{done > 1 ? 's' : ''} sur {schedule.length} faite{done > 1 ? 's' : ''}{lastEnd != null ? ` · fin prévue vers ${formatTime(lastEnd)}` : ''}</Text>
+            </View>
+          </View>
+        );
+      })() : null}
       {hIssues.map((h) => (
         <View key={h.kind} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 48, paddingHorizontal: space.md, borderRadius: radius.field, backgroundColor: colors.surface2 }}>
           <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.warm }} />
@@ -255,7 +279,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
           const isLast = index === schedule.length - 1;
           const name = s.place?.name ?? s.item.title ?? 'Étape';
           return (
-            <View style={focusItemId === s.item.id ? { borderRadius: radius.field, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.accent, padding: space.xs } : undefined}>
+            <View style={focusItemId === s.item.id ? { borderRadius: radius.field, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.accent, padding: space.xs } : live?.states[index] === 'current' ? { borderRadius: radius.field, backgroundColor: `${colors.accent}17`, paddingHorizontal: space.xs } : undefined}>
               {index === 0 && lodging && s.place ? <LegRow from={lodging} to={s.place} fromName={lodging.name} toName={s.place.name} /> : null}
               {index > 0 && schedule[index - 1].place && s.place ? <LegRow from={schedule[index - 1].place!} to={s.place} fromName={schedule[index - 1].place!.name} toName={s.place.name} /> : null}
               <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: space.sm, minHeight: 56 }}>

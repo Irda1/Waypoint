@@ -1,4 +1,4 @@
-# Waypoint — contexte complet du projet (à jour v1.11.19, 11/10/2026)
+# Waypoint — contexte complet du projet (à jour v1.11.20, 11/10/2026)
 
 Document de reprise : à donner à toute nouvelle session Claude. Détails techniques : `docs/BACKEND.md` (guide + journal de chaque version), `docs/DESCRIPTION-TECHNIQUE.md`.
 
@@ -12,15 +12,15 @@ Document de reprise : à donner à toute nouvelle session Claude. Détails techn
 ## 2. Produit
 Compagnon de voyage collaboratif : créer un voyage (pays, dates, villes avec nuits, voyageurs, envies, budget), programme jour par jour, carte, météo, budget et partage des dépenses entre amis, hors connexion. Principes : simplicité, fiabilité (estimations marquées « ≈ », jamais de faux « temps réel »), **l'IA propose, l'utilisateur décide**. Référence design : maquettes V5 « immersif sombre » et prototype « Escale v0.8 » (thème Crépuscule, nuit/jour/auto, accents).
 
-## 3. Fonctionnalités principales (état v1.11.17)
+## 3. Fonctionnalités principales (état v1.11.20)
 - **Deux modes de voyage** (choix à la création) : **complet** (tout ce qui suit) ou **Simple « juste les lieux »** : un ou plusieurs pays, leurs villes, onglets Lieux (liste filtrable, ♡ = ma sélection, lien Google Maps, prix ≈, horaires du jour) · Carte · Budget (total ≈ de la sélection, sans partage de dépenses). Colonne `trips.mode` (migration 1900) ; `features/simple/`, `domain/simple.ts`.
 - **Compte** : connexion e-mail/mot de passe, mot de passe oublié, changement de mot de passe, suppression du compte, Paramètres (Nuit/Jour/Auto, accent, style des icônes, rappels).
 - **Accueil** : planète animée en fond (points + tracé, Jour ou Nuit), cartes voyage avec photo de la première ville, statut, compte à rebours, badge « Nouveau », carrousel « Envie de… », rejoindre un voyage par code.
 - **Assistant de création** (barre d'étapes, fil des choix touchables, étapes qui glissent) : pays (Terre réaliste 2K/4K ou liste) → dates (calendrier ou « pas encore ») → villes (pays isolé en perspective, villes reliées par un arc, parcours repliable à glisser-déposer, nuits réparties automatiquement) → voyageurs → ville de départ (vols préremplis) → envies → budget → propositions (programme jour par jour) → récap.
 - **Onglet Voyage** : en-tête = itinéraire 3D animé de ville en ville, résumé en 4 tuiles, sections repliables ; destinations (nuits recalculées, **réordonnables par glisser-déposer**), hébergements multiples (nuits, paiement), programme auto (horaires réalistes, lieux fermés écartés), « Non prévu » (favoris à planifier), réservations, « À ne pas oublier » (checklist partagée), mémo, export (texte + .ics), code d'invitation/Partager.
-- **Onglet Jour** : frise des jours (‹ ›, aujourd'hui entouré), photo de la ville du jour, étapes avec heures, glisser-déposer, vérif des horaires d'ouverture, plans B/C, « Journée en cours », fiche lieu (description courte base/Wikipédia, **entrée estimée**, durée, « Y aller · N min », Marquer payé, favoris).
+- **Onglet Jour** : s'ouvre sur aujourd'hui pendant le voyage, carte « Prochaine étape » (Y aller, Fiche, avancement de la journée), frise des jours (‹ ›, aujourd'hui entouré), photo de la ville du jour, étapes avec heures, glisser-déposer, vérif des horaires d'ouverture, plans B/C, « Journée en cours », fiche lieu (description courte base/Wikipédia, **entrée estimée**, durée, « Y aller · N min », Marquer payé, favoris).
 - **Carte** (MapLibre + OpenFreeMap, **toujours en clair**) : programme numéroté par jour, lieux à découvrir filtrables, recherche, légende, panneau glissant, favoris, bouton « Voir les détails ».
-- **Budget** : total/budget, payé/prévu, reste par jour, détail par poste (icône, % du total, flèche de dépliage), Groupe/Par personne, cartes repliables « Ajouter une dépense » (**préremplie depuis une activité liée : titre, poste, montant estimé × voyageurs**, « Payé par » masqué en solo) et « Convertisseur ». **Amis** : graphique « Qui doit, qui reçoit », « Qui a payé quoi », « Pour être quittes » (relancer, marquer reçu).
+- **Budget** : total/budget, payé/prévu, reste par jour, détail par poste (icône, % du total, flèche de dépliage), Groupe/Par personne, dépense éclair (feuille : montant au clavier en monnaie locale ou du voyage, poste, payeur, libellé et activité liée en option, « Annuler »), carte repliable « Convertisseur », activités à payer (**préremplies : titre, poste, montant estimé × voyageurs**). **Amis** : graphique « Qui doit, qui reçoit », « Qui a payé quoi », « Pour être quittes » (relancer, marquer reçu).
 - **Météo** Open-Meteo avec cache hors connexion ; **lecture hors connexion** des voyages ; **rappels** sur téléphone (veille du départ, 1 h avant la première étape).
 - Temps de trajet : à pied/vélo/voiture calculés ; **transports en commun estimés** (vraie source = à faire).
 
@@ -50,7 +50,7 @@ Open-Meteo gratuit = usage non commercial (à changer avant publication commerci
 ## 8. Reste à faire
 **Feuille de route choisie par Adrien le 11/10/2026** (une PR à la fois, dans cet ordre ; maquette validée d'abord pour tout ce qui se voit) :
 1. **Fondations** : une seule adresse (GitHub Pages) ✓, vérifications automatiques ✓, planète plus légère ✓, documentation ✓ (v1.11.17), remontée des erreurs ✓ (v1.11.18, migration 2000).
-2. **Pendant le voyage** : écran « Aujourd'hui », dépense éclair, squelettes de chargement, chiffres qui défilent, petites réactions (cœur, coche, puces).
+2. **Pendant le voyage** ✓ (v1.11.20) : écran « Aujourd'hui », dépense éclair, squelettes de chargement, chiffres qui défilent, petites réactions (cœur, coche, puces).
 3. **Finir la refonte** : carte et fiche d'un lieu (fiche qui glisse au doigt), Paramètres, mode Simple (complété : recherche par nom, passage Simple → Complet, mode visible sur l'accueil), pages de partage et Rejoindre, premier lancement et écrans vides, photos plus rapides (flou puis net, cache).
 4. **Souvenirs** : carnet de voyage (photos et notes par jour), récap animé, bilan final des comptes et export, refaire ou partager un itinéraire ; animations (la carte devient la couverture, arrivée sur le pays, voyage créé avec avion + confettis, compte à rebours qui se retourne).
 5. **Avant et ouverture** : importer une réservation depuis un e-mail, billets et PDF joints aux réservations, valise intelligente, notifications entre amis, clés cachées derrière le serveur (Geoapify : restreindre aux domaines du site ou passer par une fonction Supabase), tests de parcours automatiques, cartes natives sur téléphone, publication sur le Play Store (APK signé), licences à vérifier (Open-Meteo non commercial, imagerie EOX CC BY-NC).

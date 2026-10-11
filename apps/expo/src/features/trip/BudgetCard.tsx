@@ -14,6 +14,7 @@ import { budgetSummary, posteDetail, posteShares, savingSuggestions, share } fro
 import { POSTES } from '../../domain/types.ts';
 import type { Poste } from '../../domain/types.ts';
 import type { TripData } from '../../data/useTrip';
+import { CountUp } from '../../ui/motion';
 
 const ICONE: Record<Poste, IconName> = { hebergement: 'bed', transports: 'train', repas: 'gastronomie', activites: 'ticket', shopping: 'shopping' };
 const NOMS: Record<Poste, string> = { hebergement: 'Hébergement', transports: 'Transports', repas: 'Repas', activites: 'Activités', shopping: 'Shopping' };
@@ -63,7 +64,7 @@ export function BudgetCard({ data, onChanged, activitiesPanel }: { data: TripDat
       ) : null}
       <View style={{ gap: space.xs }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: space.sm, flexWrap: 'wrap' }}>
-          <Text variant="title" style={{ fontVariant: ['tabular-nums'], fontFamily: fonts.serif, fontSize: 40, lineHeight: 44 }}>{fm(spentAll)}</Text>
+          <CountUp value={spentAll} format={fm} style={{ fontVariant: ['tabular-nums'], fontFamily: fonts.serif, fontSize: 40, lineHeight: 44, color: colors.text }} />
           {envelopeAll > 0 ? <Text variant="mono" style={{ color: colors.text3 }}>/ {fm(envelopeAll)}</Text> : null}
         </View>
         {envelopeAll > 0 ? (

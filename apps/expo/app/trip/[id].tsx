@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
@@ -35,7 +35,8 @@ import { MemoCard } from '../../src/features/trip/MemoCard';
 import { StayCard } from '../../src/features/trip/StayCard';
 import { FriendsCard } from '../../src/features/trip/FriendsCard';
 import { BudgetCard } from '../../src/features/trip/BudgetCard';
-import { AddExpenseCard } from '../../src/features/trip/AddExpenseCard';
+import { QuickExpenseSheet } from '../../src/features/trip/QuickExpenseSheet';
+import { deleteExpense } from '../../src/data/trips';
 import { ShareCard } from '../../src/features/trip/ShareCard';
 import { FlightsCard } from '../../src/features/trip/FlightsCard';
 import { ConverterCard } from '../../src/features/trip/ConverterCard';
@@ -56,6 +57,7 @@ import { Icon } from '../../src/ui/Icon';
 import { FadeIn } from '../../src/ui/FadeIn';
 import { fonts, palette, radius, space } from '../../src/theme/tokens';
 import { useTheme } from '../../src/theme/useTheme';
+import { SkeletonPage } from '../../src/ui/motion';
 
 const TABS: NavTab[] = [
   { key: 'accueil', label: 'Accueil', icon: 'home' },
@@ -92,9 +94,19 @@ export default function TripScreen() {
   const bottomInset = useBottomInset();
   const { data, error, loading, status, savedAt, reload } = useTrip(String(id));
   const [tab, setTab] = useState<'voyage' | 'jour' | 'budget' | 'amis'>('voyage');
+  // Pendant le voyage, il s'ouvre sur la journée du jour (une seule fois, l'onglet choisi ensuite est respecté).
+  const openedOnToday = useRef(false);
+  useEffect(() => {
+    if (!data || openedOnToday.current) return;
+    openedOnToday.current = true;
+    if (data.days.some((d) => d.day_date === todayIso())) setTab('jour');
+  }, [data]);
   const [chosenDay, setChosenDay] = useState<number | null>(null);
   const [dayDir, setDayDir] = useState<1 | -1>(1);
   const [plusOpen, setPlusOpen] = useState(false);
+  const [quickOpen, setQuickOpen] = useState(false);
+  const [added, setAdded] = useState<{ id: string | null; summary: string } | null>(null);
+  useEffect(() => { if (!added) return; const t = setTimeout(() => setAdded(null), 5000); return () => clearTimeout(t); }, [added]);
   const [confirmTrash, setConfirmTrash] = useState(false);
   const [trashError, setTrashError] = useState<string | null>(null);
   const [pendingAdd, setPendingAdd] = useState(false);
@@ -135,7 +147,7 @@ export default function TripScreen() {
   }, [data, savedAt]);
 
   if (guard) return guard;
-  if (loading) return <Screen><Text variant="muted">Chargement du voyage…</Text></Screen>;
+  if (loading) return <Screen><SkeletonPage /></Screen>;
   if (error || !data) {
     return <Screen><ErrorNote message={error ?? 'Voyage introuvable.'} /><Button label="Retour à mes voyages" onPress={() => router.replace('/')} /></Screen>;
   }
@@ -185,7 +197,7 @@ export default function TripScreen() {
   function onPlus(c: PlusChoice) {
     setPlusOpen(false);
     if (c === 'activite') { setTab('jour'); setPendingAdd(true); }
-    else if (c === 'depense') setTab('budget');
+    else if (c === 'depense') setQuickOpen(true);
     else { setTab('voyage'); setPendingMemo(true); }
   }
 
@@ -340,7 +352,7 @@ export default function TripScreen() {
         <View style={styles.page}>
           <BudgetCard data={data} onChanged={reload} activitiesPanel={session ? <ToPayCard data={data} userId={session.user.id} onChanged={reload} embedded /> : undefined} />
           <ConverterCard data={data} />
-          {session ? <AddExpenseCard data={data} userId={session.user.id} onChanged={reload} /> : null}
+          {session ? <Button label="Ajouter une dépense" icon="expense" onPress={() => setQuickOpen(true)} /> : null}
         </View>
         ) : null}
 
@@ -399,6 +411,22 @@ export default function TripScreen() {
       </Pressable>
       <FloatingNav tabs={TABS} active={tab} onSelect={onNav} />
       <PlusMenu visible={plusOpen} onPick={onPlus} onClose={() => setPlusOpen(false)} />
+      {session ? (
+        <QuickExpenseSheet visible={quickOpen} data={data} userId={session.user.id} onClose={() => setQuickOpen(false)}
+          onSaved={(id, summary) => { setQuickOpen(false); setAdded({ id, summary }); reload(); }} />
+      ) : null}
+      {added ? (
+        <View accessibilityLiveRegion="polite" style={{ position: 'absolute', left: 16, right: 16, bottom: bottomInset + NAV_HEIGHT + 64, alignItems: 'center' }} pointerEvents="box-none">
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, backgroundColor: colors.text, borderRadius: radius.pill, paddingLeft: space.lg, paddingRight: space.sm, minHeight: 44, maxWidth: 520 }}>
+            <RNText numberOfLines={1} style={{ flexShrink: 1, fontFamily: fonts.sansSemi, fontSize: 13.5, color: colors.bg }}>Dépense ajoutée · {added.summary}</RNText>
+            {added.id ? (
+              <Pressable accessibilityRole="button" onPress={async () => { const id = added.id!; setAdded(null); await deleteExpense(id); reload(); }} style={{ minHeight: 44, justifyContent: 'center', paddingHorizontal: space.sm }}>
+                <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13.5, color: mode === 'jour' ? palette('nuit', accent).accent : colors.accent }}>Annuler</RNText>
+              </Pressable>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }

@@ -19,6 +19,7 @@ import { fonts, palette, radius, space } from '../src/theme/tokens';
 import { useAppearance } from '../src/theme/store';
 import { useTheme } from '../src/theme/useTheme';
 import { Icon } from '../src/ui/Icon';
+import { Skeleton } from '../src/ui/motion';
 
 
 // Textes posés sur la photo : toujours clairs, quel que soit le mode du téléphone.
@@ -34,6 +35,9 @@ const IDEAS: { key: 'lisbonne' | 'porto' | 'alfama'; name: string; city: string;
   { key: 'porto', name: 'Porto', city: 'Porto', hint: 'Fleuve et azulejos' },
   { key: 'alfama', name: 'Alfama', city: 'Lisbonne', hint: 'Ruelles et fado' },
 ];
+
+// Ouverture automatique du voyage en cours : seulement au premier affichage de l'accueil.
+let autoOpened = false;
 
 export default function Home() {
   const guard = useRequireAuth();
@@ -58,6 +62,10 @@ export default function Home() {
     setTrips(res.trips);
     setError(res.error);
     setSavedAt(res.savedAt ?? null);
+    // Pendant un voyage, l'appli s'ouvre directement dessus (sur la journée du jour), une fois par lancement.
+    const ongoing = res.trips.filter((x) => tripStatus(x.starts_on, x.ends_on, todayIso()).kind === 'ongoing');
+    if (!autoOpened && ongoing.length === 1) { autoOpened = true; router.push({ pathname: '/trip/[id]', params: { id: ongoing[0].id } }); }
+    autoOpened = true;
     if (!res.savedAt) {
       void listTrash().then((r) => setTrash(r.trips));
       // Copies pour le hors-ligne : les voyages à venir ou en cours d'abord (8 au plus).
@@ -156,11 +164,11 @@ export default function Home() {
           </ScrollView>
 
           <Text variant="label">{trips && trips.length > 0 ? `Mes voyages · ${trips.length}` : 'Mes voyages'}</Text>
-          {trips === null ? <Text variant="muted">Chargement…</Text> : trips.length === 0 ? (
+          {trips === null ? <View style={{ gap: space.sm }}><Skeleton height={150} round={radius.card} /><Skeleton height={150} round={radius.card} /></View> : trips.length === 0 ? (
             <Card><Text variant="body">Aucun voyage pour l'instant. Démarre le premier avec le bouton ci-dessus, ou rejoins celui d'un ami avec son lien d'invitation.</Text></Card>
           ) : (
             <Columns>
-              {trips.map((t) => (
+              {[...trips].sort((a, b) => Number(tripStatus(b.starts_on, b.ends_on, today).kind === 'ongoing') - Number(tripStatus(a.starts_on, a.ends_on, today).kind === 'ongoing')).map((t) => (
                 <Pressable key={t.id} accessibilityRole="button" accessibilityLabel={`Ouvrir ${t.title}${t.cities?.length ? `, ${t.cities.join(', ')}` : ''}`} onPress={() => router.push({ pathname: '/trip/[id]', params: { id: t.id } })}
                   style={({ pressed }) => ({ transform: [{ scale: pressed ? 0.98 : 1 }], opacity: pressed ? 0.92 : 1 })}>
                   <ImageBackground source={t.cover ? { uri: t.cover.small } : photos[photoKeyFor(t.title)]} resizeMode="cover" style={styles.tripCard} imageStyle={{ borderRadius: radius.card }}>
