@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { BUDGET_LEVELS, choiceTrail, POSTE_SHARES, autoTitle, budgetTotal, changeNights, cityPerDay, dayCount, flexibleDates, missingSteps, newWizard, sameCity, nightCount, pickDate, pickDuration, pickParty, spreadNights, splitBudget, toggleCity, toggleExcluded, wizardPlan } from './wizard.ts';
+import { BUDGET_LEVELS, choiceTrail, POSTE_SHARES, autoTitle, budgetTotal, changeNights, cityPerDay, dayCount, flexibleDates, missingSteps, newWizard, sameCity, nightCount, pickDate, pickDuration, pickParty, quartierPerDay, spreadNights, splitBudget, toggleCity, toggleExcluded, toggleQuartier, wizardPlan } from './wizard.ts';
+import type { WizardCity } from './wizard.ts';
 import { addDays, diffDays, monthGrid, nextMonths, todayIso } from '../lib/dates.ts';
 import { COUNTRIES, POPULAR, COUNTRY_NAME, flagEmoji, searchCountries } from './countries.ts';
 
@@ -147,4 +148,19 @@ test('tes choix : une pastille par étape renseignée, dans l\'ordre', () => {
   assert.equal(trail[2].label, '1 ville');
   assert.match(trail[5].label, /1\s?440/);
   assert.match(choiceTrail({ ...s, indicative: true })[1].label, /^≈ /);
+});
+
+test('quartiers : cochés sous leur ville, puis un jour chacun (pas le jour d\'arrivée)', () => {
+  const asakusa = { id: 11, name: 'Asakusa', lat: 35.71, lng: 139.79 }, shibuya = { id: 12, name: 'Shibuya', lat: 35.66, lng: 139.7 };
+  let cities: WizardCity[] = [{ id: 1, name: 'Tokyo', nights: 3 }, { id: 2, name: 'Kyoto', nights: 2 }];
+  cities = toggleQuartier(toggleQuartier(cities, 1, asakusa), 1, shibuya);
+  assert.deepEqual(cities[0].quartiers?.map((q) => q.name), ['Asakusa', 'Shibuya']);
+  assert.equal(cities[1].quartiers, undefined);
+  assert.deepEqual(toggleQuartier(cities, 1, asakusa)[0].quartiers?.map((q) => q.name), ['Shibuya']);
+  // 6 jours : Tokyo, Tokyo, Tokyo, Kyoto, Kyoto, Kyoto
+  assert.deepEqual(quartierPerDay(cities, 6).map((q) => q?.name ?? null), [null, 'Asakusa', 'Shibuya', null, null, null]);
+  // Plus de quartiers que de jours : les derniers attendent
+  assert.deepEqual(quartierPerDay([{ ...cities[0], nights: 2 }], 2).map((q) => q?.name ?? null), [null, 'Asakusa']);
+  // Les nuits ne bougent pas, et les quartiers suivent leur ville
+  assert.deepEqual(spreadNights(cities, 6).map((c) => c.quartiers?.length ?? 0), [2, 0]);
 });

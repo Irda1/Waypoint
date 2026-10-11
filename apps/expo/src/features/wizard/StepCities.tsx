@@ -1,23 +1,23 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, Text as RNText, View, useWindowDimensions } from 'react-native';
-import { Button, ChevronBadge, ErrorNote, Field, Text } from '../../ui';
+import { Button, ChevronBadge, Chip, ErrorNote, Field, Text } from '../../ui';
 import { RegionMap } from '../regions/RegionMap';
-import { listCountryCities, listCountryCityPoints } from '../../data/places';
+import { listCountryCities, listCountryCityPoints, listQuartiers } from '../../data/places';
 import { warmCity } from '../../data/cityCollection';
-import type { CityOption, CityPoint } from '../../data/places';
+import type { CityPoint, CountryCity, Quartier } from '../../data/places';
 import { Flag } from '../../ui/Flag';
 import { COUNTRY_NAME } from '../../domain/countries.ts';
-import { changeNights, nightCount, toggleCity } from '../../domain/wizard.ts';
+import { changeNights, nightCount, toggleCity, toggleQuartier } from '../../domain/wizard.ts';
 import { moveCity } from '../../domain/destinations.ts';
 import { DragList } from '../trip/DragList';
-import type { WizardState } from '../../domain/wizard.ts';
+import type { WizardCity, WizardState } from '../../domain/wizard.ts';
 import { useTheme } from '../../theme/useTheme';
 import { fonts, space } from '../../theme/tokens';
 import { Choice, RoundButton, StepTitle } from './parts';
 import type { StepProps } from './parts';
 import { ViewToggle } from './ViewToggle';
 
-type Row = CityOption & { featured_rank: number | null };
+type Row = CountryCity;
 
 export function StepCities({ state, update, preferCity, onMapGrab }: StepProps<WizardState> & { preferCity?: string | null; onMapGrab?: (on: boolean) => void }) {
   const { colors } = useTheme();
@@ -28,6 +28,8 @@ export function StepCities({ state, update, preferCity, onMapGrab }: StepProps<W
   const [showList, setShowList] = useState(false);
   const [routeOpen, setRouteOpen] = useState(false);
   const [points, setPoints] = useState<CityPoint[]>([]);
+  const [quartiers, setQuartiers] = useState<Map<number, Quartier[]>>(new Map());
+  const [allQ, setAllQ] = useState<Set<number>>(new Set());
   const nights = nightCount(state);
   const country = state.country ?? '';
 
@@ -72,10 +74,44 @@ export function StepCities({ state, update, preferCity, onMapGrab }: StepProps<W
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cityKey]);
 
+  // Quartiers à explorer des villes choisies (vides tant que la migration 2200 et la collecte n'ont pas tourné).
+  useEffect(() => {
+    let alive = true;
+    void listQuartiers(state.cities.map((c) => c.id)).then((m) => { if (alive) setQuartiers(m); });
+    return () => { alive = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cityKey]);
+
   function toggle(c: Row) {
+    // Un quartier trouvé par la recherche : on choisit sa ville avec ce quartier à explorer.
+    if (c.parent && c.lat != null && c.lng != null) {
+      const q = { id: c.id, name: c.name, lat: c.lat, lng: c.lng };
+      if (chosen.has(c.parent.id)) { update({ ...state, cities: toggleQuartier(state.cities, c.parent.id, q) }); return; }
+      const r = toggleCity(state.cities, c.parent, nights);
+      setWarn(r.error);
+      if (!r.error) update({ ...state, cities: toggleQuartier(r.cities, c.parent.id, q) });
+      return;
+    }
     const r = toggleCity(state.cities, { id: c.id, name: c.name }, nights);
     setWarn(r.error);
     if (!r.error) update({ ...state, cities: r.cities });
+  }
+
+  /** « Quartiers à explorer » sous une ville du parcours : 6 d'abord, les autres sur demande. Les choisis restent visibles. */
+  function quartierChips(c: WizardCity) {
+    const picked = c.quartiers ?? [];
+    const list = [...picked.filter((q) => !(quartiers.get(c.id) ?? []).some((x) => x.id === q.id)), ...(quartiers.get(c.id) ?? [])];
+    if (!list.length) return null;
+    const shown = allQ.has(c.id) ? list : list.slice(0, Math.max(6, picked.length));
+    return (
+      <View style={{ gap: space.xs, paddingHorizontal: space.xs }}>
+        <Text variant="label">Quartiers à explorer · {picked.length ? `${picked.length} choisi${picked.length > 1 ? 's' : ''}` : 'facultatif'}</Text>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.xs }}>
+          {shown.map((q) => <Chip key={q.id} label={q.name} selected={picked.some((x) => x.id === q.id)} onPress={() => update({ ...state, cities: toggleQuartier(state.cities, c.id, q) })} />)}
+          {list.length > shown.length ? <Chip label={`+ ${list.length - shown.length} autres`} onPress={() => setAllQ(new Set([...allQ, c.id]))} /> : null}
+        </View>
+      </View>
+    );
   }
 
   const selected = useMemo(() => state.cities.map((c, i) => ({ id: c.id, order: i + 1 })), [state.cities]);
@@ -110,7 +146,8 @@ export function StepCities({ state, update, preferCity, onMapGrab }: StepProps<W
             const c = state.cities[i];
             return (
             <View style={{ paddingBottom: space.sm }}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, padding: space.sm, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface }}>
+            <View style={{ gap: space.sm, padding: space.sm, borderRadius: 14, borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
               {state.cities.length > 1 ? handle : null}
               <View style={{ flex: 1 }}>
                 <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{i + 1}. {c.name}</Text>
@@ -125,6 +162,8 @@ export function StepCities({ state, update, preferCity, onMapGrab }: StepProps<W
               {state.cities.length > 1 ? (
                 <RoundButton label="+" name={`Ajouter une nuit à ${c.name}`} disabled={!state.cities.some((o, j) => j !== i && o.nights > 1)} onPress={() => update({ ...state, cities: changeNights(state.cities, i, 1) })} />
               ) : null}
+            </View>
+            {quartierChips(c)}
             </View>
             </View>
             );
@@ -143,6 +182,11 @@ export function StepCities({ state, update, preferCity, onMapGrab }: StepProps<W
       {list === null ? <Text variant="muted">Chargement des villes…</Text> : list.length === 0 ? (
         <Text variant="muted">{query ? 'Aucune ville ne correspond.' : 'Aucune ville en base pour ce pays. Tu peux continuer sans, ou lancer la collecte des villes (voir le guide).'}</Text>
       ) : list.map((c) => {
+        if (c.parent) {
+          const at = chosen.get(c.parent.id);
+          const on = at !== undefined && (state.cities[at].quartiers ?? []).some((q) => q.id === c.id);
+          return <Choice key={c.id} title={c.name} detail={`Quartier de ${c.parent.name}`} selected={on} onPress={() => toggle(c)} />;
+        }
         const index = chosen.get(c.id);
         return (
           <Choice key={c.id} title={c.name} detail={c.featured_rank != null ? 'Ville phare' : undefined} selected={index !== undefined} onPress={() => toggle(c)}

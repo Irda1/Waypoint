@@ -72,15 +72,16 @@ export function parseAdmin1(text) {
  * elevation, dem, timezone, modification date.
  * Tri : uniquement les lieux habités (classe P), avec nom, coordonnées valides et pays connu.
  */
-export function parseCities(text, { admin1 = new Map(), minPopulation = 15000, countries = null, only = null, retrievedAt = new Date().toISOString() } = {}) {
+export function parseCities(text, { admin1 = new Map(), admin2 = new Map(), minPopulation = 15000, countries = null, only = null, retrievedAt = new Date().toISOString() } = {}) {
   const rows = [];
+  const kinds = [];
   const stats = { read: 0, kept: 0, skippedCountry: 0, skippedSmall: 0, skippedInvalid: 0 };
   for (const line of text.split(/\r?\n/)) {
     if (!line) continue;
     stats.read++;
     const c = line.split('\t');
     if (c.length < 19) throw new Error(`cities : ${c.length} colonnes au lieu de 19 (ligne « ${line.slice(0, 40)} »)`);
-    const [geonameId, name, ascii, , lat, lng, fclass, fcode, cc, , a1, , , , pop, , , tz] = c;
+    const [geonameId, name, ascii, , lat, lng, fclass, fcode, cc, , a1, a2, , , pop, , , tz] = c;
     if (fclass !== 'P') { stats.skippedInvalid++; continue; }
     const latN = Number(lat), lngN = Number(lng), popN = Number(pop || 0);
     if (!name || !Number.isFinite(latN) || !Number.isFinite(lngN) || Math.abs(latN) > 90 || Math.abs(lngN) > 180) {
@@ -100,12 +101,52 @@ export function parseCities(text, { admin1 = new Map(), minPopulation = 15000, c
       timezone: tz || null,
       is_capital: fcode === 'PPLC',
       geonames_id: Number(geonameId),
+      parent_geonames_id: null,
       source: 'geonames',
       license: GEONAMES_LICENSE,
       source_url: `https://www.geonames.org/${geonameId}`,
       retrieved_at: retrievedAt,
     });
+    kinds.push({ fcode, admin2: admin2.get(`${cc}.${a1}.${a2}`) || '' });
   }
   stats.kept = rows.length;
+  stats.districts = linkDistricts(rows, kinds);
   return { rows, stats };
+}
+
+const kmBetween = (a, b) => {
+  const r = Math.PI / 180, dLat = (b.lat - a.lat) * r, dLng = (b.lng - a.lng) * r;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a.lat * r) * Math.cos(b.lat * r) * Math.sin(dLng / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(h));
+};
+
+/**
+ * Quartiers : lieux qui font partie d'une plus grande ville (« section de ville » PPLX, arrondissements PPLA5 comme
+ * Marseille 01, « Paris 15 Vaugirard », arrondissements « -ku » de Tokyo). Jamais une capitale ni un chef-lieu.
+ * Chacun est rattaché à la ville voisine qui l'attire le plus (population / distance², moins de 30 km, plus peuplée
+ * que lui et pas elle-même un quartier) : `parent_geonames_id`. Sans ville assez proche, il reste une ville.
+ */
+export function linkDistricts(rows, kinds) {
+  const byCountry = new Map();
+  for (const r of rows) { if (!byCountry.has(r.country_code)) byCountry.set(r.country_code, []); byCountry.get(r.country_code).push(r); }
+  const near = (r, km) => byCountry.get(r.country_code).filter((o) => o !== r && Math.abs(o.lat - r.lat) < km / 111 && kmBetween(r, o) < km);
+  const isDistrict = rows.map((r, i) => {
+    const { fcode, admin2 } = kinds[i];
+    if (fcode === 'PPLC' || fcode === 'PPLA') return false;
+    if (fcode === 'PPLX' || fcode === 'PPLA5' || /[- ]ku$/i.test(admin2)) return true;
+    const m = /^(.+?) \d{1,2}\b/.exec(r.name);
+    return !!m && near(r, 25).some((o) => o.name === m[1] && (o.population ?? 0) > (r.population ?? 0));
+  });
+  const district = new Set(rows.filter((_, i) => isDistrict[i]));
+  let linked = 0;
+  for (const r of district) {
+    let best = null, bestPull = 0;
+    for (const o of near(r, 30)) {
+      if (district.has(o) || (o.population ?? 0) <= (r.population ?? 0)) continue;
+      const pull = (o.population ?? 0) / Math.max(kmBetween(r, o), 1) ** 2;
+      if (pull > bestPull) { best = o; bestPull = pull; }
+    }
+    if (best) { r.parent_geonames_id = best.geonames_id; linked++; }
+  }
+  return linked;
 }

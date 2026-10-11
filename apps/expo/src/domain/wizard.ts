@@ -11,7 +11,9 @@ import type { AirPrefs } from './flights.ts';
 export type PartyType = 'seul' | 'deux' | 'amis' | 'famille';
 export type BudgetLevelId = 'economique' | 'moyen' | 'confortable' | 'premium';
 
-export interface WizardCity { id: number; name: string; nights: number }
+/** Quartier d'une ville (Shibuya pour Tokyo) : ses lieux sont aussi proposés, et une journée peut lui être consacrée. */
+export interface WizardQuartier { id: number; name: string; lat: number; lng: number }
+export interface WizardCity { id: number; name: string; nights: number; quartiers?: WizardQuartier[] }
 
 export interface WizardState {
   country: string | null;
@@ -84,6 +86,26 @@ export function toggleCity(cities: WizardCity[], city: { id: number; name: strin
   if (cities.some((c) => c.id === city.id)) return { cities: spreadNights(cities.filter((c) => c.id !== city.id), nights), error: null };
   if (cities.length >= max) return { cities, error: `Pour ${nights} nuit${nights > 1 ? 's' : ''}, choisis au plus ${max} ville${max > 1 ? 's' : ''}.` };
   return { cities: spreadNights([...cities, { id: city.id, name: city.name, nights: 0 }], nights), error: null };
+}
+
+/** Coche ou décoche un quartier à explorer d'une ville choisie (facultatif : les nuits ne changent pas). */
+export function toggleQuartier(cities: WizardCity[], cityId: number, q: WizardQuartier): WizardCity[] {
+  return cities.map((c) => {
+    if (c.id !== cityId) return c;
+    const list = c.quartiers ?? [];
+    return { ...c, quartiers: list.some((x) => x.id === q.id) ? list.filter((x) => x.id !== q.id) : [...list, q] };
+  });
+}
+
+/**
+ * Quartier de chaque jour : dans chaque ville, les jours qui ne sont pas des jours d'arrivée sont consacrés,
+ * dans l'ordre, aux quartiers choisis (un jour par quartier ; s'il y a plus de quartiers que de jours, les
+ * derniers attendent). null = journée dans toute la ville.
+ */
+export function quartierPerDay(cities: WizardCity[], days: number): (WizardQuartier | null)[] {
+  const perDay = cityPerDay(cities, days);
+  const queue = new Map(cities.map((c) => [c.id, [...(c.quartiers ?? [])]]));
+  return perDay.map((id, i) => (id == null || i === 0 || perDay[i - 1] !== id ? null : queue.get(id)?.shift() ?? null));
 }
 
 /** +/− sur une ville : la nuit vient de (ou va à) une autre ville, le total reste égal au nombre de nuits. */
@@ -201,7 +223,8 @@ export function wizardPlan(s: WizardState, candidates: Candidate[]): PlannedDay[
   const total = budgetTotal(s);
   if (!s.start || !days || !s.cities.length) return [];
   const perDay = cityPerDay(s.cities, days);
-  return buildPlan(perDay.map((cityId, i) => ({ date: addDays(s.start!, i), cityId })), candidates, {
+  const focus = quartierPerDay(s.cities, days);
+  return buildPlan(perDay.map((cityId, i) => ({ date: addDays(s.start!, i), cityId, focus: focus[i] })), candidates, {
     interests: s.interests,
     travelers: Math.max(s.travelers, 1),
     activityBudgetPerDay: total ? (total * 0.15) / days : null,

@@ -11,7 +11,7 @@ import type { Poste, TripItem } from '../domain/types.ts';
 import { addDays } from '../lib/dates.ts';
 import { autoTitle, budgetTotal, cityPerDay, dayCount, splitBudget, wizardPlan } from '../domain/wizard.ts';
 import type { WizardState } from '../domain/wizard.ts';
-import { applyPlan, loadCandidates } from './itinerary';
+import { applyPlan, loadWizardCandidates } from './itinerary';
 
 const msg = (e: { message: string; code?: string } | null): string | null => {
   if (!e) return null;
@@ -268,7 +268,7 @@ export async function createTripFromWizard(s: WizardState, rootOf?: (code: strin
 
 /** Remplit les jours d'un voyage tout juste créé avec le programme proposé par l'assistant. */
 async function fillProgram(tripId: string, s: WizardState, rootOf: (code: string) => string): Promise<string | null> {
-  const { candidates, error } = await loadCandidates(s.cities.map((c) => c.id), rootOf);
+  const { candidates, error } = await loadWizardCandidates(s.cities, rootOf);
   if (error) return error;
   const { data, error: e2 } = await supabase.from('trip_days').select('id,day_date').eq('trip_id', tripId);
   if (e2) return e2.message;

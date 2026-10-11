@@ -70,3 +70,28 @@ test('villes : filtre par pays et seuil de population', () => {
   assert.deepEqual(parseCities(text, { only: 'JP' }).rows.map((r) => r.name), ['Tokyo']);
   assert.deepEqual(parseCities(text, { minPopulation: 300000 }).rows.map((r) => r.name), ['Lisbon', 'Tokyo']);
 });
+
+test('villes : les quartiers sont rattachés à leur ville, les vraies villes non', () => {
+  const line = (id, name, lat, lng, fcode, cc, a1, a2, pop) => [id, name, name, '', lat, lng, 'P', fcode, cc, '', a1, a2, '', '', pop, '', '', 'UTC', '2024-01-01'].join('\t');
+  const text = [
+    line(1850147, 'Tokyo', 35.6895, 139.69171, 'PPLC', 'JP', '40', '', 8336599),
+    line(1865047, 'Asakusa', 35.7148, 139.7967, 'PPLX', 'JP', '40', '7475134', 62092),
+    line(8469289, 'Ōta', 35.5614, 139.7161, 'PPLA2', 'JP', '40', '1853655', 748081),
+    line(1857871, 'Machida', 35.5403, 139.4508, 'PPLA2', 'JP', '40', '1857869', 431079),
+    line(2988507, 'Paris', 48.85341, 2.3488, 'PPLC', 'FR', '11', '75', 2138551),
+    line(2970479, 'Paris 15 Vaugirard', 48.8417, 2.2994, 'PPL', 'FR', '11', '75', 229713),
+    line(7284882, 'Marseille 01', 43.2999, 5.3841, 'PPLA5', 'FR', '93', '13', 40919),
+    line(2995469, 'Marseille', 43.29695, 5.38107, 'PPLA', 'FR', '93', '13', 877215),
+    line(3031137, 'Boulogne-Billancourt', 48.8333, 2.25, 'PPL', 'FR', '11', '92', 108782),
+    line(6543968, 'Lyon 02', 45.7495, 4.8278, 'PPLX', 'FR', '84', '69', 31303),
+  ].join('\n');
+  const admin2 = new Map([['JP.40.1853655', 'Ōta-ku'], ['JP.40.1857869', 'Machida Shi']]);
+  const { rows, stats } = parseCities(text, { admin2 });
+  const parent = Object.fromEntries(rows.map((r) => [r.name, rows.find((p) => p.geonames_id === r.parent_geonames_id)?.name ?? null]));
+  assert.deepEqual(parent, {
+    Tokyo: null, Asakusa: 'Tokyo', 'Ōta': 'Tokyo', Machida: null,
+    Paris: null, 'Paris 15 Vaugirard': 'Paris', 'Marseille 01': 'Marseille', Marseille: null, 'Boulogne-Billancourt': null,
+    'Lyon 02': null, // Lyon n'est pas dans la liste : le quartier reste une ville
+  });
+  assert.equal(stats.districts, 4);
+});

@@ -137,3 +137,22 @@ test('les étapes d’arrivée sont reconnues (on ne peut pas les retirer)', asy
   assert.equal(isArrivalStep({ place_id: null, title: 'Déjeuner' }), false);
   assert.equal(isArrivalStep({ place_id: 12, title: 'Arrivée dans la ville' }), false);
 });
+
+test('journée de quartier : visites et repas autour du quartier, sinon toute la ville', () => {
+  const far = { lat: 38.75, lng: -9.2 };
+  const pool2 = [
+    ...Array.from({ length: 4 }, (_, i) => cand('culture', 10 - i)),            // centre (38.70x)
+    ...Array.from({ length: 3 }, (_, i) => cand('nature', 2 - i * 0.1, far)),  // quartier, moins populaires
+    cand('gastronomie', 1, far), cand('gastronomie', 5),
+  ];
+  const focus = { name: 'Belém', ...far };
+  const [, day] = buildPlan([D('2026-10-13'), { date: '2026-10-14', cityId: 1, focus }], pool2, base);
+  assert.equal(day.focus, 'Belém');
+  const placed = day.items.filter((i) => i.place);
+  assert.ok(placed.length >= 3);
+  assert.ok(placed.every((i) => i.place!.lat === far.lat), 'tout est pris dans le quartier');
+  // Moins de deux visites possibles autour : journée normale dans toute la ville
+  const [, normal] = buildPlan([D('2026-10-13'), { date: '2026-10-14', cityId: 1, focus: { name: 'Vide', lat: 10, lng: 10 } }], pool(), base);
+  assert.equal(normal.focus, undefined);
+  assert.ok(normal.items.some((i) => i.kind === 'visit'));
+});
