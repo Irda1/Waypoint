@@ -1,4 +1,4 @@
-# Waypoint — contexte complet du projet (à jour v1.11.17, 11/10/2026)
+# Waypoint — contexte complet du projet (à jour v1.11.18, 11/10/2026)
 
 Document de reprise : à donner à toute nouvelle session Claude. Détails techniques : `docs/BACKEND.md` (guide + journal de chaque version), `docs/DESCRIPTION-TECHNIQUE.md`.
 
@@ -27,9 +27,10 @@ Compagnon de voyage collaboratif : créer un voyage (pays, dates, villes avec nu
 - **Design** (v1.11.x) : direction « Crépuscule affiné » (nuit par défaut, Fraunces + Plus Jakarta Sans, accent soleil ; textes d'accroche sur fond nuit/photo = couleur claire de l'accent, `palette('nuit', accent).accent2`). Icônes au choix (émojis, trait, plein) via `ui/Icon.tsx` ; barre du bas avec icône + nom ; sections et cartes repliables (`Section`, `FoldCard`, `ChevronBadge` dans `ui/index.tsx`) ; fondus et glissements (`ui/FadeIn.tsx`, coupés si « réduire les animations »). **Tout changement visuel passe d'abord par une maquette (artifact) validée par Adrien**, avec toutes les fonctions existantes de l'écran.
 
 ## 4. Architecture
-- **Backend** Supabase (Postgres + RLS + Realtime + RPC). Membres égaux. Migrations `supabase/migrations/2026092900*.sql` (0100→1900) lancées **à la main par Adrien** dans le SQL Editor (jusqu'à 1700 lancées ; **1800** = bouton « Élargir la zone », **1900** = mode Simple : à lancer si pas fait). Le cloud n'a que la clé anon : il ne peut pas lancer de migration.
+- **Backend** Supabase (Postgres + RLS + Realtime + RPC). Membres égaux. Migrations `supabase/migrations/2026092900*.sql` (0100→2000) lancées **à la main par Adrien** dans le SQL Editor (jusqu'à 1700 lancées ; **1800** = bouton « Élargir la zone », **1900** = mode Simple, **2000** = remontée des erreurs : à lancer si pas fait). Le cloud n'a que la clé anon : il ne peut pas lancer de migration.
 - **App** `apps/expo` : Expo SDK 57, expo-router, react-native-web. `app/` (écrans), `src/features/` (UI), `src/data/` (Supabase, hors ligne), `src/domain/` (logique pure testée, `npm test` = 217 tests, `npm run typecheck` doit rester propre). Fichiers `.web.ts(x)` = version web.
 - Pages générées : `public/globe.html` (`domain/globe.ts`), `public/route.html` (`domain/routeGlobe.ts`), `public/regions.html` (`domain/regionsMap.ts`), `public/map.html` (`domain/map.ts`), `public/regions/XX.json` ; un test vérifie la cohérence. Images de la Terre (NASA, domaine public) dans `public/tex` : 2K chargées d'abord, 4K quand la planète est grande à l'écran ; le mobile les lit sur GitHub (`REGIONS_BASE_NATIVE`).
+- **Erreurs de l'appli** (v1.11.18) : plantages et erreurs non rattrapées envoyés à `log_client_error` (`src/data/errors.ts`, écran de secours `ErrorBoundary` dans `app/_layout.tsx`), table `client_errors` lisible seulement dans Supabase > Table Editor (pas depuis l'appli ni le cloud).
 - **Vérifications automatiques** : `.github/workflows/verifications.yml` sur chaque PR et chaque fusion (tests + typage de l'appli, tests de la collecte, `bundle-sql --check`, schéma + RLS sur PostgreSQL jetable).
 - **Lieux d'une ville** : chargés par l'appli (`domain/cityCollect.ts`) via **Geoapify Places** d'abord (clé publique `EXPO_PUBLIC_GEOAPIFY_KEY`, secret GitHub `GEOAPIFY_API_KEY` ; stockage en base autorisé par le support Geoapify le 06/10/2026), repli sur Overpass ; bouton « Élargir la zone » sur la carte (rayon ×2 puis ×3,5). La clé est visible dans l'appli : voir le journal v1.10.62 de `docs/BACKEND.md`.
 - **Collecte de données** (`pipeline/`, workflow « Collecte de données ») : GeoNames, OSM, photos Pexels (villes). Secrets Actions : `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, `PEXELS_API_KEY`.
@@ -48,11 +49,13 @@ Open-Meteo gratuit = usage non commercial (à changer avant publication commerci
 
 ## 8. Reste à faire
 **Feuille de route choisie par Adrien le 11/10/2026** (une PR à la fois, dans cet ordre ; maquette validée d'abord pour tout ce qui se voit) :
-1. **Fondations** : une seule adresse (GitHub Pages) ✓, vérifications automatiques ✓, planète plus légère ✓, documentation ✓ (v1.11.17) ; puis remontée des erreurs du téléphone (table + migration à lancer par Adrien).
+1. **Fondations** : une seule adresse (GitHub Pages) ✓, vérifications automatiques ✓, planète plus légère ✓, documentation ✓ (v1.11.17), remontée des erreurs ✓ (v1.11.18, migration 2000).
 2. **Pendant le voyage** : écran « Aujourd'hui », dépense éclair, squelettes de chargement, chiffres qui défilent, petites réactions (cœur, coche, puces).
 3. **Finir la refonte** : carte et fiche d'un lieu (fiche qui glisse au doigt), Paramètres, mode Simple (complété : recherche par nom, passage Simple → Complet, mode visible sur l'accueil), pages de partage et Rejoindre, premier lancement et écrans vides, photos plus rapides (flou puis net, cache).
 4. **Souvenirs** : carnet de voyage (photos et notes par jour), récap animé, bilan final des comptes et export, refaire ou partager un itinéraire ; animations (la carte devient la couverture, arrivée sur le pays, voyage créé avec avion + confettis, compte à rebours qui se retourne).
 5. **Avant et ouverture** : importer une réservation depuis un e-mail, billets et PDF joints aux réservations, valise intelligente, notifications entre amis, clés cachées derrière le serveur (Geoapify : restreindre aux domaines du site ou passer par une fonction Supabase), tests de parcours automatiques, cartes natives sur téléphone, publication sur le Play Store (APK signé), licences à vérifier (Open-Meteo non commercial, imagerie EOX CC BY-NC).
+
+**Bug connu (11/10/2026)** : « Supprimer mon compte » échoue pour une personne encore dans un voyage partagé (le journal d'activité et l'auteur d'origine pointent vers le profil supprimé). Correctif = nouvelle migration (voir v1.11.18 dans `docs/BACKEND.md`).
 
 Autres pistes, hors feuille de route :
 - Vraies données de transports en commun (source externe + clé ; Google Maps en attendant).
