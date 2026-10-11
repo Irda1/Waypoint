@@ -7,6 +7,7 @@ import { fonts, radius, space } from '../theme/tokens';
 import { useTheme } from '../theme/useTheme';
 import { useBreakpoint } from './useBreakpoint';
 import { Icon } from './Icon';
+import { Pop } from './motion';
 import { FadeIn } from './FadeIn';
 import type { IconName } from './Icon';
 
@@ -66,11 +67,13 @@ export function Card({ children, style }: { children: React.ReactNode; style?: S
 export function Chip({ label, selected, onPress, icon }: { label: string; selected?: boolean; onPress?: () => void; icon?: IconName }) {
   const { colors } = useTheme();
   return (
+    <Pop on={!!selected} style={{ alignSelf: 'flex-start' }}>
     <Pressable accessibilityRole="button" accessibilityState={{ selected: !!selected }} onPress={onPress}
       style={{ minHeight: 40, paddingHorizontal: space.lg, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6, alignSelf: 'flex-start', backgroundColor: selected ? colors.accent : colors.surface2 }}>
       {icon ? <Icon name={icon} size={16} tone={selected ? 'onAccent' : 'text'} filled={selected} /> : null}
       <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: selected ? colors.onAccent : colors.text }}>{label}</RNText>
     </Pressable>
+    </Pop>
   );
 }
 
@@ -135,10 +138,12 @@ export function PayBadge({ state }: { state: 'paid' | 'partial' | 'unpaid' | nul
   const filled = state === 'paid';
   const color = state === 'unpaid' ? colors.text3 : colors.paid;
   return (
+    <Pop on={filled}>
     <View accessible accessibilityRole="image" accessibilityLabel={label}
       style={{ width: 24, height: 24, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: filled ? colors.paid : 'transparent', borderWidth: filled ? 0 : 1.5, borderColor: color }}>
-      <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: filled ? colors.onPaid : color }}>$</RNText>
+      <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: filled ? colors.onPaid : color }}>{filled ? '✓' : '$'}</RNText>
     </View>
+    </Pop>
   );
 }
 
