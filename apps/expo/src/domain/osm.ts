@@ -35,6 +35,7 @@ export const GROUPS = {
     selectors: [
       '["amenity"~"^(pharmacy|bank|atm|hospital|toilets|laundry)$"]',
       '["shop"="laundry"]',
+      '["shop"~"^(convenience|supermarket)$"]',
     ],
   },
   stays_transit: {
@@ -81,6 +82,7 @@ export function classify(t) {
     default:
   }
   if (t.shop === 'laundry') return { kind: 'service', category: 'laverie' };
+  if (t.shop === 'convenience' || t.shop === 'supermarket') return { kind: 'service', category: 'superette' };
 
   // Transports
   if (t.aeroway === 'aerodrome' && t.iata) return { kind: 'transit', category: 'aeroport' };
@@ -145,7 +147,7 @@ export const CAPS = {
   musee: 100, galerie: 60, monument: 150, temple: 60, parc: 60, plage: 30, point_de_vue: 40,
   cinema: 20, arcade: 20, parc_attractions: 10, centre_commercial: 30, atelier: 80, spa: 30, sport: 30,
   hebergement: 80, gare: 40, metro: 120, aeroport: 5,
-  pharmacie: 60, banque: 40, distributeur: 80, hopital: 30, toilettes: 60, laverie: 30,
+  pharmacie: 60, banque: 40, distributeur: 80, hopital: 30, toilettes: 60, laverie: 30, superette: 60,
 };
 // Catégories très nombreuses : sans signal de notoriété, on ne garde rien
 export const MIN_SCORE = { restaurant: 1, cafe: 1, street_food: 1, bar: 1, club: 0.5, hebergement: 1, sport: 1 };
@@ -225,7 +227,7 @@ function expandDays(part) {
 // ---------------------------------------------------------------------------
 const FALLBACK_NAMES = {
   toilettes: 'Toilettes publiques', distributeur: 'Distributeur', banque: 'Banque',
-  pharmacie: 'Pharmacie', hopital: 'Hôpital', laverie: 'Laverie',
+  pharmacie: 'Pharmacie', hopital: 'Hôpital', laverie: 'Laverie', superette: 'Supérette',
 };
 const KEPT_TAGS = ['cuisine', 'brand', 'operator', 'religion', 'stars', 'wheelchair', 'fee', 'takeaway',
   'diet:vegetarian', 'diet:vegan', 'bath:type', 'iata', 'internet_access', 'outdoor_seating'];

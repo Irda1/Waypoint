@@ -7,22 +7,23 @@ import { Button, Chip, ErrorNote, Screen, Text } from '../../src/ui';
 import { useTrip } from '../../src/data/useTrip';
 import { useCategories } from '../../src/data/categories';
 import { loadCandidates } from '../../src/data/itinerary';
-import { addPlaceItem } from '../../src/data/places';
+import { addPlaceItem, loadServices } from '../../src/data/places';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { extendCityNow } from '../../src/data/cityCollection';
 import { useFavorites } from '../../src/data/favorites';
-import { PlaceSheet } from '../../src/features/trip/PlaceSheet';
-import { discoverPoints, legendDays, planPoints, searchPoints, visiblePoints } from '../../src/domain/map.ts';
+import { PlaceDetails } from '../../src/features/trip/PlaceSheet';
+import { USEFUL, discoverPoints, legendDays, planPoints, searchPoints, servicePoints, visiblePoints } from '../../src/domain/map.ts';
+import type { Place } from '../../src/domain/types.ts';
 import type { MapPoint } from '../../src/domain/map.ts';
 import { MapCanvas } from '../../src/features/map/MapCanvas';
 import { SlidingPanel } from '../../src/features/map/SlidingPanel';
 import { useBottomInset } from '../../src/features/nav/FloatingNav';
 import type { PanelPos } from '../../src/features/map/SlidingPanel';
-import { formatMoney } from '../../src/lib/format';
-import { mapsUrl } from '../../src/domain/simple.ts';
-import { formatDuration } from '../../src/lib/search';
 import { categoryColors, fonts, radius, space } from '../../src/theme/tokens';
 import { Icon } from '../../src/ui/Icon';
 import { useTheme } from '../../src/theme/useTheme';
+
+const DARK_KEY = 'waypoint.mapDark';
 
 export default function TripMap() {
   const guard = useRequireAuth();
@@ -49,7 +50,14 @@ export default function TripMap() {
   const [widening, setWidening] = useState<number | null>(null);
   const [panel, setPanel] = useState<PanelPos>('bas');
   const [areaH, setAreaH] = useState(0);
-  const [details, setDetails] = useState(false);
+  const [sheet, setSheet] = useState<PanelPos>('bas');
+  // Filtre « Pratique » : catégories de lieux pratiques montrées (null = filtre éteint), chargées à la demande.
+  const [useful, setUseful] = useState<string[] | null>(null);
+  const [services, setServices] = useState<Place[] | null>(null);
+  // Fond de carte nuit : réglage gardé sur l'appareil.
+  const [dark, setDark] = useState(false);
+  useEffect(() => { void AsyncStorage.getItem(DARK_KEY).then((v) => setDark(v === '1')).catch(() => undefined); }, []);
+  const toggleDark = () => { setDark((d) => { void AsyncStorage.setItem(DARK_KEY, d ? '0' : '1').catch(() => undefined); return !d; }); };
 
   const cityIds = useMemo(() => [...new Set((data?.days ?? []).map((d) => d.city_id).filter((c): c is number => c != null).concat((data?.destinations ?? []).map((d) => d.city_id)))], [data?.days, data?.destinations]);
 
@@ -59,7 +67,12 @@ export default function TripMap() {
     void loadCandidates(cityIds, categories.rootOf).then((r) => { setLoaded(r.candidates); if (r.error) setProblem(r.error); });
   }, [discover, onlyFav, term, loaded, cityIds, categories]);
 
-  // « Élargir la zone » : rayon x2 puis x3,5 pour chaque ville du voyage, avec un pourcentage réel.
+  useEffect(() => {
+    if (!useful || services !== null || !cityIds.length) return;
+    void loadServices(cityIds).then((r) => { setServices(r.places); if (r.error) setProblem(r.error); });
+  }, [useful, services, cityIds]);
+
+  // « Voir plus de lieux » (élargir la zone) : rayon x2 puis x3,5 pour chaque ville du voyage, avec un pourcentage réel.
   const ZONE_SCALES = [2, 3.5];
   const widen = async () => {
     const scale = ZONE_SCALES[zoneStep];
@@ -72,7 +85,7 @@ export default function TripMap() {
     }));
     setWidening(null);
     if (errors.length) setProblem(errors[0]);
-    if (errors.length < cityIds.length) { setZoneStep((n) => n + 1); setLoaded(null); }
+    if (errors.length < cityIds.length) { setZoneStep((n) => n + 1); setLoaded(null); setServices(null); }
   };
 
   const plan = useMemo(() => (data ? planPoints({ days: data.days, items: data.items, places: data.places, rootOf: categories.rootOf }) : []), [data, categories]);
@@ -81,13 +94,14 @@ export default function TripMap() {
     const inTrip = new Set(data.items.map((i) => i.place_id).filter((p): p is number => p != null));
     return discoverPoints({ candidates: loaded, inTrip, colorOf: (r) => categoryColors[mode][r] ?? colors.text3 });
   }, [data, loaded, mode, colors.text3]);
-  const shown = useMemo(() => visiblePoints([...plan, ...disc], { day, discover: discover || onlyFav, roots }), [plan, disc, day, discover, onlyFav, roots]);
-  const points = useMemo(() => (onlyFav ? shown.filter((p) => p.placeId != null && favorites.ids.has(p.placeId)) : shown), [shown, onlyFav, favorites.ids]);
+  const svc = useMemo(() => servicePoints(services ?? []), [services]);
+  const shown = useMemo(() => visiblePoints([...plan, ...disc, ...svc], { day, discover: discover || onlyFav, roots, useful }), [plan, disc, svc, day, discover, onlyFav, roots, useful]);
+  const points = useMemo(() => (onlyFav && !useful ? shown.filter((p) => p.placeId != null && favorites.ids.has(p.placeId)) : shown), [shown, onlyFav, favorites.ids]);
   const found = useMemo(() => searchPoints([...plan, ...disc], term), [plan, disc, term]);
   const legend = useMemo(() => legendDays(points), [points]);
   const point: MapPoint | undefined = points.find((p) => p.id === selected);
   // Bande du bas seulement quand il y a quelque chose à dire (le chargement est un badge sur la carte).
-  const message = notice ?? (points.length === 0 ? (discover ? (loaded === null ? null : 'Aucun lieu à afficher pour ce filtre.') : 'Rien au programme pour l\'instant. Active « Lieux à découvrir » pour voir des idées.') : null);
+  const message = notice ?? (points.length === 0 ? (useful ? (services === null ? null : 'Aucun lieu pratique de ce type ici : touche « Voir plus de lieux ».') : discover ? (loaded === null ? null : 'Aucun lieu à afficher pour ce filtre.') : 'Rien au programme pour l\'instant. Active « Lieux à découvrir » pour voir des idées.') : null);
 
   const bottomInset = useBottomInset();
   // Web : la page ne doit jamais défiler quand on déplace la carte (sinon la barre du haut part avec).
@@ -108,7 +122,9 @@ export default function TripMap() {
   const start = first ? { lat: first.lat, lng: first.lng, zoom: 11 } : { lat: 20, lng: 0, zoom: 1.5 };
   const dayId = day ? data.days[day - 1]?.id : null;
   const category = point ? categories.byCode.get(point.root)?.name_fr ?? point.root : '';
-  const place = point?.placeId != null ? data.places.get(point.placeId) ?? loaded?.find((c) => c.place.id === point.placeId)?.place : undefined;
+  const place = point?.placeId != null ? data.places.get(point.placeId) ?? loaded?.find((c) => c.place.id === point.placeId)?.place ?? services?.find((p) => p.id === point.placeId) : undefined;
+  const loadingPlaces = (discover && loaded === null) || (!!useful && services === null);
+  const canWiden = (discover || !!useful) && zoneStep < ZONE_SCALES.length && cityIds.length > 0;
 
   async function add() {
     if (!point?.placeId || !dayId) return;
@@ -125,7 +141,7 @@ export default function TripMap() {
   return (
     <View style={{ flex: 1, backgroundColor: colors.bg }}>
       <View style={{ flex: 1 }} onLayout={(e) => setAreaH(e.nativeEvent.layout.height)}>
-        <MapCanvas points={points} selectedId={selected} dark={false} start={start} fitKey={`${day}|${discover}`} focusId={focus} onSelect={(pid) => { setSelected(pid); setNotice(null); }} />
+        <MapCanvas points={points} selectedId={selected} dark={dark} start={start} fitKey={`${day}|${discover}|${useful ? 1 : 0}`} focusId={focus} onSelect={(pid) => { setSelected(pid); setSheet('bas'); setNotice(null); }} />
         <SafeAreaView edges={['top']} pointerEvents="box-none" style={{ position: 'absolute', top: 0, left: 0, right: 0 }}>
           <View style={{ padding: space.sm, gap: space.sm }} pointerEvents="box-none">
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm }}>
@@ -166,11 +182,16 @@ export default function TripMap() {
             ) : null}
             <View style={{ flexDirection: 'row', gap: space.sm }}>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
-                <Chip label="Favoris" icon="heart" selected={onlyFav} onPress={() => setOnlyFav((v) => !v)} />
-                <Chip label={discover ? 'Lieux à découvrir : oui' : 'Lieux à découvrir'} selected={discover} onPress={() => setDiscover((v) => !v)} />
-                {discover ? categories.activityRoots.map((c) => (
-                  <Chip key={c.code} label={c.name_fr} selected={roots.includes(c.code)} onPress={() => setRoots((r) => (r.includes(c.code) ? r.filter((x) => x !== c.code) : [...r, c.code]))} />
-                )) : null}
+                <Chip label={useful ? 'Pratique : oui' : 'Pratique'} icon="pratique" selected={!!useful} onPress={() => { setUseful((u) => (u ? null : USEFUL.map((c) => c.code))); setSelected(null); }} />
+                {useful ? USEFUL.map((c) => (
+                  <Chip key={c.code} label={`${c.icon} ${c.name}`} selected={useful.includes(c.code)} onPress={() => setUseful((u) => (u!.includes(c.code) ? u!.filter((x) => x !== c.code) : [...u!, c.code]))} />
+                )) : <>
+                  <Chip label="Favoris" icon="heart" selected={onlyFav} onPress={() => setOnlyFav((v) => !v)} />
+                  <Chip label={discover ? 'Lieux à découvrir : oui' : 'Lieux à découvrir'} selected={discover} onPress={() => setDiscover((v) => !v)} />
+                  {discover ? categories.activityRoots.map((c) => (
+                    <Chip key={c.code} label={c.name_fr} selected={roots.includes(c.code)} onPress={() => setRoots((r) => (r.includes(c.code) ? r.filter((x) => x !== c.code) : [...r, c.code]))} />
+                  )) : null}
+                </>}
               </ScrollView>
             </View>
           </View>
@@ -185,10 +206,11 @@ export default function TripMap() {
                 <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: p.color }} />
                 <View style={{ flex: 1 }}>
                   <RNText numberOfLines={1} style={{ fontFamily: fonts.sansSemi, fontSize: 15, color: colors.text }}>{p.label}</RNText>
-                  <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: colors.text3 }}>{p.kind === 'plan' ? `Jour ${p.day} · étape ${p.order}` : 'À découvrir'}</RNText>
+                  <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: colors.text3 }}>{p.kind === 'plan' ? `Jour ${p.day} · étape ${p.order}` : p.kind === 'svc' ? 'Pratique' : 'À découvrir'}</RNText>
                 </View>
               </Pressable>
             ))}
+            {canWiden && widening === null ? <View style={{ padding: space.md }}><Button label="Voir plus de lieux" icon="add" variant="ghost" onPress={() => { void widen(); }} /></View> : null}
           </ScrollView>
         </SlidingPanel> : null}
         {!point && panel === 'bas' ? <View pointerEvents="box-none" style={{ position: 'absolute', left: space.sm, bottom: 72 + space.sm, gap: space.xs, alignItems: 'flex-start' }}>
@@ -224,55 +246,40 @@ export default function TripMap() {
               style={{ width: 32, height: 32, borderRadius: radius.pill, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
               <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>i</RNText>
             </Pressable>
-            {discover && loaded === null ? (
+            <Pressable accessibilityRole="switch" accessibilityState={{ checked: dark }} accessibilityLabel="Carte en thème nuit" onPress={toggleDark}
+              style={{ minHeight: 32, paddingHorizontal: space.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: dark ? colors.accent : colors.surface, borderWidth: 1, borderColor: dark ? colors.accent : colors.line }}>
+              <Icon name={dark ? 'sunny' : 'nocturne'} size={14} tone={dark ? 'onAccent' : 'text'} />
+              <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 12, color: dark ? colors.onAccent : colors.text }}>{dark ? 'Jour' : 'Nuit'}</RNText>
+            </Pressable>
+            {widening !== null ? (
+              <View accessibilityRole="progressbar" accessibilityValue={{ min: 0, max: 100, now: Math.round(widening * 100) }} style={{ minHeight: 32, paddingHorizontal: space.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: space.sm, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
+                <RNText style={{ fontFamily: fonts.sans, fontSize: 12, color: colors.text2 }}>Recherche de lieux… {Math.round(widening * 100)} %</RNText>
+                <View style={{ width: 56, height: 6, borderRadius: 3, backgroundColor: colors.surface2, overflow: 'hidden' }}><View style={{ width: `${Math.max(4, Math.round(widening * 100))}%`, height: '100%', backgroundColor: colors.accent }} /></View>
+              </View>
+            ) : loadingPlaces ? (
               <View accessibilityLiveRegion="polite" style={{ minHeight: 32, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
                 <RNText style={{ fontFamily: fonts.sans, fontSize: 12, color: colors.text2 }}>Chargement des lieux…</RNText>
               </View>
+            ) : canWiden ? (
+              <Pressable accessibilityRole="button" onPress={() => { void widen(); }} style={{ minHeight: 32, paddingHorizontal: space.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.accent }}>
+                <Icon name="add" size={14} tone="onAccent" />
+                <RNText style={{ fontFamily: fonts.sansBold, fontSize: 12, color: colors.onAccent }}>Voir plus de lieux</RNText>
+              </Pressable>
             ) : null}
           </View>
         </View> : null}
         {point ? (
-          <View style={{ position: 'absolute', left: space.sm, right: space.sm, bottom: space.sm + bottomInset, maxWidth: 560, alignSelf: 'center', backgroundColor: colors.surface, borderRadius: radius.card, borderWidth: 1, borderColor: colors.line, padding: space.md, gap: space.xs }}>
-            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: space.sm }}>
-              <View style={{ flex: 1, gap: 2 }}>
-                <RNText numberOfLines={2} style={{ fontFamily: fonts.sansBold, fontSize: 17, color: colors.text }}>{point.label}</RNText>
-                <RNText numberOfLines={2} style={{ fontFamily: fonts.sans, fontSize: 13, color: colors.text2 }}>
-                  {[point.kind === 'plan' ? `Jour ${point.day} · étape ${point.order}` : 'À découvrir', category,
-                    place?.visit_duration_min ? `≈ ${formatDuration(place.visit_duration_min)}` : null,
-                    place?.price_amount != null ? `≈ ${formatMoney(place.price_amount, data.trip.currency)}` : null].filter(Boolean).join(' · ')}
-                </RNText>
-              </View>
-              <Pressable accessibilityRole="button" accessibilityLabel="Fermer" hitSlop={8} onPress={() => setSelected(null)} style={{ width: 32, height: 32, alignItems: 'center', justifyContent: 'center' }}>
-                <Icon name="close" size={20} tone="muted" />
-              </Pressable>
-            </View>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, alignItems: 'center' }}>
-              {point.placeId != null ? (
-                <Pressable accessibilityRole="button" onPress={() => setDetails(true)} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', borderWidth: 1, borderColor: colors.lineStrong }}>
-                  <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>Détails</RNText>
-                </Pressable>
-              ) : null}
-              {point.placeId != null ? (
-                <Pressable accessibilityRole="button" accessibilityLabel={favorites.ids.has(point.placeId) ? 'Retirer des favoris' : 'Ajouter aux favoris'} onPress={() => { void favorites.toggle(point.placeId!); }} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.lineStrong }}>
-                  <Icon name="heart" size={16} filled={favorites.ids.has(point.placeId)} />
-                  <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>Favori</RNText>
-                </Pressable>
-              ) : null}
-              {place ? (
-                <Pressable accessibilityRole="link" accessibilityLabel={`Ouvrir ${point.label} dans Google Maps`} onPress={() => void Linking.openURL(mapsUrl({ name: point.label, lat: place.lat, lng: place.lng }))} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, flexDirection: 'row', alignItems: 'center', gap: 6, borderWidth: 1, borderColor: colors.lineStrong }}>
-                  <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.text }}>Maps</RNText>
-                  <Icon name="external" size={14} tone="text" />
-                </Pressable>
-              ) : null}
-              {point.kind === 'disc' && dayId ? (
-                <Pressable accessibilityRole="button" disabled={busy} onPress={add} style={{ minHeight: 40, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.accent, opacity: busy ? 0.6 : 1 }}>
-                  <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: colors.onAccent }}>{`Ajouter au jour ${day}`}</RNText>
-                </Pressable>
-              ) : null}
-            </View>
-            {point.kind === 'disc' && !dayId && data.mode !== 'simple' ? <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: colors.text3 }}>Choisis un jour en haut pour l'ajouter à ton programme.</RNText> : null}
-            {problem ? <ErrorNote message={problem} /> : null}
-          </View>
+          <SlidingPanel containerHeight={areaH} position={sheet} onPosition={setSheet} title="" handleLabel="Agrandir ou réduire la fiche du lieu" peek={236 + bottomInset}>
+            <PlaceDetails key={point.id} expanded={sheet !== 'bas'} tripId={data.trip.id} placeId={point.placeId} name={point.label}
+              category={point.kind === 'svc' ? USEFUL.find((u) => u.code === point.root)?.name ?? category : category}
+              root={point.kind === 'svc' ? 'pratique' : point.root} symbol={point.icon}
+              context={point.kind === 'plan' ? `Jour ${point.day}, étape ${point.order}` : point.kind === 'disc' ? 'À découvrir' : undefined}
+              dot={point.kind === 'svc' ? point.color : categoryColors[mode][point.root] ?? colors.text3} place={place ?? null} currency={data.trip.currency}
+              travelers={Math.max(1, data.members.filter((m) => !m.left_at).length)} closedToday={false}
+              primary={point.kind === 'disc' && dayId ? { label: `Ajouter au jour ${day}`, onPress: () => { void add(); }, busy } : null}
+              note={problem ?? (point.kind === 'disc' && !dayId && data.mode !== 'simple' ? 'Choisis un jour en haut pour l\'ajouter à ton programme.' : null)}
+              onClose={() => setSelected(null)} />
+          </SlidingPanel>
         ) : null}
       </View>
 
@@ -282,11 +289,6 @@ export default function TripMap() {
           <ErrorNote message={problem} />
         </View>
       </View> : null}
-      {details && point?.placeId != null ? (
-        <PlaceSheet visible tripId={data.trip.id} placeId={point.placeId} name={point.label} category={category}
-          dot={categoryColors[mode][point.root] ?? colors.text3} place={place ?? null} currency={data.trip.currency}
-          travelers={Math.max(1, data.members.filter((m) => !m.left_at).length)} closedToday={false} onClose={() => setDetails(false)} />
-      ) : null}
     </View>
   );
 }

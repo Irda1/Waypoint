@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { DAY_COLORS, boundsOf, dayColor, discoverPoints, legendDays, mapHtml, planPoints, searchPoints, safeJson, visiblePoints } from './map.ts';
+import { DAY_COLORS, boundsOf, dayColor, discoverPoints, legendDays, mapHtml, planPoints, searchPoints, safeJson, servicePoints, visiblePoints } from './map.ts';
 import type { MapPoint } from './map.ts';
 import type { Place, TripItem } from './types.ts';
 
@@ -84,4 +84,13 @@ test('recherche : insensible aux accents, étapes du programme d\'abord, deux le
   assert.deepEqual(searchPoints(pts, 'MUSEE').map((p) => p.id), ['b']);
   assert.deepEqual(searchPoints(pts, 'c'), []);
   assert.deepEqual(legendDays(pts).map((l) => l.day), [1, 2]);
+});
+
+test('filtre Pratique : seulement les lieux pratiques choisis, jamais sans le filtre', () => {
+  const svc = servicePoints([pl(20, { kind: 'service', category_code: 'pharmacie' }), pl(21, { kind: 'service', category_code: 'toilettes' }), pl(22, { kind: 'service', category_code: 'inconnu' })]);
+  assert.deepEqual(svc.map((p) => [p.root, p.icon, p.kind]), [['pharmacie', '✚', 'svc'], ['toilettes', 'WC', 'svc']]);
+  const disc = discoverPoints({ candidates: [{ place: pl(5), root: 'nature' }], inTrip: new Set(), colorOf: () => '#000' });
+  const all = [...svc, ...disc];
+  assert.deepEqual(visiblePoints(all, { day: null, discover: true, roots: [] }).map((p) => p.kind), ['disc']);
+  assert.deepEqual(visiblePoints(all, { day: null, discover: true, roots: [], useful: ['toilettes'] }).map((p) => p.root), ['toilettes']);
 });

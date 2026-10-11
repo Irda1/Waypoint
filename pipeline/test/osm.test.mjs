@@ -12,6 +12,8 @@ test('tri : services utiles (filtre Pratique)', () => {
   assert.deepEqual(classify({ amenity: 'hospital' }), { kind: 'service', category: 'hopital' });
   assert.deepEqual(classify({ amenity: 'toilets' }), { kind: 'service', category: 'toilettes' });
   assert.deepEqual(classify({ shop: 'laundry' }), { kind: 'service', category: 'laverie' });
+  assert.deepEqual(classify({ shop: 'convenience' }), { kind: 'service', category: 'superette' });
+  assert.deepEqual(classify({ shop: 'supermarket' }), { kind: 'service', category: 'superette' });
 });
 
 test('tri : culture, nature, gastronomie, créatif, transports', () => {
@@ -34,7 +36,7 @@ test('tri : culture, nature, gastronomie, créatif, transports', () => {
 
 test('chaque catégorie produite existe dans la migration place_categories', async () => {
   const { readFileSync } = await import('node:fs');
-  const sql = readFileSync(new URL('../../supabase/migrations/20260929000200_reference_data.sql', import.meta.url), 'utf8');
+  const sql = readFileSync(new URL('../../supabase/all-migrations.sql', import.meta.url), 'utf8');
   const codes = new Set([...sql.matchAll(/\('([a-z_]+)',\s*'(?:activity|service|lodging|transit)'/g)].map((m) => m[1]));
   const produced = new Set(Object.keys(CAPS));
   for (const c of produced) assert.ok(codes.has(c), `catégorie « ${c} » absente de place_categories`);

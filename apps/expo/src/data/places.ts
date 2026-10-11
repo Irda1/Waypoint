@@ -199,3 +199,12 @@ export async function searchHomeCities(text: string): Promise<HomeCity[]> {
     .filter((r) => airportNear(r.lat, r.lng) !== null).slice(0, 8)
     .map((r) => ({ id: r.id, name: r.name_fr ?? r.name, country_code: r.country_code, lat: r.lat, lng: r.lng }));
 }
+
+/** Lieux pratiques (pharmacies, toilettes, distributeurs…) des villes du voyage, pour le filtre « Pratique » de la carte. */
+export async function loadServices(cityIds: number[]): Promise<{ places: Place[]; error: string | null }> {
+  if (!cityIds.length) return { places: [], error: null };
+  const { data, error } = await supabase.from('places')
+    .select('id,name,kind,category_code,lat,lng,price_amount,visit_duration_min,closed_days')
+    .in('city_id', cityIds).eq('kind', 'service').eq('status', 'active').limit(1500);
+  return { places: (data ?? []) as Place[], error: error?.message ?? null };
+}

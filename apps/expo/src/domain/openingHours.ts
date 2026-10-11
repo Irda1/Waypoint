@@ -86,3 +86,47 @@ export function checkOpening(hours: string | null | undefined, closedDays: numbe
   const end = endMin ?? startMin;
   return slots.some(([a, b]) => startMin >= a && end <= b) ? { status: 'ok' } : { status: 'outside', slots };
 }
+
+/** « 9 h », « 17 h 30 », « 0 h » (minutes depuis minuit, le lendemain compris). */
+export function formatHour(min: number): string {
+  const m = ((min % 1440) + 1440) % 1440;
+  const h = Math.floor(m / 60), r = m % 60;
+  return `${h} h${r ? ` ${String(r).padStart(2, '0')}` : ''}`;
+}
+
+/** Ouvert ou fermé à l'instant `now` : texte court pour la fiche (« Ouvert · ferme à 17 h »), ton pour la couleur. */
+export function openNow(hours: string | null | undefined, closedDays: number[], now: Date): { tone: 'ok' | 'warn' | 'none'; text: string } {
+  const day = now.getDay(), min = now.getHours() * 60 + now.getMinutes();
+  const week = parseOpeningHours(hours);
+  if (!week) return closedDays.includes(day) ? { tone: 'warn', text: 'Fermé aujourd\'hui' } : { tone: 'none', text: 'Horaires non renseignés' };
+  if ([0, 1, 2, 3, 4, 5, 6].every((d) => week[d]?.length === 1 && week[d][0][0] === 0 && week[d][0][1] >= 1440)) return { tone: 'ok', text: 'Ouvert 24 h/24' };
+  const yesterday = week[(day + 6) % 7] ?? [];
+  const late = yesterday.find(([, b]) => b > 1440 && min < b - 1440);
+  if (late) return { tone: 'ok', text: `Ouvert · ferme à ${formatHour(late[1])}` };
+  const today = week[day];
+  if (today == null) return { tone: 'none', text: 'Horaires non renseignés' };
+  const now_ = today.find(([a, b]) => min >= a && min < b);
+  if (now_) return { tone: 'ok', text: `Ouvert · ferme à ${formatHour(now_[1])}` };
+  const later = today.find(([a]) => a > min);
+  if (later) return { tone: 'warn', text: `Fermé · ouvre à ${formatHour(later[0])}` };
+  for (let k = 1; k <= 7; k++) {
+    const d = (day + k) % 7, first = week[d]?.[0];
+    if (first) return { tone: 'warn', text: `Fermé · ouvre ${k === 1 ? 'demain' : dayName(d)} à ${formatHour(first[0])}` };
+  }
+  return { tone: 'warn', text: 'Fermé' };
+}
+
+/** Horaires de la semaine, du lundi au dimanche (« Lun », « 9 h – 17 h »), ou null s'ils ne sont pas lisibles. */
+export function weekLines(hours: string | null | undefined): { weekday: number; day: string; text: string }[] | null {
+  const week = parseOpeningHours(hours);
+  if (!week) return null;
+  return [1, 2, 3, 4, 5, 6, 0].map((d) => {
+    const slots = week[d];
+    const name = dayName(d);
+    return {
+      weekday: d,
+      day: name.charAt(0).toUpperCase() + name.slice(1, 3),
+      text: slots == null ? 'Non renseigné' : slots.length === 0 ? 'Fermé' : slots.map(([a, b]) => (a === 0 && b >= 1440 ? '24 h/24' : `${formatHour(a)} – ${formatHour(b)}`)).join(', '),
+    };
+  });
+}

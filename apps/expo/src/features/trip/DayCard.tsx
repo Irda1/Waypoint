@@ -438,7 +438,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
         if (!s) return null;
         const category = s.place?.category_code ?? s.item.category_code ?? '';
         return (
-          <PlaceSheet visible tripId={tripId} placeId={s.place?.id ?? null} name={s.place?.name ?? s.item.title ?? 'Étape'} category={categories.byCode.get(category)?.name_fr ?? 'Étape'}
+          <PlaceSheet visible tripId={tripId} placeId={s.place?.id ?? null} name={s.place?.name ?? s.item.title ?? 'Étape'} category={categories.byCode.get(category)?.name_fr ?? 'Étape'} root={categories.rootOf(category)}
             dot={categoryColors[mode][categories.rootOf(category)] ?? colors.text3} place={s.place ?? null} currency={currency} travelers={travelers}
             closedToday={s.issues.some((i) => i.type === 'closed_day')}
             from={(() => { const i = schedule.findIndex((x) => x.item.id === sheetId); const prev = i > 0 ? schedule[i - 1].place : null; return prev ? { ...prev, name: prev.name } : i === 0 ? lodging ?? null : null; })()}

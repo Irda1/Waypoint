@@ -11,14 +11,17 @@ interface Props {
   containerHeight: number;
   position: PanelPos;
   onPosition: (p: PanelPos) => void;
+  /** Texte sous la poignée (aucun si vide). */
   title: string;
+  /** Nom lu par les lecteurs d'écran pour la poignée. */
+  handleLabel?: string;
   /** Hauteur visible en position basse. */
   peek?: number;
   children: React.ReactNode;
 }
 
 /** Panneau glissant de la maquette Escale : on tire la poignée (ou on la touche) pour le faire passer de bas à milieu puis haut. */
-export function SlidingPanel({ containerHeight, position, onPosition, title, peek = 72, children }: Props) {
+export function SlidingPanel({ containerHeight, position, onPosition, title, handleLabel = 'Faire glisser le panneau des lieux', peek = 72, children }: Props) {
   const { colors } = useTheme();
   const panelHeight = Math.max(260, Math.round(containerHeight * 0.8));
   const offsets = useMemo(() => ({
@@ -56,9 +59,9 @@ export function SlidingPanel({ containerHeight, position, onPosition, title, pee
   if (containerHeight <= 0) return null;
   return (
     <Animated.View style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: panelHeight, transform: [{ translateY: ty }], backgroundColor: colors.surface, borderTopLeftRadius: 22, borderTopRightRadius: 22, borderWidth: 1, borderColor: colors.line, overflow: 'hidden', maxWidth: 640, alignSelf: 'center', width: '100%' }}>
-      <View {...pan.panHandlers} accessibilityRole="button" accessibilityLabel="Faire glisser le panneau des lieux" style={{ paddingTop: 10, paddingBottom: 10, alignItems: 'center', gap: 8, cursor: 'grab' } as object}>
+      <View {...pan.panHandlers} accessibilityRole="button" accessibilityLabel={handleLabel} style={{ paddingTop: 10, paddingBottom: 10, alignItems: 'center', gap: 8, cursor: 'grab' } as object}>
         <View style={{ width: 40, height: 4, borderRadius: 2, backgroundColor: colors.lineStrong }} />
-        <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text, paddingHorizontal: space.md }}>{title}</RNText>
+        {title ? <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 14, color: colors.text, paddingHorizontal: space.md }}>{title}</RNText> : null}
       </View>
       <View style={{ flex: 1 }}>{children}</View>
     </Animated.View>
