@@ -118,8 +118,9 @@ export async function listCountryCityPoints(country: string): Promise<{ points: 
   type R = { id: number; name: string; name_fr: string | null; lat: number; lng: number; population: number | null; featured_rank: number | null; is_capital: boolean };
   const rows = (data ?? []) as R[];
   const score = (r: R) => (r.featured_rank != null ? r.featured_rank : 1000) * 1e10 - (r.is_capital ? 5e9 : 0) - (r.population ?? 0);
-  const withAirport = airportCities(rows);
-  const points = [...rows].sort((a, b) => score(a) - score(b)).map((r, i) => ({ id: r.id, name: r.name_fr ?? r.name, lat: r.lat, lng: r.lng, rank: i, airport: withAirport.has(r.id) }));
+  const sorted = [...rows].sort((a, b) => score(a) - score(b));
+  const withAirport = airportCities(sorted);
+  const points = sorted.map((r, i) => ({ id: r.id, name: r.name_fr ?? r.name, lat: r.lat, lng: r.lng, rank: i, airport: withAirport.has(r.id) }));
   return { points, error: error?.message ?? null };
 }
 
