@@ -25,7 +25,7 @@ canvas{display:block;width:100%;height:100%}
   var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, alpha: false });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   var scene = new THREE.Scene(); scene.background = new THREE.Color(BG);
-  var camera = new THREE.PerspectiveCamera(36, 1, 0.1, 100);
+  var camera = new THREE.PerspectiveCamera(36, 1, TRIPV ? 0.002 : 0.1, 100);
   var group = new THREE.Group(); scene.add(group);
   // Cadrage : sur téléphone la planète occupe le haut du bandeau (le texte de l'accueil est en bas) ;
   // sur grand écran elle se place à droite, le texte reste à gauche.
@@ -66,10 +66,16 @@ canvas{display:block;width:100%;height:100%}
   var SPAN = CITIES.reduce(function (m, c) { return Math.max(m, vec(c[0], c[1], 1).angleTo(mid)); }, 0);
   // Demi-hauteur de vue utile (en unités, planète de rayon 2) et taille relative des repères lumineux.
   // VIEW : vue d'ensemble du trajet ; VIEWF : gros plan qui suit le point.
-  var VIEW = TRIPV ? Math.max(2 * Math.sin(Math.min(SPAN, 1.2)) * 2.2, 0.2) : 2, VIEWF = TRIPV ? Math.max(0.2, Math.min(VIEW * 0.45, 1.2)) : 2;
-  var K = TRIPV ? Math.max(0.25, Math.min(1, VIEWF / 1.2)) : 1;
-  // Terres plus finement pointillées autour d'un parcours régional (pas de 0,35° au lieu de 1,35°).
+  // Le zoom suit la taille du parcours, jusqu'aux villes voisines (Tokyo → Fuchū : ~30 km).
+  var VIEW = TRIPV ? Math.max(2 * Math.sin(Math.min(SPAN, 1.2)) * 2.2, 0.015) : 2, VIEWF = TRIPV ? Math.max(0.012, Math.min(VIEW * 0.45, 1.2)) : 2;
+  var K = TRIPV ? Math.max(0.012, Math.min(1, VIEWF / 1.2)) : 1;
+  // Hauteur du tracé au-dessus du sol, proportionnée au parcours (sinon il flotte loin des villes en gros plan).
+  var ALT = TRIPV ? Math.max(0.0006, Math.min(0.012, SPAN * 0.3)) : 0.012;
+  // Terres plus finement pointillées autour d'un parcours régional : le pas suit la taille du parcours
+  // (0,35° pour un pays, jusqu'à 0,015° pour des villes voisines), sur une calotte proportionnée.
   var FINE = TRIPV && SPAN < 0.35;
+  var STEPF = FINE ? Math.min(0.35, Math.max(0.015, SPAN * 180 / Math.PI * 0.12)) : 1.35;
+  var RCAP = FINE ? Math.min(SPAN + 0.6, Math.max(SPAN * 4, STEPF * 80 * Math.PI / 180)) : 0;
 
   // Nuit : ciel étoilé et halo de soleil discret dans le coin haut droit (placé au redimensionnement).
   var sun = null;
@@ -100,7 +106,7 @@ canvas{display:block;width:100%;height:100%}
   var dotMat = new THREE.ShaderMaterial({
     uniforms: { scale: { value: 1 } }, transparent: true, depthWrite: false,
     vertexShader: "uniform float scale; varying float vF; void main(){ vec4 mv = modelViewMatrix * vec4(position, 1.0); vF = dot(normalize(normalMatrix * position), vec3(0.0, 0.0, 1.0)); gl_PointSize = scale / -mv.z; gl_Position = projectionMatrix * mv; }",
-    fragmentShader: "varying float vF; void main(){ vec2 p = gl_PointCoord - 0.5; if (dot(p, p) > 0.25) discard; float a = mix(0.18, 0.62, smoothstep(0.0, 0.8, vF)); gl_FragColor = vec4(" + (DAY ? "vec3(0.29, 0.38, 0.41)" : "vec3(0.62, 0.66, 0.68)") + ", a); }"
+    fragmentShader: "varying float vF; void main(){ vec2 p = gl_PointCoord - 0.5; if (dot(p, p) > 0.25) discard; float a = mix(0.18, 0.62, smoothstep(" + (STEPF < 0.3 ? "-0.6, 0.3" : "0.0, 0.8") + ", vF)); gl_FragColor = vec4(" + (DAY ? "vec3(0.29, 0.38, 0.41)" : "vec3(0.62, 0.66, 0.68)") + ", a); }"
   });
   function addLand(topo) {
     var W = 1024, H = 512, cv = document.createElement("canvas"); cv.width = W; cv.height = H;
@@ -135,11 +141,36 @@ canvas{display:block;width:100%;height:100%}
         }
       }
     }
-    // Zone fine : calotte autour du centre du parcours (rayon angulaire « R »), le reste au pas normal.
-    var R = SPAN + 0.6, c2 = mid.clone().multiplyScalar(2);
-    var inCap = function (v) { return v.angleTo(c2) < R; };
+    // Zone fine : calotte autour du centre du parcours (rayon angulaire RCAP), le reste au pas normal.
+    var c2 = mid.clone().multiplyScalar(2);
+    var inCap = function (v) { return v.angleTo(c2) < RCAP; };
     sample(1.35, -56, 80, function (v) { return !FINE || !inCap(v); });
-    if (FINE) sample(0.35, -56, 80, inCap);
+    if (FINE && STEPF >= 0.3) sample(STEPF, -56, 80, inCap);
+    else if (FINE) {
+      // Très petit parcours : les côtes sont redessinées en grand sur la seule zone utile, pour garder des points nets.
+      var cLat = Math.asin(mid.y) * 180 / Math.PI, cLon = Math.atan2(mid.z, -mid.x) * 180 / Math.PI - 180;
+      var dLat = RCAP * 180 / Math.PI, dLon = dLat / Math.max(Math.cos(cLat * Math.PI / 180), 0.2);
+      var la0 = cLat - dLat, lo0 = cLon - dLon, RW = 1024, RH = 1024, rc = document.createElement("canvas"); rc.width = RW; rc.height = RH;
+      var rx = rc.getContext("2d"); rx.fillStyle = "#fff"; rx.beginPath();
+      polys.forEach(function (poly) { poly.forEach(function (ring) {
+        ring.forEach(function (pt, i) {
+          var lon = pt[0]; while (lon - cLon > 180) lon -= 360; while (cLon - lon > 180) lon += 360;
+          var px = (lon - lo0) / (2 * dLon) * RW, py = (la0 + 2 * dLat - pt[1]) / (2 * dLat) * RH;
+          if (i === 0) rx.moveTo(px, py); else rx.lineTo(px, py);
+        });
+        rx.closePath();
+      }); });
+      rx.fill("evenodd");
+      var rimg = rx.getImageData(0, 0, RW, RH).data;
+      for (var lat = la0; lat <= la0 + 2 * dLat; lat += STEPF) {
+        var dl = STEPF / Math.max(Math.cos(lat * Math.PI / 180), 0.2);
+        for (var lon = lo0; lon <= lo0 + 2 * dLon; lon += dl) {
+          var qx = Math.floor((lon - lo0) / (2 * dLon) * RW), qy = Math.floor((la0 + 2 * dLat - lat) / (2 * dLat) * RH);
+          if (qx < 0 || qy < 0 || qx >= RW || qy >= RH || rimg[(qy * RW + qx) * 4 + 3] <= 128) continue;
+          var v = vec(lon, lat, 2); if (inCap(v)) pts.push(v.x, v.y, v.z);
+        }
+      }
+    }
     var g = new THREE.BufferGeometry(); g.setAttribute("position", new THREE.Float32BufferAttribute(pts, 3));
     group.add(new THREE.Points(g, dotMat)); draw();
   }
@@ -154,13 +185,13 @@ canvas{display:block;width:100%;height:100%}
     for (var i = 0; i <= PER; i++) {
       if (c > 0 && i === 0) continue;
       var t = i / PER, s = Math.sin(ang), wa = Math.sin((1 - t) * ang) / s, wb = Math.sin(t * ang) / s;
-      var p = a.clone().multiplyScalar(wa).add(b.clone().multiplyScalar(wb)).normalize().multiplyScalar(2.012 + lift * Math.sin(Math.PI * t));
+      var p = a.clone().multiplyScalar(wa).add(b.clone().multiplyScalar(wb)).normalize().multiplyScalar(2 + ALT + lift * Math.sin(Math.PI * t));
       path.push(p);
     }
   }
   stops.push(Math.max(0, path.length - 1));
   // Une seule ville : un point, pas de trajet.
-  if (!path.length) { path.push(vec(CITIES[0][0], CITIES[0][1], 2.012)); stops = [0]; }
+  if (!path.length) { path.push(vec(CITIES[0][0], CITIES[0][1], 2 + ALT)); stops = [0]; }
   var lineGeo = new THREE.BufferGeometry().setFromPoints(path);
   var lineMat = new THREE.LineBasicMaterial({ color: accent, transparent: true, opacity: 0.95 });
   var line = new THREE.Line(lineGeo, lineMat); group.add(line);
@@ -173,7 +204,7 @@ canvas{display:block;width:100%;height:100%}
     sp.scale.set(size, size, 1); return sp;
   }
   var head = glow(0.34 * K * (TRIPV ? 1.4 : 1), 1); group.add(head);
-  var marks = CITIES.map(function (ct) { var m = glow(0.16 * K, 0.9); m.position.copy(vec(ct[0], ct[1], 2.015)); m.visible = false; group.add(m); return m; });
+  var marks = CITIES.map(function (ct) { var m = glow(0.16 * K, 0.9); m.position.copy(vec(ct[0], ct[1], 2 + ALT * 1.25)); m.visible = false; group.add(m); return m; });
   // Noms des villes du voyage (carte d'itinéraire) : pastilles posées à côté de chaque étape, masquées si elles se chevauchent.
   var labels = TRIPV ? CITIES.map(function (ct) {
     if (!ct[2]) return null;
@@ -217,7 +248,7 @@ canvas{display:block;width:100%;height:100%}
   }
 
   // Taille des points en pixels : ~0,02 unité vue à la distance de la caméra (champ de 36°).
-  function draw() { dotMat.uniforms.scale.value = (FINE ? 0.009 : 0.034) * renderer.getPixelRatio() * window.innerHeight; renderer.render(scene, camera); if (labels && labels.length) placeLabels(); }
+  function draw() { dotMat.uniforms.scale.value = 0.77 * (STEPF > 1 ? 0.047 : STEPF * Math.PI / 90) * renderer.getPixelRatio() * window.innerHeight; renderer.render(scene, camera); if (labels && labels.length) placeLabels(); }
   var last = 0;
   function frame(now) {
     var dt = last ? Math.min(now - last, 100) : 16; last = now;
@@ -246,6 +277,6 @@ canvas{display:block;width:100%;height:100%}
   }
   window.addEventListener("resize", resize); resize();
   if (!reduce) requestAnimationFrame(frame);
-  if (window.topojson) fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-110m.json").then(function (r) { return r.json(); }).then(addLand).catch(function () {});
+  if (window.topojson) fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/land-" + (FINE && STEPF < 0.3 ? "50m" : "110m") + ".json").then(function (r) { return r.json(); }).then(addLand).catch(function () {});
 })();
 </script></body></html>

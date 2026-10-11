@@ -33,16 +33,16 @@ function nearest(lat: number, lng: number, maxKm: number): { iata: string; km: n
 }
 
 /**
- * Villes qui portent l'icône avion : chaque aéroport n'est attribué qu'à la ville affichée la plus proche
- * (sinon toutes les petites villes autour d'une grande en héritaient).
+ * Villes qui portent l'icône avion : chaque aéroport n'est attribué qu'à une seule ville parmi celles dont il est
+ * l'aéroport le plus proche (sinon toutes les petites villes autour d'une grande en héritaient). `cities` est classé
+ * par importance (la plus importante d'abord) : l'aéroport va à la plus importante, pas à la plus proche
+ * (Haneda est dans l'arrondissement d'Ōta, mais c'est l'aéroport de Tokyo).
  */
 export function airportCities(cities: ReadonlyArray<{ id: number; lat: number; lng: number }>, maxKm: number = MAX_KM): Set<number> {
-  const owner = new Map<string, { id: number; km: number }>();
+  const owner = new Map<string, number>();
   for (const c of cities) {
     const a = nearest(c.lat, c.lng, maxKm);
-    if (!a) continue;
-    const cur = owner.get(a.iata);
-    if (!cur || a.km < cur.km) owner.set(a.iata, { id: c.id, km: a.km });
+    if (a && !owner.has(a.iata)) owner.set(a.iata, c.id);
   }
-  return new Set([...owner.values()].map((o) => o.id));
+  return new Set(owner.values());
 }
