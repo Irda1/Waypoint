@@ -1,0 +1,66 @@
+# Vérifications automatiques de chaque PR (et de main) : tests et typage de l'appli, tests de la collecte,
+# all-migrations.sql à jour, schéma et sécurité (RLS) de la base sur un PostgreSQL jetable.
+# Aucun secret utilisé. Une PR dont une vérification échoue s'affiche en rouge : on corrige avant de fusionner.
+name: Vérifications
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verifications-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  appli:
+    name: Appli (tests et typage)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/expo/package-lock.json
+
+      - name: Installer les dépendances
+        working-directory: apps/expo
+        run: npm install --no-audit --no-fund
+
+      - name: Tests du domaine
+        working-directory: apps/expo
+        run: npm test
+
+      - name: Typage
+        working-directory: apps/expo
+        run: npm run typecheck
+
+  base:
+    name: Collecte, SQL et sécurité de la base
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - name: Tests de la collecte
+        run: node --test pipeline/test/*.test.mjs
+
+      - name: all-migrations.sql à jour
+        run: node scripts/bundle-sql.mjs --check
+
+      - name: PostgreSQL (déjà présent sur les machines GitHub, sinon installé)
+        run: ls /usr/lib/postgresql/*/bin/initdb >/dev/null 2>&1 || (sudo apt-get update && sudo apt-get install -y postgresql)
+
+      - name: Schéma et sécurité de la base (PostgreSQL jetable)
+        run: bash supabase/tests/run-local.sh

@@ -9,4 +9,4 @@ export const GEOAPIFY_KEY: string = process.env.EXPO_PUBLIC_GEOAPIFY_KEY ?? '';
 export const BUILD_ID: string = (process.env.EXPO_PUBLIC_BUILD_ID ?? 'local').slice(0, 7);
 export const isConfigured: boolean = SUPABASE_URL.startsWith('http') && SUPABASE_ANON_KEY.length > 20;
 /** Adresse du site web de l'appli (pour les liens de partage ouverts hors de l'appli). Sur le web, l'adresse courante est utilisée. */
-export const WEB_URL: string = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://cool-biscuit-29de47.netlify.app';
+export const WEB_URL: string = process.env.EXPO_PUBLIC_WEB_URL ?? 'https://irda1.github.io/Waypoint';
