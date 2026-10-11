@@ -214,6 +214,8 @@ select test.throws($$insert into public.expenses (trip_id, label, poste, amount,
 -- Bob ne peut pas réécrire l'auteur d'origine d'une ligne
 update public.trip_items set created_by = 'bbbbbbbb-0000-0000-0000-000000000002' where id = '44444444-4444-4444-4444-444444444445';
 select test.ok((select created_by from public.trip_items where id = '44444444-4444-4444-4444-444444444445') = 'aaaaaaaa-0000-0000-0000-000000000001', 'created_by ne peut pas être réécrit');
+update public.trip_items set created_by = null where id = '44444444-4444-4444-4444-444444444445';
+select test.ok((select created_by from public.trip_items where id = '44444444-4444-4444-4444-444444444445') = 'aaaaaaaa-0000-0000-0000-000000000001', 'created_by ne peut pas être effacé (son auteur existe)');
 
 -- ===========================================================================
 -- Intégrité entre voyages : un membre de deux voyages ne peut pas les mélanger
@@ -422,5 +424,33 @@ select test.as_admin();
 delete from auth.users where id = 'dddddddd-0000-0000-0000-000000000004';
 select test.ok(not exists (select 1 from public.client_errors where message = 'erreur de Dan'), 'erreurs : effacées avec le compte');
 
+-- ===========================================================================
+-- Supprimer son compte en étant dans un voyage partagé (migration 2100)
+-- ===========================================================================
+select test.as_admin();
+insert into auth.users (id, email, raw_user_meta_data) values ('ffffffff-0000-0000-0000-00000000000f', 'fanny@example.test', '{}');
+select test.as_user('ffffffff-0000-0000-0000-00000000000f');
+insert into public.trips (id, title) values ('f6000000-0000-0000-0000-000000000001', 'Voyage de Fanny');
+insert into public.trip_days (id, trip_id, day_date) values ('f7000000-0000-0000-0000-000000000001', 'f6000000-0000-0000-0000-000000000001', '2026-11-02');
+insert into public.trip_items (id, trip_id, day_id, title, position) values ('f8000000-0000-0000-0000-000000000001', 'f6000000-0000-0000-0000-000000000001', 'f7000000-0000-0000-0000-000000000001', 'Marché', 1);
+insert into public.expenses (id, trip_id, label, poste, amount, paid_by) values ('f9000000-0000-0000-0000-000000000001', 'f6000000-0000-0000-0000-000000000001', 'Dîner', 'repas', 60, 'ffffffff-0000-0000-0000-00000000000f');
+insert into public.saved_places (trip_id, place_id, list) values ('f6000000-0000-0000-0000-000000000001', 9001, 'favorite');
+update public.trips set title = 'Voyage de Fanny et Carol' where id = 'f6000000-0000-0000-0000-000000000001';
+select test.as_admin();
+insert into public.trip_members (trip_id, user_id) values ('f6000000-0000-0000-0000-000000000001', 'cccccccc-0000-0000-0000-000000000003');
+select test.as_user('ffffffff-0000-0000-0000-00000000000f');
+select public.delete_my_account();
+select test.as_admin();
+select test.ok(not exists (select 1 from public.profiles where id = 'ffffffff-0000-0000-0000-00000000000f'), 'suppression du compte dans un voyage partagé : le profil est effacé');
+select test.ok((select created_by is null and updated_by is null from public.trips where id = 'f6000000-0000-0000-0000-000000000001'), 'le voyage partagé reste, auteur inconnu');
+select test.ok((select created_by is null and paid_by is null from public.expenses where id = 'f9000000-0000-0000-0000-000000000001'), 'sa dépense reste, sans nom');
+select test.ok((select created_by is null from public.trip_items where id = 'f8000000-0000-0000-0000-000000000001'), 'son étape reste, auteur inconnu');
+select test.ok(not exists (select 1 from public.trip_members where trip_id = 'f6000000-0000-0000-0000-000000000001' and user_id = 'ffffffff-0000-0000-0000-00000000000f')
+  and exists (select 1 from public.trip_members where trip_id = 'f6000000-0000-0000-0000-000000000001' and user_id = 'cccccccc-0000-0000-0000-000000000003'), 'elle quitte le voyage, Carol y reste');
+select test.ok(not exists (select 1 from public.trip_activity_log where actor = 'ffffffff-0000-0000-0000-00000000000f'), 'le journal ne garde pas son identifiant');
+select test.as_user('cccccccc-0000-0000-0000-000000000003');
+update public.trips set title = 'Voyage de Carol' where id = 'f6000000-0000-0000-0000-000000000001';
+select test.as_admin();
+select test.ok((select created_by is null and updated_by = 'cccccccc-0000-0000-0000-000000000003' from public.trips where id = 'f6000000-0000-0000-0000-000000000001'), 'Carol peut encore modifier le voyage (auteur toujours inconnu)');
 do $$ begin raise notice ''; raise notice 'TOUS LES TESTS PASSENT'; end $$;
 rollback;
