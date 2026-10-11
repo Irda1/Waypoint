@@ -12,8 +12,10 @@ const WebViewView = WebView as unknown as React.ComponentType<Record<string, unk
 /** Globe 3D sur Android et iOS : la page Three.js dans une WebView. */
 export function Globe({ mode, color = GLOBE_COLOR, focus = null, onPick, theme = 'nuit', route }: GlobeProps) {
   const view = useRef<{ injectJavaScript: (script: string) => void } | null>(null);
-  const html = useMemo(() => (mode === 'route' ? routeHtml() : globeHtml()), [mode]);
-  const before = `window.__GLOBE__=${JSON.stringify(route ? { mode, color, theme, route } : { mode, color, theme, base: REGIONS_BASE_NATIVE })}; true;`;
+  const config = `window.__GLOBE__=${JSON.stringify(route ? { mode, color, theme, route } : { mode, color, theme, base: REGIONS_BASE_NATIVE })};`;
+  // Réglages (couleur, thème, trajet) écrits dans la page avant son premier script : pas de couleur par défaut si l'injection arrive trop tard.
+  const html = useMemo(() => (mode === 'route' ? routeHtml() : globeHtml()).replace('<script', `<script>${config}</script><script`), [mode, config]);
+  const before = `${config} true;`;
   const send = useCallback(() => {
     if (focus && /^[A-Z]{2}$/.test(focus)) view.current?.injectJavaScript(`window.__focus && window.__focus(${JSON.stringify(focus)}); true;`);
   }, [focus]);

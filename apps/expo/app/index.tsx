@@ -25,7 +25,6 @@ import { Icon } from '../src/ui/Icon';
 const ON_PHOTO = '#F4EFE6';
 const ON_PHOTO_SOFT = 'rgba(245, 245, 242, 0.82)';
 // Sable clair pour les petits titres posés sur photo (l'accent du thème clair est trop sombre ici).
-const ON_PHOTO_ACCENT = '#FFD08A';
 // Titre automatique des voyages « juste les lieux » (mode Simple) : remplacé par un badge sur la carte.
 const SIMPLE_PREFIX = 'Lieux · ';
 
@@ -44,7 +43,7 @@ export default function Home() {
   const heroAccent = (mode === 'jour' ? colors.accent : palette('nuit', accent).accent).slice(1);
   const H = mode === 'jour'
     ? { text: colors.text, soft: colors.text2, eyebrow: colors.accent, glassBg: colors.surface, glassLine: colors.lineStrong }
-    : { text: ON_PHOTO, soft: ON_PHOTO_SOFT, eyebrow: ON_PHOTO_ACCENT, glassBg: 'rgba(7, 9, 11, 0.45)', glassLine: 'rgba(245, 245, 242, 0.25)' };
+    : { text: ON_PHOTO, soft: ON_PHOTO_SOFT, eyebrow: palette('nuit', accent).accent2, glassBg: 'rgba(7, 9, 11, 0.45)', glassLine: 'rgba(245, 245, 242, 0.25)' };
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);

@@ -7,6 +7,8 @@ export interface RegionMapProps {
   /** Villes déjà choisies, dans l'ordre du parcours (le numéro est celui du parcours). */
   selected: { id: number; order: number }[];
   onToggle: (id: number) => void;
+  /** Doigt posé sur la carte (true) ou levé (false) : la page parente bloque son défilement pendant ce temps. */
+  onGrab?: (on: boolean) => void;
 }
 export const REGIONS_COLOR = '5FD3BC';
 // Fichiers publics (régions, images de la Terre) sur GitHub : le mobile n'a pas d'adresse de site à laquelle les demander.

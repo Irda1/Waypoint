@@ -15,7 +15,6 @@ import { useTheme } from '../src/theme/useTheme';
 // Fond de la connexion : la planète en points et son tracé de voyage (même animation que l'accueil), sur noir.
 const ON_PHOTO = '#F4EFE6';
 const ON_PHOTO_SOFT = 'rgba(245, 245, 242, 0.84)';
-const ON_PHOTO_ACCENT = '#FFD08A';
 
 // N'accepte que des chemins internes : évite une redirection vers un site extérieur.
 const safeNext = (next: string | string[] | undefined): string => {
@@ -27,8 +26,8 @@ export default function SignIn() {
   const { session, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
   const { next } = useLocalSearchParams<{ next?: string }>();
   const { colors, mode: theme } = useTheme();
-  const H = theme === 'jour' ? { text: colors.text, soft: colors.text2, eyebrow: colors.accent } : { text: ON_PHOTO, soft: ON_PHOTO_SOFT, eyebrow: ON_PHOTO_ACCENT };
   const { accent } = useAppearance();
+  const H = theme === 'jour' ? { text: colors.text, soft: colors.text2, eyebrow: colors.accent } : { text: ON_PHOTO, soft: ON_PHOTO_SOFT, eyebrow: palette('nuit', accent).accent2 };
   const { breakpoint } = useBreakpoint();
   const wide = breakpoint === 'desktop';
   const [mode, setMode] = useState<'in' | 'up'>('in');
