@@ -394,5 +394,33 @@ select test.ok((select count(*) from public.trip_items where trip_id = '11111111
 select test.ok((select count(*) from public.trip_destinations) = 0, 'suppression serveur : les destinations aussi');
 select test.ok((select count(*) from public.trip_activity_log where trip_id = '11111111-1111-1111-1111-111111111111') = 0, 'suppression serveur : le journal du voyage aussi');
 
+-- ===========================================================================
+-- Remontée des erreurs de l'appli (migration 2000)
+-- ===========================================================================
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select public.log_client_error('Erreur d''essai', 'pile', '/trip/x', 'android', 'abc1234', true);
+select public.log_client_error('   ');
+select public.log_client_error(repeat('x', 800));
+select test.throws($$select * from public.client_errors$$, '42501', 'erreurs : la table n''est pas lisible depuis l''appli');
+select test.throws($$insert into public.client_errors (user_id, message) values ('bbbbbbbb-0000-0000-0000-000000000002', 'x')$$, '42501', 'erreurs : pas d''écriture directe dans la table');
+do $$ begin for i in 1..40 loop perform public.log_client_error('rafale ' || i); end loop; end $$;
+select test.as_anon();
+select test.throws($$select public.log_client_error('anonyme')$$, '42501', 'anonyme : envoi d''erreur refusé');
+select test.as_admin();
+select test.ok((select fatal and screen = '/trip/x' and platform = 'android' and build = 'abc1234' from public.client_errors where message = 'Erreur d''essai'), 'erreurs : écran, plateforme, build et plantage enregistrés');
+select test.ok((select max(length(message)) from public.client_errors) = 500, 'erreurs : message tronqué à 500 caractères');
+select test.ok((select count(*) from public.client_errors where user_id = 'bbbbbbbb-0000-0000-0000-000000000002') = 30, 'erreurs : 30 rapports par personne et par 24 h au plus, message vide ignoré');
+insert into public.client_errors (user_id, message, created_at) values ('cccccccc-0000-0000-0000-000000000003', 'ancienne', now() - interval '31 days');
+select test.as_user('cccccccc-0000-0000-0000-000000000003');
+select public.log_client_error('récente');
+select test.as_admin();
+select test.ok(not exists (select 1 from public.client_errors where message = 'ancienne') and exists (select 1 from public.client_errors where message = 'récente'), 'erreurs : effacées après 30 jours');
+insert into auth.users (id, email, raw_user_meta_data) values ('dddddddd-0000-0000-0000-000000000004', 'dan@example.test', '{}');
+select test.as_user('dddddddd-0000-0000-0000-000000000004');
+select public.log_client_error('erreur de Dan');
+select test.as_admin();
+delete from auth.users where id = 'dddddddd-0000-0000-0000-000000000004';
+select test.ok(not exists (select 1 from public.client_errors where message = 'erreur de Dan'), 'erreurs : effacées avec le compte');
+
 do $$ begin raise notice ''; raise notice 'TOUS LES TESTS PASSENT'; end $$;
 rollback;
