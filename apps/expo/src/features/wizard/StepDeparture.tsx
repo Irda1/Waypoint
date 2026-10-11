@@ -1,19 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, View } from 'react-native';
+import { ActivityIndicator, View } from 'react-native';
 import { Button, Card, Field, Text } from '../../ui';
 import { cityCoords, searchHomeCities } from '../../data/places';
 import type { HomeCity } from '../../data/places';
 import type { WizardState } from '../../domain/wizard.ts';
 import { sameCity } from '../../domain/wizard.ts';
-import { airportNear } from '../../domain/airports.ts';
-import { estimateFlight, flightLinks, flightMinutes } from '../../domain/flights.ts';
-import { distanceKm } from '../../domain/planning.ts';
 import { COUNTRY_NAME } from '../../domain/countries.ts';
-import { formatMoney } from '../../lib/format';
-import { formatDuration } from '../../lib/search';
 import { useTheme } from '../../theme/useTheme';
 import { space } from '../../theme/tokens';
 import { Choice, StepTitle } from './parts';
+import { FlightPicker } from '../trip/FlightPicker';
 import type { StepProps } from './parts';
 
 type Home = NonNullable<WizardState['home']>;
@@ -33,8 +29,6 @@ const POPULAR: (Home & { iata: string })[] = [
   { name: 'Londres', country_code: 'GB', lat: 51.5074, lng: -0.1278, iata: 'LHR · LGW' },
   { name: 'Montréal', country_code: 'CA', lat: 45.5017, lng: -73.5673, iata: 'YUL' },
 ];
-
-const airportFor = (lat: number, lng: number): string | null => airportNear(lat, lng) ?? airportNear(lat, lng, 150);
 
 /** Étape « D'où pars-tu ? » : ville de départ, puis temps de vol et prix estimés vers la première ville du voyage. */
 export function StepDeparture({ state, update }: StepProps<WizardState>) {
@@ -67,12 +61,6 @@ export function StepDeparture({ state, update }: StepProps<WizardState>) {
   const pick = (h: Home) => { update({ ...state, home: { name: h.name, country_code: h.country_code, lat: h.lat, lng: h.lng } }); setText(''); setHits([]); };
 
   const firstAt = first ? coords.get(first.id) : undefined, lastAt = last ? coords.get(last.id) : undefined;
-  const homeIata = home ? airportFor(home.lat, home.lng) : null;
-  const arriveIata = firstAt ? airportFor(firstAt.lat, firstAt.lng) : null, leaveIata = lastAt ? airportFor(lastAt.lat, lastAt.lng) : null;
-  const km = home && firstAt ? distanceKm(home, firstAt) : 0;
-  const est = km > 0 && homeIata && arriveIata ? estimateFlight(km) : null;
-  const links = home && homeIata && first ? flightLinks({ home: home.name, homeIata, arrive: arriveIata ? { name: first.name, iata: arriveIata } : null, leave: last && leaveIata ? { name: last.name, iata: leaveIata } : null, start: state.start, end: state.end, adults: state.travelers }) : [];
-  const eur = (n: number) => formatMoney(n, 'EUR');
 
   return (
     <View style={{ gap: space.md }}>
@@ -80,7 +68,7 @@ export function StepDeparture({ state, update }: StepProps<WizardState>) {
 
       {home ? (
         <Card>
-          <Text variant="label">Départ · {home.name}{homeIata ? ` (${homeIata})` : ''}</Text>
+          <Text variant="label">Départ · {home.name}</Text>
           {first && isFirst(home.name) ? <Text variant="body" style={{ color: colors.warm }} accessibilityRole="alert">{home.name} est la première ville de ton voyage : on ne peut pas en partir. Touche « Changer la ville de départ » ci-dessous.</Text>
             : !first ? <Text variant="muted">Choisis des villes à l'étape précédente pour estimer le vol.</Text>
             : searching || !firstAt ? (
@@ -88,16 +76,10 @@ export function StepDeparture({ state, update }: StepProps<WizardState>) {
                 <ActivityIndicator color={colors.accent} />
                 <Text variant="muted">Recherche des vols vers {first.name}…</Text>
               </View>
-            ) : !arriveIata ? <Text variant="muted" style={{ color: colors.warm }}>{first.name} n'a pas d'aéroport proche : l'arrivée se fera par une autre ville.</Text>
-            : est ? (
-              <View style={{ gap: space.sm }}>
-                <Text variant="heading">{home.name} → {first.name}</Text>
-                <Text variant="body">Vol ≈ {formatDuration(flightMinutes(km, false))} en direct{est.stopover ? `, ≈ ${formatDuration(flightMinutes(km, true))} avec escale` : ''}</Text>
-                <Text variant="body">À partir de ≈ {eur(est.cheapest)} par personne (aller simple, éco){state.travelers > 1 ? ` · ≈ ${eur(est.cheapest * 2 * state.travelers)} aller-retour pour ${state.travelers}` : ''}</Text>
-                <Text variant="muted" style={{ fontSize: 12 }}>Estimation d'après la distance, pas un prix réel : Google Flights affiche les vrais prix du moment.</Text>
-                {links.map((l) => <Button key={l.url} label={l.label} icon="plane" onPress={() => void Linking.openURL(l.url)} />)}
-              </View>
-            ) : null}
+            ) : (
+              <FlightPicker home={home} air={home.air} first={{ name: first.name, ...firstAt }} last={last && lastAt ? { name: last.name, ...lastAt } : null}
+                start={state.start} end={state.end} adults={state.travelers} onAir={(air) => update({ ...state, home: { ...home, air } })} />
+            )}
           <Button label="Changer la ville de départ" variant="ghost" onPress={() => update({ ...state, home: null })} />
         </Card>
       ) : (

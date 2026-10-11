@@ -25,3 +25,9 @@ test('airportCities : l\'aéroport va à la ville la plus importante qu\'il dess
   assert.ok(ids.has(1));
   assert.ok(!ids.has(2));
 });
+
+test('aéroports proches d\'une ville, du plus proche au plus lointain', async () => {
+  const { airportsNear } = await import('./airports.ts');
+  assert.deepEqual(airportsNear(48.8566, 2.3522).map((a) => a.iata), ['ORY', 'CDG', 'BVA']);
+  assert.equal(airportsNear(0, -30).length, 0);
+});

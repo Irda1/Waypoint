@@ -6,6 +6,7 @@ import { addDays, diffDays, dateRange } from '../lib/dates.ts';
 import type { Poste } from './types.ts';
 import { buildPlan } from './itinerary.ts';
 import type { Candidate, PlannedDay } from './itinerary.ts';
+import type { AirPrefs } from './flights.ts';
 
 export type PartyType = 'seul' | 'deux' | 'amis' | 'famille';
 export type BudgetLevelId = 'economique' | 'moyen' | 'confortable' | 'premium';
@@ -21,7 +22,8 @@ export interface WizardState {
   cities: WizardCity[];
   party: PartyType | null;
   /** Ville de départ (facultative) : sert aux estimations et aux liens de vols. */
-  home: { name: string; country_code: string; lat: number; lng: number } | null;
+  /** Ville de départ, avec les choix de vol (aller simple, aéroports) faits à l'étape Départ. */
+  home: { name: string; country_code: string; lat: number; lng: number; air?: AirPrefs } | null;
   travelers: number;
   interests: string[];
   budget: { level: BudgetLevelId | 'montant' | null; amount: number | null; currency: string };

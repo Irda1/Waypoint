@@ -46,3 +46,25 @@ export function airportCities(cities: ReadonlyArray<{ id: number; lat: number; l
   }
   return new Set(owner.values());
 }
+
+/** Aéroports à moins de `maxKm` (150 km par défaut), du plus proche au plus lointain, `max` au plus. */
+export function airportsNear(lat: number, lng: number, maxKm = 150, max = 3): { iata: string; km: number }[] {
+  const out: { iata: string; km: number }[] = [];
+  for (const [aLat, aLng, iata] of AIRPORTS) {
+    if (Math.abs(aLat - lat) > maxKm / 111 + 0.1) continue;
+    const d = km(lat, lng, aLat, aLng);
+    if (d < maxKm) out.push({ iata, km: Math.round(d) });
+  }
+  return out.sort((a, b) => a.km - b.km).slice(0, max);
+}
+
+/** Nom courant des aéroports les plus utilisés (les autres s'affichent avec leur code). */
+export const AIRPORT_NAMES: Record<string, string> = {
+  CDG: 'Roissy-CDG', ORY: 'Orly', BVA: 'Beauvais', LYS: 'Lyon-Saint-Exupéry', MRS: 'Marseille-Provence', NCE: 'Nice', TLS: 'Toulouse',
+  BOD: 'Bordeaux', NTE: 'Nantes', LIL: 'Lille', SXB: 'Strasbourg', MPL: 'Montpellier', BRU: 'Bruxelles', CRL: 'Charleroi', GVA: 'Genève',
+  BSL: 'Bâle-Mulhouse', ZRH: 'Zurich', LHR: 'Heathrow', LGW: 'Gatwick', STN: 'Stansted', LTN: 'Luton', YUL: 'Montréal',
+  HND: 'Haneda', NRT: 'Narita', IBR: 'Ibaraki', KIX: 'Kansai', ITM: 'Itami', UKB: 'Kobe', NGO: 'Nagoya', CTS: 'Sapporo', FUK: 'Fukuoka', OKA: 'Okinawa',
+  LIS: 'Lisbonne', OPO: 'Porto', FAO: 'Faro', MAD: 'Madrid', BCN: 'Barcelone', FCO: 'Rome-Fiumicino', CIA: 'Rome-Ciampino',
+  MXP: 'Milan-Malpensa', LIN: 'Milan-Linate', BGY: 'Bergame', VCE: 'Venise', NAP: 'Naples', ATH: 'Athènes', AMS: 'Amsterdam',
+  FRA: 'Francfort', MUC: 'Munich', BER: 'Berlin', JFK: 'New York-JFK', EWR: 'Newark', LGA: 'LaGuardia',
+};
