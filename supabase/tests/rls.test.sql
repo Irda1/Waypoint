@@ -484,5 +484,48 @@ end $$;
 select test.throws($$select public.add_user_place(current_setting('test.lisboa')::bigint, 'Lieu 41', 38.69, -9.14, 'cafe', 'google_maps')$$, '53400', 'au plus 40 lieux ajoutés par jour et par personne');
 select test.as_admin();
 
+-- ===========================================================================
+-- Carnet de voyage : note et photos du jour, stockage privé (migration 2600)
+-- ===========================================================================
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+insert into public.trips (id, title) values ('c6000000-0000-0000-0000-000000000001', 'Carnet d''Alice');
+insert into public.trip_days (id, trip_id, day_date) values ('c7000000-0000-0000-0000-000000000001', 'c6000000-0000-0000-0000-000000000001', '2026-12-01');
+insert into public.trip_journal (day_id, trip_id, note) values ('c7000000-0000-0000-0000-000000000001', 'c6000000-0000-0000-0000-000000000001', 'Coucher de soleil');
+select test.ok((select updated_by = 'aaaaaaaa-0000-0000-0000-000000000001' from public.trip_journal where day_id = 'c7000000-0000-0000-0000-000000000001'), 'carnet : note du jour écrite, autrice notée');
+insert into public.trip_photos (trip_id, day_id, path, created_by) values ('c6000000-0000-0000-0000-000000000001', 'c7000000-0000-0000-0000-000000000001',
+  'c6000000-0000-0000-0000-000000000001/c7000000-0000-0000-0000-000000000001/p1.jpg', 'bbbbbbbb-0000-0000-0000-000000000002');
+select test.ok((select created_by = 'aaaaaaaa-0000-0000-0000-000000000001' from public.trip_photos where path like '%/p1.jpg'), 'carnet : l''auteur d''une photo ne s''usurpe pas');
+select test.throws($$insert into public.trip_photos (trip_id, day_id, path) values ('c6000000-0000-0000-0000-000000000001', 'c7000000-0000-0000-0000-000000000001', 'autre/chemin.jpg')$$, '23514', 'carnet : le chemin d''une photo suit voyage/jour');
+insert into storage.objects (bucket_id, name) values ('trip-photos', 'c6000000-0000-0000-0000-000000000001/c7000000-0000-0000-0000-000000000001/p1.jpg');
+select test.ok((select count(*) from storage.objects where bucket_id = 'trip-photos') = 1, 'stockage : une membre envoie et voit sa photo');
+select test.throws($$insert into storage.objects (bucket_id, name) values ('trip-photos', 'pas-un-voyage/x.jpg')$$, '42501', 'stockage : chemin hors voyage refusé');
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select test.ok((select count(*) from public.trip_journal where trip_id = 'c6000000-0000-0000-0000-000000000001') = 0, 'carnet : invisible hors du voyage');
+select test.ok((select count(*) from public.trip_photos where trip_id = 'c6000000-0000-0000-0000-000000000001') = 0, 'carnet : photos invisibles hors du voyage');
+select test.ok((select count(*) from storage.objects where bucket_id = 'trip-photos') = 0, 'stockage : fichiers invisibles hors du voyage');
+select test.throws($$insert into storage.objects (bucket_id, name) values ('trip-photos', 'c6000000-0000-0000-0000-000000000001/c7000000-0000-0000-0000-000000000001/intrus.jpg')$$, '42501', 'stockage : envoi refusé hors du voyage');
+select test.throws($$insert into public.trip_journal (day_id, trip_id, note) values ('c7000000-0000-0000-0000-000000000001', 'c6000000-0000-0000-0000-000000000001', 'x')$$, '42501', 'carnet : écriture refusée hors du voyage');
+select test.as_admin();
+insert into public.trip_members (trip_id, user_id) values ('c6000000-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000002');
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+update public.trip_journal set note = 'Coucher de soleil, puis fado' where day_id = 'c7000000-0000-0000-0000-000000000001';
+select test.ok((select updated_by = 'bbbbbbbb-0000-0000-0000-000000000002' and created_by = 'aaaaaaaa-0000-0000-0000-000000000001' from public.trip_journal where day_id = 'c7000000-0000-0000-0000-000000000001'), 'carnet : un autre membre complète la note');
+delete from public.trip_photos where path like '%/p1.jpg';
+delete from storage.objects where name like '%/p1.jpg';
+select test.ok((select count(*) from public.trip_photos where path like '%/p1.jpg') = 1, 'carnet : on ne supprime pas la photo d''un autre');
+select test.as_admin();
+select test.ok((select count(*) from storage.objects where name like '%/p1.jpg') = 1, 'stockage : le fichier d''un autre reste');
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+do $$ begin
+  for i in 2..12 loop
+    insert into public.trip_photos (trip_id, day_id, path) values ('c6000000-0000-0000-0000-000000000001', 'c7000000-0000-0000-0000-000000000001',
+      'c6000000-0000-0000-0000-000000000001/c7000000-0000-0000-0000-000000000001/p' || i || '.jpg');
+  end loop;
+end $$;
+select test.throws($$insert into public.trip_photos (trip_id, day_id, path) values ('c6000000-0000-0000-0000-000000000001', 'c7000000-0000-0000-0000-000000000001', 'c6000000-0000-0000-0000-000000000001/c7000000-0000-0000-0000-000000000001/p13.jpg')$$, '23514', 'carnet : au plus 12 photos par jour');
+delete from public.trip_photos where path like '%/p1.jpg';
+select test.ok((select count(*) from public.trip_photos where path like '%/p1.jpg') = 0, 'carnet : on supprime sa propre photo');
+select test.as_admin();
+
 do $$ begin raise notice ''; raise notice 'TOUS LES TESTS PASSENT'; end $$;
 rollback;
