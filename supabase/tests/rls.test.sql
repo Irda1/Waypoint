@@ -373,6 +373,7 @@ select test.throws($$insert into public.trip_shares (trip_id) values ('11111111-
 select test.as_anon();
 select test.ok(public.shared_trip(current_setting('test.share')) is not null, 'anonyme : le lien de partage montre le programme');
 select test.ok(not (public.shared_trip(current_setting('test.share')) ? 'expenses') and not (public.shared_trip(current_setting('test.share')) ? 'members'), 'le lien de partage n''expose ni dépenses ni membres');
+select test.ok(jsonb_typeof(public.shared_trip(current_setting('test.share'))->'stops') = 'array', 'le lien de partage donne les villes du trajet (stops)');
 select test.ok(public.shared_trip('inconnu') is null, 'un jeton inconnu ne donne rien');
 select test.throws($$select * from public.trip_shares$$, '42501', 'anonyme : table des liens inaccessible');
 select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
