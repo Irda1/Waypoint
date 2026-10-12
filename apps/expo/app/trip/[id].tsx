@@ -6,6 +6,8 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useJournal } from '../../src/data/journal';
 import { JournalCard, JournalSection } from '../../src/features/trip/JournalCard';
 import { Recap } from '../../src/features/trip/Recap';
+import { FinalBalanceCard } from '../../src/features/trip/FinalBalanceCard';
+import { finalBalance } from '../../src/domain/finalBalance.ts';
 import { useAuth } from '../../src/auth/AuthProvider';
 import { useRequireAuth } from '../../src/auth/useRequireAuth';
 import { Button, Card, Columns, ErrorNote, Field, Screen, Section, Text } from '../../src/ui';
@@ -177,6 +179,11 @@ export default function TripScreen() {
   }
   const dates = trip.starts_on ? `${formatDay(trip.starts_on)}${trip.ends_on ? ` → ${formatDay(trip.ends_on)}` : ''}` : 'Dates à définir';
   const ended = !!trip.ends_on && trip.ends_on < todayIso();
+  const balance = finalBalance({
+    expenses: data.expenses, budgetTotal: trip.budget_total, days: data.days.length, payments: data.payments ?? [],
+    envelopes: Object.fromEntries(data.budgetLines.map((l) => [l.poste, Number(l.amount)])),
+    memberIds: data.members.filter((m) => !m.left_at).map((m) => m.user_id),
+  });
 
   async function invite() {
     const res = await createInvite(data!.trip.id);
@@ -382,8 +389,10 @@ export default function TripScreen() {
 
         {tab === 'budget' ? (
         <View style={styles.page}>
+          {ended ? <FinalBalanceCard data={data} balance={balance} ended onOpenFriends={() => setTab('amis')} /> : null}
           <BudgetCard data={data} onChanged={reload} activitiesPanel={session ? <ToPayCard data={data} userId={session.user.id} onChanged={reload} embedded /> : undefined} />
           <ConverterCard data={data} />
+          {ended ? null : <FinalBalanceCard data={data} balance={balance} ended={false} onOpenFriends={() => setTab('amis')} />}
           {session ? <Button label="Ajouter une dépense" icon="expense" onPress={() => setQuickOpen(true)} /> : null}
         </View>
         ) : null}
@@ -445,7 +454,7 @@ export default function TripScreen() {
       <PlusMenu visible={plusOpen} onPick={onPlus} onClose={() => setPlusOpen(false)} />
       {recap ? (
         <Recap visible onClose={() => setRecap(false)} title={trip.title} dates={dates} currency={trip.currency} days={data.days} destinations={data.destinations}
-          items={data.items} expenses={data.expenses} journal={journal} members={data.members} cityName={(d) => nameOfCity(cityOfDay(d))} />
+          items={data.items} expenses={data.expenses} journal={journal} members={data.members} cityName={(d) => nameOfCity(cityOfDay(d))} balance={balance} />
       ) : null}
       {session ? (
         <QuickExpenseSheet visible={quickOpen} data={data} userId={session.user.id} onClose={() => setQuickOpen(false)}
