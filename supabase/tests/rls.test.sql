@@ -453,5 +453,36 @@ select test.as_user('cccccccc-0000-0000-0000-000000000003');
 update public.trips set title = 'Voyage de Carol' where id = 'f6000000-0000-0000-0000-000000000001';
 select test.as_admin();
 select test.ok((select created_by is null and updated_by = 'cccccccc-0000-0000-0000-000000000003' from public.trips where id = 'f6000000-0000-0000-0000-000000000001'), 'Carol peut encore modifier le voyage (auteur toujours inconnu)');
+-- ===========================================================================
+-- Ajouter un lieu qui manque (migration 2500)
+-- ===========================================================================
+select test.as_admin();
+select set_config('test.lisboa', (select id::text from public.cities where name = 'Lisboa'), true);
+select test.as_anon();
+select test.throws($$select public.add_user_place(1, 'x', 38.7, -9.1, 'cafe', 'osm')$$, '42501', 'anonyme : ajout de lieu refusé');
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select set_config('test.p1', public.add_user_place(current_setting('test.lisboa')::bigint, '  Pastéis de Belém ', 38.6975, -9.2033, 'cafe', 'osm', 'node', 398922337, 'Rua de Belém 84')::text, true);
+select test.ok((select name = 'Pastéis de Belém' and kind = 'activity' and source = 'photon' and license = 'ODbL 1.0'
+  and added_by = 'aaaaaaaa-0000-0000-0000-000000000001' from public.places where id = current_setting('test.p1')::bigint), 'ajout d''un lieu OpenStreetMap : nom nettoyé, licence, auteur');
+select test.ok(public.add_user_place(current_setting('test.lisboa')::bigint, 'Autre nom', 38.6975, -9.2033, 'cafe', 'osm', 'node', 398922337) = current_setting('test.p1')::bigint, 'même référence OpenStreetMap : lieu réutilisé');
+select test.ok(public.add_user_place(current_setting('test.lisboa')::bigint, 'pastéis de belém', 38.6976, -9.2034, 'cafe', 'google_maps') = current_setting('test.p1')::bigint, 'même nom au même endroit : lieu réutilisé');
+select set_config('test.p2', public.add_user_place(current_setting('test.lisboa')::bigint, 'Miradouro de Santa Luzia', 38.7116, -9.1301, 'point_de_vue', 'google_maps')::text, true);
+select test.ok((select source = 'google_maps_link' and license = 'saisie voyageur' and osm_id is null from public.places
+  where id = current_setting('test.p2')::bigint), 'ajout depuis un lien Google Maps');
+select test.throws($$select public.add_user_place(current_setting('test.lisboa')::bigint, 'Porto', 41.15, -8.61, 'cafe', 'osm')$$, '22023', 'lieu à plus de 60 km de la ville refusé');
+select test.throws($$select public.add_user_place(current_setting('test.lisboa')::bigint, 'x', 38.7, -9.1, 'hebergement', 'osm')$$, '22023', 'type de lieu hors activités et services refusé');
+select test.throws($$select public.add_user_place(current_setting('test.lisboa')::bigint, '   ', 38.7, -9.1, 'cafe', 'osm')$$, '22023', 'nom vide refusé');
+select test.throws($$select public.add_user_place(current_setting('test.lisboa')::bigint, 'x', 38.7, -9.1, 'cafe', 'google_maps', 'node', 1)$$, '22023', 'référence OpenStreetMap sur un lien Google refusée');
+select test.throws($$select public.add_user_place(current_setting('test.lisboa')::bigint, 'Pharmacie masquée', 38.73, -9.15, 'pharmacie', 'osm')$$, '22023', 'un lieu masqué ne revient pas');
+select test.throws($$insert into public.places (city_id, kind, category_code, name, lat, lng, source, license) values (1,'activity','cafe','x',0,0,'x','x')$$, '42501', 'toujours pas d''écriture directe dans les lieux');
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+do $$ begin
+  for i in 1..40 loop
+    perform public.add_user_place(current_setting('test.lisboa')::bigint, 'Lieu ' || i, 38.70 + i * 0.0005, -9.14, 'cafe', 'google_maps');
+  end loop;
+end $$;
+select test.throws($$select public.add_user_place(current_setting('test.lisboa')::bigint, 'Lieu 41', 38.69, -9.14, 'cafe', 'google_maps')$$, '53400', 'au plus 40 lieux ajoutés par jour et par personne');
+select test.as_admin();
+
 do $$ begin raise notice ''; raise notice 'TOUS LES TESTS PASSENT'; end $$;
 rollback;
