@@ -27,3 +27,24 @@ export function shortExtract(text: string | null | undefined, max = 240): string
   if (!out) out = clean.slice(0, max - 1).replace(/\s+\S*$/, '') + '…';
   return out;
 }
+
+export type WikiPage = { lang: string; title: string };
+
+/** Réponse Wikidata « wbgetentities » (sitelinks) → page Wikipédia de chaque identifiant demandé (français, sinon anglais ; null si aucune). */
+export function wikidataPages(json: unknown, ids: string[]): Map<string, WikiPage | null> {
+  const entities = (json as { entities?: Record<string, { sitelinks?: Record<string, { title: string }> }> } | null)?.entities ?? {};
+  const out = new Map<string, WikiPage | null>();
+  for (const id of ids) {
+    const links = entities[id]?.sitelinks ?? {};
+    out.set(id, links.frwiki ? { lang: 'fr', title: links.frwiki.title } : links.enwiki ? { lang: 'en', title: links.enwiki.title } : null);
+  }
+  return out;
+}
+
+/** Réponse Wikipédia « prop=pageimages » (formatversion=2) → vignette de chaque titre demandé, en suivant normalisations et redirections. */
+export function pageThumbs(json: unknown, titles: string[]): Map<string, string | null> {
+  const q = (json as { query?: { normalized?: { from: string; to: string }[]; redirects?: { from: string; to: string }[]; pages?: { title: string; thumbnail?: { source?: string } }[] } } | null)?.query ?? {};
+  const hop = (list: { from: string; to: string }[] | undefined, t: string) => list?.find((x) => x.from === t)?.to ?? t;
+  const byTitle = new Map((q.pages ?? []).map((p) => [p.title, p.thumbnail?.source ?? null] as const));
+  return new Map(titles.map((t) => [t, byTitle.get(hop(q.redirects, hop(q.normalized, t))) ?? null]));
+}

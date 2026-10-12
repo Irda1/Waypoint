@@ -1,5 +1,5 @@
 import React from 'react';
-import { Image, Modal, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { Modal, Pressable, ScrollView, Text as RNText, View } from 'react-native';
 import * as Linking from 'expo-linking';
 import { Button, ErrorNote, Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
@@ -10,11 +10,12 @@ import { fastest, googleDirectionsUrl, googlePlaceUrl, travelOptions } from '../
 import type { Point } from '../../domain/routes.ts';
 import { openNow, weekLines } from '../../domain/openingHours.ts';
 import { useFavorites } from '../../data/favorites';
-import { usePlaceInfo } from '../../data/placeInfo';
+import { knownPlacePhoto, usePlaceInfo } from '../../data/placeInfo';
+import { resizeThumb } from '../../domain/cityPhoto.ts';
 import { iconFor } from '../../theme/categoryIcons';
 import { Icon } from '../../ui/Icon';
 import type { IconName } from '../../ui/Icon';
-import { Pop } from '../../ui/motion';
+import { FadeImage, Pop } from '../../ui/motion';
 
 export interface PlaceDetailsProps {
   tripId: string;
@@ -74,14 +75,15 @@ export function PlaceDetails(props: PlaceDetailsProps & { expanded: boolean; vis
   const site = info.website ? (/^https?:\/\//i.test(info.website) ? info.website : `https://${info.website}`) : null;
   const tel = info.phone ? `tel:${info.phone.replace(/[^\d+]/g, '')}` : null;
 
+  // Photo déjà vue (grille, carte…) affichée tout de suite, sans attendre la fiche complète.
+  const photo = info.photo ?? knownPlacePhoto(placeId);
   const picture = (size: 'thumb' | 'hero') => {
-    const style = size === 'hero' ? { height: info.photo ? 200 : 120, borderRadius: 18 } : { width: 64, height: 64, borderRadius: 14 };
-    if (info.photo) return <Image source={{ uri: info.photo }} accessibilityIgnoresInvertColors resizeMode="cover" style={{ ...style, backgroundColor: colors.surface2 }} />;
+    const style = size === 'hero' ? { height: photo || info.loading ? 200 : 120, borderRadius: 18 } : { width: 64, height: 64, borderRadius: 14 };
     return (
-      <View style={{ ...style, backgroundColor: dot, alignItems: 'center', justifyContent: 'center' }}>
+      <FadeImage uri={photo ? resizeThumb(photo, size === 'hero' ? 500 : 330) : info.loading ? undefined : null} style={{ ...style, backgroundColor: dot }}>
         {symbol ? <RNText style={{ fontFamily: fonts.sansBold, fontSize: size === 'hero' ? 54 : 22, color: '#fff' }}>{symbol}</RNText>
           : <Icon name={iconFor(root ?? '')} size={size === 'hero' ? 56 : 28} color="#fff" />}
-      </View>
+      </FadeImage>
     );
   };
 
@@ -90,7 +92,7 @@ export function PlaceDetails(props: PlaceDetailsProps & { expanded: boolean; vis
       {expanded ? (
         <View>
           {picture('hero')}
-          {info.photo ? <RNText style={{ position: 'absolute', right: 8, bottom: 8, fontFamily: fonts.sans, fontSize: 10.5, color: '#fff', backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, overflow: 'hidden' }}>Photo : Wikipédia</RNText> : null}
+          {photo ? <RNText style={{ position: 'absolute', right: 8, bottom: 8, fontFamily: fonts.sans, fontSize: 10.5, color: '#fff', backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, overflow: 'hidden' }}>Photo : Wikipédia</RNText> : null}
           <Pressable accessibilityRole="button" accessibilityLabel="Fermer la fiche" onPress={onClose} style={{ position: 'absolute', right: 10, top: 10, width: 36, height: 36, borderRadius: 18, backgroundColor: 'rgba(0,0,0,0.45)', alignItems: 'center', justifyContent: 'center' }}>
             <Icon name="close" size={18} color="#fff" />
           </Pressable>

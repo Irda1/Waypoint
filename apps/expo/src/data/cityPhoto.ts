@@ -6,8 +6,8 @@ import { photoFromSummary } from '../domain/cityPhoto.ts';
 import type { FoundPhoto, WikiSummary } from '../domain/cityPhoto.ts';
 import type { CityCover } from './cityCover';
 
-// v2 : les échecs gardés en v1 venaient d'un défaut de lecture des adresses Wikipédia, on recommence à zéro.
-const KEY = 'waypoint.cityphoto.v2.';
+// v3 : les petites photos gardées en v2 demandaient une largeur que Wikimédia refuse (640 px), on recommence à zéro.
+const KEY = 'waypoint.cityphoto.v3.';
 const TIMEOUT_MS = 6000;
 // Un échec est retenté au plus une fois par semaine.
 const RETRY_MS = 7 * 24 * 3600 * 1000;
