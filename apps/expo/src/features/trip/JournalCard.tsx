@@ -137,7 +137,7 @@ export function JournalCard({ tripId, dayId, journal, members, userId }: { tripI
 }
 
 /** Section « Carnet » de l'onglet Voyage : un résumé par jour écrit, et tout le carnet à lire d'un trait. */
-export function JournalSection({ journal, days, cityName }: { journal: Reloadable; days: { id: string; day_date: string; city_id: number | null }[]; cityName: (cityId: number | null) => string }) {
+export function JournalSection({ journal, days, cityName, onRecap }: { journal: Reloadable; days: { id: string; day_date: string; city_id: number | null }[]; cityName: (cityId: number | null) => string; onRecap?: () => void }) {
   const { colors } = useTheme();
   const [reading, setReading] = useState(false);
   if (!journal.available) return null;
@@ -160,6 +160,7 @@ export function JournalSection({ journal, days, cityName }: { journal: Reloadabl
         </View>
       ))}
       <Button label="Lire tout le carnet" icon="book" variant="ghost" onPress={() => setReading(true)} />
+      {onRecap ? <Button label="Voir le récap animé" icon="sparkles" variant="ghost" onPress={onRecap} /> : null}
       <Modal visible={reading} animationType="slide" onRequestClose={() => setReading(false)}>
         <View style={{ flex: 1, backgroundColor: colors.bg }}>
           <ScrollView contentContainerStyle={{ padding: space.lg, paddingTop: space.xl, gap: space.xl, maxWidth: 720, width: '100%', alignSelf: 'center' }}>
