@@ -2,8 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router, useLocalSearchParams } from 'expo-router';
-import { Button, Card, Screen, Text } from '../../src/ui';
-import { loadSharedTrip } from '../../src/data/trips';
+import { Button, Card, ErrorNote, Screen, Text } from '../../src/ui';
+import { copySharedTrip, loadSharedTrip } from '../../src/data/trips';
+import { useAuth } from '../../src/auth/AuthProvider';
+import { MiniCalendar } from '../../src/features/trip/MiniCalendar';
+import { shiftedRange, suggestStart } from '../../src/domain/copyTrip.ts';
 import type { SharedTrip } from '../../src/data/trips';
 import { useCategories } from '../../src/data/categories';
 import { Globe } from '../../src/features/globe/Globe';
@@ -19,16 +22,33 @@ const SUN = palette('nuit', 'soleil');
 
 /** Page publique en lecture seule : le programme d'un voyage partagé par lien, sans compte (planète, puis jour par jour). */
 export default function SharedTripPage() {
-  const { token } = useLocalSearchParams<{ token: string }>();
+  const { token, copy } = useLocalSearchParams<{ token: string; copy?: string }>();
+  const { session } = useAuth();
   const { colors, mode } = useTheme();
   const categories = useCategories();
   const [trip, setTrip] = useState<SharedTrip | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState<Set<number> | null>(null);
+  // « Refaire ce voyage » : choix de la date (on revient ici avec ?copy=1 après la connexion).
+  const [copying, setCopying] = useState(copy === '1');
+  const [start, setStart] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [copyError, setCopyError] = useState<string | null>(null);
 
   useEffect(() => {
     void loadSharedTrip(String(token)).then((r) => { setTrip(r.trip); setError(r.error); });
   }, [token]);
+  useEffect(() => { if (copying && trip && start === null) setStart(suggestStart(trip.starts_on, todayIso())); }, [copying, trip, start]);
+
+  const askSignIn = () => router.push({ pathname: '/sign-in', params: { next: `/share/${String(token)}?copy=1` } });
+  async function copyTrip() {
+    if (!session) { askSignIn(); return; }
+    setBusy(true); setCopyError(null);
+    const res = await copySharedTrip(String(token), trip?.starts_on ? start : null);
+    setBusy(false);
+    if (!res.id) { setCopyError(res.error ?? 'Copie impossible pour le moment.'); return; }
+    router.replace(`/trip/${res.id}`);
+  }
 
   if (trip === undefined) return <Screen><Text variant="muted">Chargement…</Text></Screen>;
   if (trip === null) return <Screen><Card><Text variant="body">{error ?? 'Ce lien n\'existe pas ou n\'est plus partagé.'}</Text></Card></Screen>;
@@ -110,9 +130,24 @@ export default function SharedTripPage() {
             );
           })}
           <View style={{ borderRadius: radius.card, padding: space.lg, gap: space.sm, alignItems: 'center', backgroundColor: colors.surface2 }}>
-            <RNText style={{ fontFamily: fonts.serif, fontSize: 18, color: colors.text }}>Toi aussi, prépare ton voyage</RNText>
-            <Text variant="muted" style={{ textAlign: 'center' }}>Programme jour par jour, carte et budget partagé.</Text>
-            <Button label="Créer mon voyage avec Waypoint" onPress={() => router.push('/')} />
+            <RNText style={{ fontFamily: fonts.serif, fontSize: 18, color: colors.text }}>Envie du même voyage ?</RNText>
+            <Text variant="muted" style={{ textAlign: 'center' }}>On reprend les villes, les nuits et le programme, à la date de ton choix. Rien d'autre : ni budget, ni dépenses, ni noms.</Text>
+            {copying && session ? (
+              <View style={{ alignSelf: 'stretch', gap: space.sm }}>
+                {trip.starts_on && start ? (
+                  <>
+                    <Text variant="label">Ta date de départ</Text>
+                    <MiniCalendar value={start} taken={new Set()} onPick={setStart} />
+                    <Text variant="muted">{formatDay(start)}{shiftedRange(trip.starts_on, trip.ends_on, start).end ? ` → ${formatDay(shiftedRange(trip.starts_on, trip.ends_on, start).end!)}` : ''}</Text>
+                  </>
+                ) : null}
+                <ErrorNote message={copyError} />
+                <Button label="Créer mon voyage" icon="undo" loading={busy} disabled={!!trip.starts_on && !start} onPress={() => void copyTrip()} />
+              </View>
+            ) : (
+              <Button label="Refaire ce voyage" icon="undo" onPress={() => (session ? setCopying(true) : askSignIn())} />
+            )}
+            <Button label="Créer un autre voyage" variant="ghost" onPress={() => router.push('/')} />
           </View>
           <Text variant="muted" style={{ fontSize: 12, textAlign: 'center' }}>Partagé avec Waypoint · Lieux © contributeurs d'OpenStreetMap</Text>
         </View>

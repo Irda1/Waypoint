@@ -349,3 +349,19 @@ export async function loadSharedTrip(token: string): Promise<{ trip: SharedTrip 
   const { data, error } = await supabase.rpc('shared_trip', { p_token: token });
   return { trip: (data as SharedTrip | null) ?? null, error: msg(error) };
 }
+
+// « Refaire ce voyage » (migration 2700). Fonction absente : la mise à jour de la base n'est pas encore faite.
+const notYet = (error: { code?: string } | null): string | null =>
+  error && (error.code === 'PGRST202' || error.code === '42883') ? 'Pas encore disponible (mise à jour de la base à faire).' : null;
+
+/** Nouveau voyage à partir d'un des siens, décalé au départ choisi ; programme et budget au choix. */
+export async function copyTrip(args: { tripId: string; title: string; start: string | null; program: boolean; budget: boolean }): Promise<{ id: string | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('copy_trip', { p_trip: args.tripId, p_title: args.title, p_start: args.start, p_program: args.program, p_budget: args.budget });
+  return { id: (data as string | null) ?? null, error: notYet(error) ?? msg(error) };
+}
+
+/** Nouveau voyage à partir de la page de partage d'un ami (villes, nuits et programme seulement). */
+export async function copySharedTrip(token: string, start: string | null): Promise<{ id: string | null; error: string | null }> {
+  const { data, error } = await supabase.rpc('copy_shared_trip', { p_token: token, p_start: start });
+  return { id: (data as string | null) ?? null, error: notYet(error) ?? msg(error) };
+}

@@ -6,6 +6,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useJournal } from '../../src/data/journal';
 import { JournalCard, JournalSection } from '../../src/features/trip/JournalCard';
 import { Recap } from '../../src/features/trip/Recap';
+import { CopyTripSheet } from '../../src/features/trip/CopyTripSheet';
 import { FinalBalanceCard } from '../../src/features/trip/FinalBalanceCard';
 import { finalBalance } from '../../src/domain/finalBalance.ts';
 import { markSouvenirsSeen } from '../../src/lib/souvenirs';
@@ -13,7 +14,7 @@ import { useAuth } from '../../src/auth/AuthProvider';
 import { useRequireAuth } from '../../src/auth/useRequireAuth';
 import { Button, Card, Columns, ErrorNote, Field, Screen, Section, Text } from '../../src/ui';
 import { useTrip } from '../../src/data/useTrip';
-import { addDay, addDestination, createInvite, removeDestination } from '../../src/data/trips';
+import { addDay, addDestination, createInvite, createShare, getShareToken, removeDestination } from '../../src/data/trips';
 import type { CityOption } from '../../src/data/places';
 import { MiniCalendar } from '../../src/features/trip/MiniCalendar';
 import { DestinationsCard } from '../../src/features/trip/DestinationsCard';
@@ -43,7 +44,7 @@ import { FriendsCard } from '../../src/features/trip/FriendsCard';
 import { BudgetCard } from '../../src/features/trip/BudgetCard';
 import { QuickExpenseSheet } from '../../src/features/trip/QuickExpenseSheet';
 import { deleteExpense } from '../../src/data/trips';
-import { ShareCard } from '../../src/features/trip/ShareCard';
+import { ShareCard, shareUrl } from '../../src/features/trip/ShareCard';
 import { FlightsCard } from '../../src/features/trip/FlightsCard';
 import { ConverterCard } from '../../src/features/trip/ConverterCard';
 import { ToPayCard } from '../../src/features/trip/ToPayCard';
@@ -142,6 +143,7 @@ export default function TripScreen() {
   // Carnet de voyage (migration 2600) : rechargé avec les données du voyage.
   const journal = useJournal(String(id), data);
   const [recap, setRecap] = useState(false);
+  const [copyOpen, setCopyOpen] = useState(false);
   // Récap ou bilan ouvert : la pastille « Récap prêt » de l'accueil disparaît.
   useEffect(() => { if (recap || tab === 'budget') void markSouvenirsSeen(String(id)); }, [recap, tab, id]);
 
@@ -270,15 +272,25 @@ export default function TripScreen() {
                 <RNText style={[styles.lead, { color: H.soft }]}>{dates}</RNText>
                 {destNames ? <RNText style={[styles.route, { color: H.text }]} numberOfLines={2}>{destNames.replace(/ · /g, ' → ')}</RNText> : null}
               </View>
-              {ended && data.days.length > 0 && data.destinations.length > 0 ? (
-                // Récap animé : un souvenir, proposé une fois la dernière date passée.
-                <Pressable accessibilityRole="button" onPress={() => setRecap(true)}
-                  style={[styles.glass, { alignSelf: 'flex-start', marginTop: space.md, backgroundColor: palette('nuit', accent).accent, borderColor: 'transparent' }]}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Icon name="sparkles" size={16} color={palette('nuit', accent).onAccent} />
-                    <RNText style={[styles.glassLabel, { color: palette('nuit', accent).onAccent }]}>Revoir le voyage</RNText>
-                  </View>
-                </Pressable>
+              {ended ? (
+                // Voyage terminé : revoir le récap animé (un souvenir), ou refaire le voyage à d'autres dates.
+                <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm, marginTop: space.md }}>
+                  {data.days.length > 0 && data.destinations.length > 0 ? (
+                    <Pressable accessibilityRole="button" onPress={() => setRecap(true)}
+                      style={[styles.glass, { backgroundColor: palette('nuit', accent).accent, borderColor: 'transparent' }]}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <Icon name="sparkles" size={16} color={palette('nuit', accent).onAccent} />
+                        <RNText style={[styles.glassLabel, { color: palette('nuit', accent).onAccent }]}>Revoir le voyage</RNText>
+                      </View>
+                    </Pressable>
+                  ) : null}
+                  <Pressable accessibilityRole="button" onPress={() => setCopyOpen(true)} style={[styles.glass, { backgroundColor: H.glassBg, borderColor: H.glassLine }]}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Icon name="undo" size={16} color={H.text} />
+                      <RNText style={[styles.glassLabel, { color: H.text }]}>Refaire ce voyage</RNText>
+                    </View>
+                  </Pressable>
+                </View>
               ) : null}
             </SafeAreaView>
           </View>
@@ -344,10 +356,11 @@ export default function TripScreen() {
             <BookingsCard tripId={trip.id} />
           </Section>
 
-          <Section title="Préparation" icon="note" hint="Météo, liste, export" defaultOpen={false}>
+          <Section title="Préparation" icon="note" hint="Météo, liste, export, dupliquer" defaultOpen={false}>
             <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
             <ChecklistCard tripId={trip.id} />
             <ExportCard data={data} />
+            <Button label="Dupliquer ce voyage" icon="undo" variant="ghost" onPress={() => setCopyOpen(true)} />
           </Section>
 
           {journal.available ? (
@@ -455,9 +468,17 @@ export default function TripScreen() {
       </Pressable>
       <FloatingNav tabs={TABS} active={tab} onSelect={onNav} />
       <PlusMenu visible={plusOpen} onPick={onPlus} onClose={() => setPlusOpen(false)} />
+      <CopyTripSheet visible={copyOpen} onClose={() => setCopyOpen(false)} trip={trip} />
       {recap ? (
         <Recap visible onClose={() => setRecap(false)} title={trip.title} dates={dates} currency={trip.currency} days={data.days} destinations={data.destinations}
-          items={data.items} expenses={data.expenses} journal={journal} members={data.members} cityName={(d) => nameOfCity(cityOfDay(d))} balance={balance} />
+          items={data.items} expenses={data.expenses} journal={journal} members={data.members} cityName={(d) => nameOfCity(cityOfDay(d))} balance={balance}
+          getShareLink={async () => {
+            // Lien de la page de partage (celui de l'onglet Amis) ; créé s'il n'existe pas encore.
+            const got = await getShareToken(trip.id);
+            if (got.missing) return { url: null, error: 'Partage pas encore disponible.' };
+            const token = got.token ?? (await createShare(trip.id)).token;
+            return token ? { url: shareUrl(token), error: null } : { url: null, error: got.error ?? 'Lien de partage impossible à créer.' };
+          }} />
       ) : null}
       {session ? (
         <QuickExpenseSheet visible={quickOpen} data={data} userId={session.user.id} onClose={() => setQuickOpen(false)}

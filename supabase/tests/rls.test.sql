@@ -527,5 +527,58 @@ delete from public.trip_photos where path like '%/p1.jpg';
 select test.ok((select count(*) from public.trip_photos where path like '%/p1.jpg') = 0, 'carnet : on supprime sa propre photo');
 select test.as_admin();
 
+-- ===========================================================================
+-- Refaire un voyage : le sien, ou depuis un lien de partage (migration 2700)
+-- ===========================================================================
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+insert into public.trips (id, title, starts_on, ends_on, travelers, budget_total) values ('d6000000-0000-0000-0000-000000000001', 'Lisbonne en mai', '2026-05-12', '2026-05-13', 2, 900);
+insert into public.trip_destinations (trip_id, city_id, position, nights) values ('d6000000-0000-0000-0000-000000000001', current_setting('test.lisboa')::bigint, 1, 1);
+insert into public.trip_days (id, trip_id, day_date, city_id) values ('d7000000-0000-0000-0000-000000000001', 'd6000000-0000-0000-0000-000000000001', '2026-05-12', current_setting('test.lisboa')::bigint), ('d7000000-0000-0000-0000-000000000002', 'd6000000-0000-0000-0000-000000000001', '2026-05-13', null);
+insert into public.trip_items (trip_id, day_id, plan, place_id, title, start_time, position, note, done) values
+  ('d6000000-0000-0000-0000-000000000001', 'd7000000-0000-0000-0000-000000000001', 'A', 9001, null, '09:30', 1, 'Réserver', true),
+  ('d6000000-0000-0000-0000-000000000001', 'd7000000-0000-0000-0000-000000000002', 'B', null, 'Pique-nique', null, 1, null, false);
+insert into public.trip_budget_lines (trip_id, poste, amount) values ('d6000000-0000-0000-0000-000000000001', 'repas', 200);
+insert into public.expenses (trip_id, label, poste, amount, paid_by) values ('d6000000-0000-0000-0000-000000000001', 'Dîner', 'repas', 40, 'aaaaaaaa-0000-0000-0000-000000000001');
+insert into public.trip_journal (day_id, trip_id, note) values ('d7000000-0000-0000-0000-000000000001', 'd6000000-0000-0000-0000-000000000001', 'Super journée');
+select set_config('test.copy', public.copy_trip('d6000000-0000-0000-0000-000000000001', '  Lisbonne 2027 ', '2027-05-08', true, true)::text, true);
+select test.ok((select title = 'Lisbonne 2027' and starts_on = '2027-05-08' and ends_on = '2027-05-09' and travelers = 2 and budget_total = 900
+  from public.trips where id = current_setting('test.copy')::uuid), 'refaire : nouveau voyage, dates décalées, voyageurs et budget repris');
+select test.ok((select count(*) from public.trip_members where trip_id = current_setting('test.copy')::uuid) = 1
+  and exists (select 1 from public.trip_members where trip_id = current_setting('test.copy')::uuid and user_id = 'aaaaaaaa-0000-0000-0000-000000000001'), 'refaire : seule la personne qui copie est voyageuse');
+select test.ok((select string_agg(day_date::text, ',' order by day_date) from public.trip_days where trip_id = current_setting('test.copy')::uuid) = '2027-05-08,2027-05-09', 'refaire : jours décalés à la nouvelle date');
+select test.ok((select count(*) from public.trip_items i join public.trip_days d on d.id = i.day_id and d.trip_id = i.trip_id
+  where i.trip_id = current_setting('test.copy')::uuid) = 2, 'refaire : étapes des plans A et B rangées dans les nouveaux jours');
+select test.ok((select bool_and(not done) from public.trip_items where trip_id = current_setting('test.copy')::uuid), 'refaire : étapes remises à « à faire »');
+select test.ok((select nights from public.trip_destinations where trip_id = current_setting('test.copy')::uuid) = 1, 'refaire : villes et nuits reprises');
+select test.ok((select amount from public.trip_budget_lines where trip_id = current_setting('test.copy')::uuid and poste = 'repas') = 200, 'refaire : enveloppes du budget reprises');
+select test.ok(not exists (select 1 from public.expenses where trip_id = current_setting('test.copy')::uuid)
+  and not exists (select 1 from public.trip_journal where trip_id = current_setting('test.copy')::uuid), 'refaire : ni dépenses ni carnet');
+select set_config('test.copy2', public.copy_trip('d6000000-0000-0000-0000-000000000001', 'Sans programme', '2027-06-01', false, false)::text, true);
+select test.ok(not exists (select 1 from public.trip_items where trip_id = current_setting('test.copy2')::uuid)
+  and not exists (select 1 from public.trip_budget_lines where trip_id = current_setting('test.copy2')::uuid)
+  and (select budget_total is null from public.trips where id = current_setting('test.copy2')::uuid), 'refaire : sans programme ni budget si on le choisit');
+select test.throws($$select public.copy_trip('d6000000-0000-0000-0000-000000000001', 'x', null, true, true)$$, '22023', 'refaire : date de départ obligatoire pour un voyage daté');
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select test.throws($$select public.copy_trip('d6000000-0000-0000-0000-000000000001', 'Copie', '2027-01-01', true, true)$$, '42501', 'refaire : impossible pour un voyage dont on n''est pas voyageur');
+select test.throws($$select public.copy_trip_rows('d6000000-0000-0000-0000-000000000001', 'x', '2027-01-01', array['A'], true, true)$$, '42501', 'refaire : la copie interne n''est pas appelable depuis l''appli');
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+insert into public.trip_shares (token, trip_id) values ('partage-copie-test', 'd6000000-0000-0000-0000-000000000001');
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select set_config('test.copy3', public.copy_shared_trip('partage-copie-test', '2027-07-01')::text, true);
+select test.ok((select created_by = 'bbbbbbbb-0000-0000-0000-000000000002' and starts_on = '2027-07-01' and budget_total is null and travelers = 1
+  from public.trips where id = current_setting('test.copy3')::uuid), 'lien de partage : le voyage est à soi, sans budget ni voyageurs repris');
+select test.ok((select count(*) from public.trip_items where trip_id = current_setting('test.copy3')::uuid and plan = 'A') = 1
+  and (select count(*) from public.trip_items where trip_id = current_setting('test.copy3')::uuid) = 1, 'lien de partage : seulement le programme que la page montre (plan A)');
+select test.ok(not exists (select 1 from public.trip_budget_lines where trip_id = current_setting('test.copy3')::uuid), 'lien de partage : budget jamais repris');
+select test.as_admin();
+select test.ok(not exists (select 1 from public.trip_members where trip_id = 'd6000000-0000-0000-0000-000000000001' and user_id = 'bbbbbbbb-0000-0000-0000-000000000002'), 'lien de partage : on ne rejoint pas le voyage d''origine');
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+update public.trip_shares set revoked_at = now() where token = 'partage-copie-test';
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select test.throws($$select public.copy_shared_trip('partage-copie-test', '2027-07-01')$$, 'P0002', 'lien de partage retiré : plus de copie possible');
+select test.as_anon();
+select test.throws($$select public.copy_shared_trip('partage-copie-test', '2027-07-01')$$, '42501', 'anonyme : pas de copie');
+select test.as_admin();
+
 do $$ begin raise notice ''; raise notice 'TOUS LES TESTS PASSENT'; end $$;
 rollback;

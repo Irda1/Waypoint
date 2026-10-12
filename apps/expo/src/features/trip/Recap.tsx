@@ -6,6 +6,7 @@ import { Icon } from '../../ui/Icon';
 import { CountUp } from '../../ui/motion';
 import { fonts, palette, radius, space } from '../../theme/tokens';
 import { formatMoney } from '../../lib/format';
+import { shareText } from '../../lib/share';
 import { ROUTE_BG, routeParam } from '../../domain/routeGlobe.ts';
 import { excerpt, recapDays, recapStats } from '../../domain/recap.ts';
 import type { Journal, JournalPhoto } from '../../data/journal';
@@ -33,6 +34,8 @@ interface Props {
   members: Member[];
   cityName: (day: Day) => string;
   balance?: FinalBalance;
+  /** Lien de la page de partage du voyage, pour « Partager » à la fin du récap. */
+  getShareLink?: () => Promise<{ url: string | null; error: string | null }>;
 }
 
 /** Photo plein écran qui avance doucement (coupé si le téléphone demande moins de mouvements). */
@@ -43,7 +46,7 @@ function Drift({ uri }: { uri: string }) {
 }
 
 /** Récap animé du voyage, façon story : trajet, chiffres, jours du carnet, photos. Toucher à droite avance, à gauche revient, appui long = pause. */
-export function Recap({ visible, onClose, title, dates, currency, days, destinations, items, expenses, journal, members, cityName, balance }: Props) {
+export function Recap({ visible, onClose, title, dates, currency, days, destinations, items, expenses, journal, members, cityName, balance, getShareLink }: Props) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const photosOf = (id: string) => journal.photos.filter((p) => p.day_id === id && p.url);
@@ -61,6 +64,16 @@ export function Recap({ visible, onClose, title, dates, currency, days, destinat
   }, [days, journal]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const [i, setI] = useState(0);
+  const [shareNote, setShareNote] = useState<string | null>(null);
+  const shareRecap = async () => {
+    if (!getShareLink) return;
+    setShareNote(null);
+    const link = await getShareLink();
+    if (!link.url) { setShareNote(link.error ?? 'Partage impossible pour le moment.'); return; }
+    const facts = [`${stats.days} jour${stats.days > 1 ? 's' : ''}`, `${stats.cities} ville${stats.cities > 1 ? 's' : ''}`, stats.km ? `${stats.km.toLocaleString('fr-FR')} km` : null].filter(Boolean).join(', ');
+    const r = await shareText(`Notre voyage « ${title} » : ${facts}. Le programme jour par jour : ${link.url}`);
+    setShareNote(r === 'copied' ? 'Lien copié : colle-le dans ta messagerie.' : r === 'failed' ? 'Partage impossible ici.' : null);
+  };
   const progress = useRef(new Animated.Value(0)).current;
   const paused = useRef(0);
   const duration = (s: Slide | undefined) => (s?.kind === 'globe' ? 6500 : s?.kind === 'end' ? 0 : 5000);
@@ -159,9 +172,10 @@ export function Recap({ visible, onClose, title, dates, currency, days, destinat
               <>
                 <RNText style={st.k}>Fin du récap</RNText>
                 <RNText style={st.big}>À la prochaine aventure</RNText>
-                <RNText style={st.soft}>Le récap grandit chaque jour avec le carnet.</RNText>
+                <RNText style={st.soft}>{shareNote ?? 'Le lien de partage montre le programme ; les photos et le carnet restent privés.'}</RNText>
                 <View style={{ flexDirection: 'row', gap: space.sm, marginTop: space.sm }}>
                   <Pressable accessibilityRole="button" onPress={() => go(0)} style={[st.btn, { backgroundColor: SUN.accent }]}><RNText style={[st.btnT, { color: SUN.onAccent }]}>Revoir</RNText></Pressable>
+                  {getShareLink ? <Pressable accessibilityRole="button" onPress={() => void shareRecap()} style={[st.btn, { borderWidth: 1, borderColor: 'rgba(244,239,230,0.3)' }]}><RNText style={[st.btnT, { color: TEXT }]}>Partager</RNText></Pressable> : null}
                   <Pressable accessibilityRole="button" onPress={onClose} style={[st.btn, { borderWidth: 1, borderColor: 'rgba(244,239,230,0.3)' }]}><RNText style={[st.btnT, { color: TEXT }]}>Fermer</RNText></Pressable>
                 </View>
               </>
