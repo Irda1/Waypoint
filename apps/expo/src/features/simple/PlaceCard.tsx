@@ -1,11 +1,11 @@
 import React from 'react';
-import { Image, Linking, Pressable, Text as RNText, View } from 'react-native';
+import { Linking, Pressable, Text as RNText, View } from 'react-native';
 import { usePlacePhoto } from '../../data/placeInfo';
 import { mapsUrl } from '../../domain/simple.ts';
 import type { SimplePlace } from '../../domain/simple.ts';
 import { iconFor } from '../../theme/categoryIcons';
 import { Icon } from '../../ui/Icon';
-import { Pop } from '../../ui/motion';
+import { FadeImage, Pop } from '../../ui/motion';
 import { fonts, radius, space } from '../../theme/tokens';
 import { useTheme } from '../../theme/useTheme';
 
@@ -13,11 +13,10 @@ import { useTheme } from '../../theme/useTheme';
 export function PlacePic({ place, root, dot, size }: { place: SimplePlace; root: string; dot: string; size?: number }) {
   const photo = usePlacePhoto(place.id, place);
   const box = size ? { width: size, height: size, borderRadius: 12 } : { width: '100%' as const, aspectRatio: 4 / 3 };
-  if (photo) return <Image source={{ uri: photo }} accessibilityIgnoresInvertColors resizeMode="cover" style={{ ...box, backgroundColor: dot }} />;
   return (
-    <View style={{ ...box, backgroundColor: dot, alignItems: 'center', justifyContent: 'center' }}>
+    <FadeImage uri={photo} style={{ ...box, backgroundColor: dot }}>
       <Icon name={iconFor(root)} size={size ? Math.round(size / 2.2) : 34} color="#fff" />
-    </View>
+    </FadeImage>
   );
 }
 

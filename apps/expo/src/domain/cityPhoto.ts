@@ -22,10 +22,14 @@ function km(aLat: number, aLng: number, bLat: number, bLng: number): number {
 // Wikipédia ajoute des paramètres de suivi (« ?utm_source=… ») : on les retire avant de lire l'adresse.
 const bare = (url: string): string => url.split('?')[0];
 
-/** Même image Wikimedia à une autre largeur (miniature « …/320px-Nom.jpg » → « …/1280px-Nom.jpg »). */
+// Wikimédia ne sert plus que ces largeurs de miniature : toute autre (640 px par exemple) répond par une erreur.
+const WIDTHS = [330, 500, 960, 1280, 1920];
+
+/** Même image Wikimedia à une autre largeur (miniature « …/330px-Nom.jpg » → « …/1280px-Nom.jpg »), arrondie à une largeur servie. */
 export function resizeThumb(url: string, width: number): string {
   const u = bare(url);
-  return /\/\d+px-[^/]+$/.test(u) ? u.replace(/\/(\d+)px-([^/]+)$/, `/${width}px-$2`) : u;
+  const w = WIDTHS.find((x) => x >= width) ?? WIDTHS[WIDTHS.length - 1];
+  return /\/\d+px-[^/]+$/.test(u) ? u.replace(/\/(\d+)px-([^/]+)$/, `/${w}px-$2`) : u;
 }
 
 /** Photo utilisable pour la ville (lat, lng), ou null si la page ne correspond pas ou si l'image ne convient pas. */
@@ -37,7 +41,7 @@ export function photoFromSummary(s: WikiSummary | null | undefined, lat: number,
   const thumb = s.thumbnail?.source;
   return {
     uri: thumb && o.width > 1280 ? resizeThumb(thumb, 1280) : bare(o.source),
-    small: thumb && o.width > 640 ? resizeThumb(thumb, 640) : bare(o.source),
+    small: thumb && o.width > 500 ? resizeThumb(thumb, 500) : bare(o.source),
     credit: 'Photo : Wikimedia Commons',
   };
 }

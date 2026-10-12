@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Platform, Text as RNText, View } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Platform, StyleSheet, Text as RNText, View } from 'react-native';
 import type { StyleProp, TextStyle, ViewStyle } from 'react-native';
 import { useTheme } from '../theme/useTheme';
 import { radius } from '../theme/tokens';
@@ -32,6 +32,45 @@ export function Skeleton({ height, width = '100%', round = radius.field, style }
     return () => loop.stop();
   }, [reduce, t]);
   return <Animated.View accessible={false} style={[{ height, width, borderRadius: round, backgroundColor: colors.surface2, opacity: reduce ? 0.8 : t.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) }, style]} />;
+}
+
+/** Photo qui apparaît en fondu par-dessus sa pastille (`children` : couleur et icône de la catégorie).
+ *  `uri` : undefined pendant la recherche (la pastille « respire »), null s'il n'y a pas de photo. */
+export function FadeImage({ uri, style, children }: { uri: string | null | undefined; style: StyleProp<ViewStyle>; children?: React.ReactNode }) {
+  const reduce = useReduceMotion();
+  const pulse = useRef(new Animated.Value(0)).current;
+  const [settled, setSettled] = useState<string | null>(null);
+  const busy = !reduce && (uri === undefined || (!!uri && settled !== uri));
+  useEffect(() => {
+    if (!busy) return;
+    const loop = Animated.loop(Animated.sequence([
+      Animated.timing(pulse, { toValue: 1, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: native }),
+      Animated.timing(pulse, { toValue: 0, duration: 650, easing: Easing.inOut(Easing.quad), useNativeDriver: native }),
+    ]));
+    loop.start();
+    return () => loop.stop();
+  }, [busy, pulse]);
+  return (
+    <View style={[{ overflow: 'hidden', alignItems: 'center', justifyContent: 'center' }, style]}>
+      {children}
+      {busy ? <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: '#fff', opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [0, 0.18] }) }]} /> : null}
+      {uri ? <FadingPhoto key={uri} uri={uri} instant={reduce} onSettled={() => setSettled(uri)} /> : null}
+    </View>
+  );
+}
+
+// Une instance par adresse (key) : l'opacité repart de zéro pour chaque nouvelle photo, même déjà en cache.
+function FadingPhoto({ uri, instant, onSettled }: { uri: string; instant: boolean; onSettled: () => void }) {
+  const shown = useRef(new Animated.Value(0)).current;
+  const [loaded, setLoaded] = useState(false);
+  // Le fondu part d'un effet (photo déjà affichée à l'écran) : une image en cache peut finir de charger avant.
+  useEffect(() => {
+    if (loaded) Animated.timing(shown, { toValue: 1, duration: instant ? 0 : 320, easing: Easing.out(Easing.cubic), useNativeDriver: native }).start();
+  }, [loaded, instant, shown]);
+  return (
+    <Animated.Image source={{ uri }} accessibilityIgnoresInvertColors resizeMode="cover" style={[StyleSheet.absoluteFill, { opacity: shown }]}
+      onError={onSettled} onLoad={() => { onSettled(); setLoaded(true); }} />
+  );
 }
 
 /** Forme d'un écran en chargement : un titre et quelques lignes. */

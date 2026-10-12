@@ -12,13 +12,17 @@ const kyoto = {
 test('miniature Wikimedia redimensionnée', () => {
   assert.equal(resizeThumb(kyoto.thumbnail.source, 1280), 'https://upload.wikimedia.org/wikipedia/commons/thumb/a/ab/Kyoto_skyline.jpg/1280px-Kyoto_skyline.jpg');
   assert.equal(resizeThumb('https://exemple.org/photo.jpg', 1280), 'https://exemple.org/photo.jpg');
+  // Largeurs refusées par Wikimédia (640, 320…) : arrondies à la largeur servie juste au-dessus.
+  assert.match(resizeThumb(kyoto.thumbnail.source, 640), /\/960px-Kyoto_skyline\.jpg$/);
+  assert.match(resizeThumb(kyoto.thumbnail.source, 320), /\/330px-Kyoto_skyline\.jpg$/);
+  assert.match(resizeThumb(kyoto.thumbnail.source, 4000), /\/1920px-Kyoto_skyline\.jpg$/);
 });
 
 test('photo gardée quand la page est bien celle de la ville', () => {
   const p = photoFromSummary(kyoto, 35.02, 135.75);
   assert.ok(p);
   assert.match(p.uri, /1280px-/);
-  assert.match(p.small, /640px-/);
+  assert.match(p.small, /500px-/);
 });
 
 test('photo écartée : autre lieu, homonymie, carte, portrait, trop petite', () => {
@@ -40,5 +44,5 @@ test('adresses Wikimedia suivies de paramètres (?utm_source=…) : photo accept
   const p = photoFromSummary(paris, 48.8566, 2.3522);
   assert.ok(p);
   assert.equal(p.uri, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Tour_Eiffel.jpg/1280px-Tour_Eiffel.jpg');
-  assert.equal(p.small, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Tour_Eiffel.jpg/640px-Tour_Eiffel.jpg');
+  assert.equal(p.small, 'https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4b/Tour_Eiffel.jpg/500px-Tour_Eiffel.jpg');
 });
