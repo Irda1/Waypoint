@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { shortExtract, wikiTarget } from '../domain/wiki.ts';
+import type { WikiSource } from '../domain/wiki.ts';
 
 export interface PlaceInfo {
   text: string | null; source: 'base' | 'wikipedia' | null;
@@ -48,7 +49,39 @@ export async function loadPlaceInfo(placeId: number): Promise<PlaceInfo> {
     }
   } catch { /* hors connexion ou service indisponible : fiche sans ces informations */ }
   cache.set(placeId, info);
+  photos.set(placeId, info.photo);
   return info;
+}
+
+const photos = new Map<number, string | null>();
+const pending = new Map<number, Promise<string | null>>();
+
+/** Photo Wikipédia d'un lieu (sans relire la base : étiquettes déjà chargées), gardée le temps de la session. */
+export function loadPlacePhoto(placeId: number, src: WikiSource): Promise<string | null> {
+  if (photos.has(placeId)) return Promise.resolve(photos.get(placeId) ?? null);
+  const target = wikiTarget(src);
+  if (!target) return Promise.resolve(null);
+  let p = pending.get(placeId);
+  if (!p) {
+    p = (async () => {
+      try {
+        const page = target.kind === 'title' ? { lang: target.lang, title: target.title } : await frTitleFromWikidata(target.id);
+        return page ? (await wikipediaSummary(page.lang, page.title))?.photo ?? null : null;
+      } catch { return null; }
+    })().then((url) => { photos.set(placeId, url); pending.delete(placeId); return url; });
+    pending.set(placeId, p);
+  }
+  return p;
+}
+
+export function usePlacePhoto(placeId: number, src: WikiSource): string | null {
+  const [url, setUrl] = useState<string | null>(photos.get(placeId) ?? null);
+  useEffect(() => {
+    let alive = true;
+    void loadPlacePhoto(placeId, src).then((u) => { if (alive) setUrl(u); });
+    return () => { alive = false; };
+  }, [placeId]); // eslint-disable-line react-hooks/exhaustive-deps
+  return url;
 }
 
 export function usePlaceInfo(placeId: number | null, enabled = true): PlaceInfo & { loading: boolean } {

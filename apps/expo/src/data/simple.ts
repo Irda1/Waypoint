@@ -9,7 +9,7 @@ const PER_CITY = 200;
 export async function loadCityPlaces(cityIds: number[]): Promise<{ places: SimplePlace[]; error: string | null }> {
   const results = await Promise.all(cityIds.map((id) =>
     supabase.from('places')
-      .select('id,city_id,name,kind,category_code,lat,lng,price_amount,visit_duration_min,closed_days,opening_hours,popularity')
+      .select('id,city_id,name,kind,category_code,lat,lng,price_amount,visit_duration_min,closed_days,opening_hours,popularity,wikidata_id,tags')
       .eq('city_id', id).eq('kind', 'activity').eq('status', 'active')
       .order('popularity', { ascending: false }).limit(PER_CITY)));
   const places = results.flatMap((r) => ((r.data ?? []) as (SimplePlace & { kind: string })[]).map((p) => withEstimatedPrice(p) as SimplePlace));
