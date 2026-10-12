@@ -7,7 +7,7 @@ import { WEB_BASE } from '../../lib/webBase';
 import { shareText } from '../../lib/share';
 import { space } from '../../theme/tokens';
 
-function shareUrl(token: string): string {
+export function shareUrl(token: string): string {
   // Sur le web, l'adresse du site courant (avec son dossier, ex. /Waypoint sur GitHub Pages) ; sur téléphone, le site public.
   const here = (globalThis as { location?: { origin: string } }).location?.origin;
   const origin = Platform.OS === 'web' && here ? here + WEB_BASE : WEB_URL;
