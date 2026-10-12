@@ -97,7 +97,7 @@ export function hedgedOverpass(query: string, opts: HedgeOptions = {}): Promise<
 const GEOAPIFY_CATEGORIES: Record<string, string> = {
   attractions: 'tourism,heritage,entertainment,leisure.park,beach,religion.place_of_worship',
   food: 'catering',
-  services: 'healthcare.pharmacy,healthcare.hospital,service.financial,commercial.laundry',
+  services: 'healthcare.pharmacy,healthcare.hospital,service.financial,commercial.laundry,commercial.supermarket,commercial.convenience,amenity.toilet',
   stays_transit: 'accommodation,public_transport.train,public_transport.bus,airport',
 };
 const OSM_TYPES: Record<string, string> = { n: 'node', w: 'way', r: 'relation' };

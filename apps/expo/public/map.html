@@ -3,6 +3,7 @@
 <style>html,body,#map{margin:0;height:100%;width:100%;background:#EDEAE3}html,body{overflow:hidden;overscroll-behavior:none}.maplibregl-canvas-container,.maplibregl-canvas{touch-action:none!important}
 .pin{width:30px;height:30px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.45);color:#fff;font:700 13px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .dot{width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);cursor:pointer}
+.svc{min-width:26px;height:26px;padding:0 3px;box-sizing:border-box;border-radius:8px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);color:#fff;font:700 10px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .sel{outline:3px solid #FFB95A;outline-offset:2px}
 .maplibregl-ctrl-attrib{font-size:8px!important;line-height:1.2!important;opacity:.6;background:rgba(255,255,255,.35)!important}.maplibregl-ctrl-attrib-button{width:16px!important;height:16px!important}.maplibregl-ctrl-bottom-right .maplibregl-ctrl{margin:0 2px 2px 0!important}
 #diag{position:absolute;left:8px;bottom:22px;max-width:70%;padding:4px 8px;border-radius:8px;background:rgba(0,0,0,.65);color:#fff;font:12px system-ui,sans-serif;display:none}
@@ -49,8 +50,9 @@
     markers.forEach(function (m) { m.marker.remove(); }); markers = [];
     points.forEach(function (p) {
       var el = document.createElement('div');
-      el.className = p.kind === 'plan' ? 'pin' : 'dot'; el.style.background = p.color;
+      el.className = p.kind === 'plan' ? 'pin' : p.kind === 'svc' ? 'svc' : 'dot'; el.style.background = p.color;
       if (p.kind === 'plan') el.textContent = String(p.order);
+      if (p.kind === 'svc') el.textContent = p.icon || '';
       el.title = p.label; el.setAttribute('role', 'button'); el.setAttribute('aria-label', p.label);
       el.addEventListener('click', function (e) { e.stopPropagation(); send({type:'select', id: p.id}); });
       markers.push({ id: p.id, el: el, marker: new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map) });

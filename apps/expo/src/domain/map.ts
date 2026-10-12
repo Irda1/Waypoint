@@ -15,8 +15,11 @@ export interface MapPoint {
   lng: number;
   label: string;
   root: string;
-  /** « plan » : étape du programme (numérotée, couleur du jour) ; « disc » : lieu à découvrir (point de sa catégorie). */
-  kind: 'plan' | 'disc';
+  /** « plan » : étape du programme (numérotée, couleur du jour) ; « disc » : lieu à découvrir (point de sa catégorie) ;
+   *  « svc » : lieu pratique (pharmacie, toilettes…), carré avec son icône, montré seulement par le filtre Pratique. */
+  kind: 'plan' | 'disc' | 'svc';
+  /** Lieu pratique : court symbole affiché dans le repère (« WC », « ✚ »…). */
+  icon?: string;
   day: number | null;
   order: number | null;
   color: string;
@@ -61,6 +64,25 @@ export function discoverPoints(args: {
     .map((c) => ({ id: `disc:${c.place.id}`, lat: c.place.lat, lng: c.place.lng, label: c.place.name, root: c.root, kind: 'disc' as const, day: null, order: null, color: args.colorOf(c.root), placeId: c.place.id }));
 }
 
+/** Lieux pratiques du filtre « Pratique » : nom, couleur et symbole de chaque catégorie (codes de place_categories). */
+export const USEFUL: { code: string; name: string; icon: string; color: string }[] = [
+  { code: 'pharmacie', name: 'Pharmacie', icon: '✚', color: '#2E8B57' },
+  { code: 'toilettes', name: 'Toilettes', icon: 'WC', color: '#3D7FB8' },
+  { code: 'distributeur', name: 'Distributeur', icon: 'ATM', color: '#B8860B' },
+  { code: 'banque', name: 'Banque', icon: '€', color: '#556B2F' },
+  { code: 'superette', name: 'Supérette', icon: '🛒', color: '#6A5ACD' },
+  { code: 'hopital', name: 'Hôpital', icon: 'H', color: '#C0392B' },
+  { code: 'laverie', name: 'Laverie', icon: '🧺', color: '#1FA7A0' },
+];
+
+/** Lieux pratiques placés sur la carte (catégorie dans `root`). */
+export function servicePoints(places: Place[]): MapPoint[] {
+  return places.flatMap((p) => {
+    const u = USEFUL.find((x) => x.code === p.category_code);
+    return u ? [{ id: `svc:${p.id}`, lat: p.lat, lng: p.lng, label: p.name, root: u.code, kind: 'svc' as const, day: null, order: null, color: u.color, placeId: p.id, icon: u.icon }] : [];
+  });
+}
+
 export interface Filters {
   /** null = tous les jours ; sinon numéro du jour dont on montre le programme. */
   day: number | null;
@@ -68,10 +90,14 @@ export interface Filters {
   discover: boolean;
   /** Catégories affichées pour les lieux à découvrir ; vide = toutes. */
   roots: string[];
+  /** Filtre Pratique : seules ces catégories de lieux pratiques sont montrées (et rien d'autre) ; null = filtre éteint. */
+  useful?: string[] | null;
 }
 
 export function visiblePoints(points: MapPoint[], f: Filters): MapPoint[] {
   return points.filter((p) => {
+    if (f.useful) return p.kind === 'svc' && f.useful.includes(p.root);
+    if (p.kind === 'svc') return false;
     if (p.kind === 'plan') return f.day === null || p.day === f.day;
     return f.discover && (f.roots.length === 0 || f.roots.includes(p.root));
   });
@@ -106,6 +132,7 @@ export function mapHtml(opts: { dark: boolean; start: { lat: number; lng: number
 <style>html,body,#map{margin:0;height:100%;width:100%;background:${bg}}html,body{overflow:hidden;overscroll-behavior:none}.maplibregl-canvas-container,.maplibregl-canvas{touch-action:none!important}
 .pin{width:30px;height:30px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 6px rgba(0,0,0,.45);color:#fff;font:700 13px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .dot{width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);cursor:pointer}
+.svc{min-width:26px;height:26px;padding:0 3px;box-sizing:border-box;border-radius:8px;border:2px solid #fff;box-shadow:0 1px 4px rgba(0,0,0,.45);color:#fff;font:700 10px system-ui,sans-serif;display:flex;align-items:center;justify-content:center;cursor:pointer}
 .sel{outline:3px solid #FFB95A;outline-offset:2px}
 .maplibregl-ctrl-attrib{font-size:8px!important;line-height:1.2!important;opacity:.6;background:rgba(255,255,255,.35)!important}.maplibregl-ctrl-attrib-button{width:16px!important;height:16px!important}.maplibregl-ctrl-bottom-right .maplibregl-ctrl{margin:0 2px 2px 0!important}
 #diag{position:absolute;left:8px;bottom:22px;max-width:70%;padding:4px 8px;border-radius:8px;background:rgba(0,0,0,.65);color:#fff;font:12px system-ui,sans-serif;display:none}
@@ -152,8 +179,9 @@ export function mapHtml(opts: { dark: boolean; start: { lat: number; lng: number
     markers.forEach(function (m) { m.marker.remove(); }); markers = [];
     points.forEach(function (p) {
       var el = document.createElement('div');
-      el.className = p.kind === 'plan' ? 'pin' : 'dot'; el.style.background = p.color;
+      el.className = p.kind === 'plan' ? 'pin' : p.kind === 'svc' ? 'svc' : 'dot'; el.style.background = p.color;
       if (p.kind === 'plan') el.textContent = String(p.order);
+      if (p.kind === 'svc') el.textContent = p.icon || '';
       el.title = p.label; el.setAttribute('role', 'button'); el.setAttribute('aria-label', p.label);
       el.addEventListener('click', function (e) { e.stopPropagation(); send({type:'select', id: p.id}); });
       markers.push({ id: p.id, el: el, marker: new maplibregl.Marker({ element: el }).setLngLat([p.lng, p.lat]).addTo(map) });
