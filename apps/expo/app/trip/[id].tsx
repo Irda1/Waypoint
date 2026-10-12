@@ -8,6 +8,7 @@ import { JournalCard, JournalSection } from '../../src/features/trip/JournalCard
 import { Recap } from '../../src/features/trip/Recap';
 import { FinalBalanceCard } from '../../src/features/trip/FinalBalanceCard';
 import { finalBalance } from '../../src/domain/finalBalance.ts';
+import { markSouvenirsSeen } from '../../src/lib/souvenirs';
 import { useAuth } from '../../src/auth/AuthProvider';
 import { useRequireAuth } from '../../src/auth/useRequireAuth';
 import { Button, Card, Columns, ErrorNote, Field, Screen, Section, Text } from '../../src/ui';
@@ -141,6 +142,8 @@ export default function TripScreen() {
   // Carnet de voyage (migration 2600) : rechargé avec les données du voyage.
   const journal = useJournal(String(id), data);
   const [recap, setRecap] = useState(false);
+  // Récap ou bilan ouvert : la pastille « Récap prêt » de l'accueil disparaît.
+  useEffect(() => { if (recap || tab === 'budget') void markSouvenirsSeen(String(id)); }, [recap, tab, id]);
 
   // Rappels du téléphone : reprogrammés à chaque changement du voyage (sans effet sur le web ni si les rappels sont coupés).
   useEffect(() => {
