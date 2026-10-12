@@ -11,12 +11,13 @@ import { excerpt, recapDays, recapStats } from '../../domain/recap.ts';
 import type { Journal, JournalPhoto } from '../../data/journal';
 import type { Day, Destination, Member } from '../../data/useTrip';
 import type { Expense, TripItem } from '../../domain/types';
+import type { FinalBalance } from '../../domain/finalBalance.ts';
 
 const SUN = palette('nuit', 'soleil');
 const TEXT = '#F4EFE6', SOFT = '#B3B9BB';
 const native = Platform.OS !== 'web';
 
-type Slide = { kind: 'globe' } | { kind: 'stats' } | { kind: 'day'; day: Day; index: number } | { kind: 'mosaic' } | { kind: 'end' };
+type Slide = { kind: 'globe' } | { kind: 'stats' } | { kind: 'day'; day: Day; index: number } | { kind: 'mosaic' } | { kind: 'money' } | { kind: 'end' };
 
 interface Props {
   visible: boolean;
@@ -31,6 +32,7 @@ interface Props {
   journal: Journal;
   members: Member[];
   cityName: (day: Day) => string;
+  balance?: FinalBalance;
 }
 
 /** Photo plein écran qui avance doucement (coupé si le téléphone demande moins de mouvements). */
@@ -41,7 +43,7 @@ function Drift({ uri }: { uri: string }) {
 }
 
 /** Récap animé du voyage, façon story : trajet, chiffres, jours du carnet, photos. Toucher à droite avance, à gauche revient, appui long = pause. */
-export function Recap({ visible, onClose, title, dates, currency, days, destinations, items, expenses, journal, members, cityName }: Props) {
+export function Recap({ visible, onClose, title, dates, currency, days, destinations, items, expenses, journal, members, cityName, balance }: Props) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const photosOf = (id: string) => journal.photos.filter((p) => p.day_id === id && p.url);
@@ -53,6 +55,7 @@ export function Recap({ visible, onClose, title, dates, currency, days, destinat
       { kind: 'globe' }, { kind: 'stats' },
       ...picked.map((day) => ({ kind: 'day' as const, day, index: days.indexOf(day) })),
       ...(journal.photos.filter((p) => p.url).length >= 2 ? [{ kind: 'mosaic' as const }] : []),
+      ...(balance && balance.count ? [{ kind: 'money' as const }] : []),
       { kind: 'end' },
     ];
   }, [days, journal]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -138,6 +141,14 @@ export function Recap({ visible, onClose, title, dates, currency, days, destinat
                   <RNText style={[st.big, { fontSize: 26, lineHeight: 32 }]}>« {excerpt(noteOf(slide.day.id))} »</RNText>
                 ) : <RNText style={st.big}>{photosOf(slide.day.id).length} photo{photosOf(slide.day.id).length > 1 ? 's' : ''}</RNText>}
                 {by(journal.notes.get(slide.day.id)?.updated_by) ? <RNText style={st.soft}>— {by(journal.notes.get(slide.day.id)?.updated_by)}</RNText> : null}
+              </>
+            ) : slide?.kind === 'money' && balance ? (
+              <>
+                <RNText style={st.k}>Le bilan</RNText>
+                <RNText style={st.big}>{formatMoney(balance.total, currency)}</RNText>
+                {balance.budget ? <RNText style={[st.soft, { color: balance.delta >= 0 ? '#6FD39A' : '#FF8F66' }]}>{balance.delta >= 0 ? `${formatMoney(balance.delta, currency)} sous le budget prévu` : `${formatMoney(-balance.delta, currency)} au-dessus du budget prévu`}</RNText> : null}
+                <RNText style={st.soft}>{formatMoney(balance.perPerson, currency)} par personne · {formatMoney(balance.perDay, currency)} par jour</RNText>
+                {members.filter((m) => !m.left_at).length > 1 ? <RNText style={st.soft}>{balance.transfersLeft ? `Encore ${balance.transfersLeft} remboursement${balance.transfersLeft > 1 ? 's' : ''} pour être quittes.` : 'Tout est réglé entre vous.'}</RNText> : null}
               </>
             ) : slide?.kind === 'mosaic' ? (
               <>

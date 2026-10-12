@@ -6,6 +6,9 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { useJournal } from '../../src/data/journal';
 import { JournalCard, JournalSection } from '../../src/features/trip/JournalCard';
 import { Recap } from '../../src/features/trip/Recap';
+import { FinalBalanceCard } from '../../src/features/trip/FinalBalanceCard';
+import { finalBalance } from '../../src/domain/finalBalance.ts';
+import { markSouvenirsSeen } from '../../src/lib/souvenirs';
 import { useAuth } from '../../src/auth/AuthProvider';
 import { useRequireAuth } from '../../src/auth/useRequireAuth';
 import { Button, Card, Columns, ErrorNote, Field, Screen, Section, Text } from '../../src/ui';
@@ -139,6 +142,8 @@ export default function TripScreen() {
   // Carnet de voyage (migration 2600) : rechargé avec les données du voyage.
   const journal = useJournal(String(id), data);
   const [recap, setRecap] = useState(false);
+  // Récap ou bilan ouvert : la pastille « Récap prêt » de l'accueil disparaît.
+  useEffect(() => { if (recap || tab === 'budget') void markSouvenirsSeen(String(id)); }, [recap, tab, id]);
 
   // Rappels du téléphone : reprogrammés à chaque changement du voyage (sans effet sur le web ni si les rappels sont coupés).
   useEffect(() => {
@@ -177,6 +182,11 @@ export default function TripScreen() {
   }
   const dates = trip.starts_on ? `${formatDay(trip.starts_on)}${trip.ends_on ? ` → ${formatDay(trip.ends_on)}` : ''}` : 'Dates à définir';
   const ended = !!trip.ends_on && trip.ends_on < todayIso();
+  const balance = finalBalance({
+    expenses: data.expenses, budgetTotal: trip.budget_total, days: data.days.length, payments: data.payments ?? [],
+    envelopes: Object.fromEntries(data.budgetLines.map((l) => [l.poste, Number(l.amount)])),
+    memberIds: data.members.filter((m) => !m.left_at).map((m) => m.user_id),
+  });
 
   async function invite() {
     const res = await createInvite(data!.trip.id);
@@ -260,13 +270,13 @@ export default function TripScreen() {
                 <RNText style={[styles.lead, { color: H.soft }]}>{dates}</RNText>
                 {destNames ? <RNText style={[styles.route, { color: H.text }]} numberOfLines={2}>{destNames.replace(/ · /g, ' → ')}</RNText> : null}
               </View>
-              {data.days.length && data.destinations.length ? (
-                // Récap animé : mis en avant une fois le voyage terminé.
+              {ended && data.days.length > 0 && data.destinations.length > 0 ? (
+                // Récap animé : un souvenir, proposé une fois la dernière date passée.
                 <Pressable accessibilityRole="button" onPress={() => setRecap(true)}
-                  style={[styles.glass, { alignSelf: 'flex-start', marginTop: space.md, backgroundColor: ended ? palette('nuit', accent).accent : H.glassBg, borderColor: ended ? 'transparent' : H.glassLine }]}>
+                  style={[styles.glass, { alignSelf: 'flex-start', marginTop: space.md, backgroundColor: palette('nuit', accent).accent, borderColor: 'transparent' }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Icon name="sparkles" size={16} color={ended ? palette('nuit', accent).onAccent : H.text} />
-                    <RNText style={[styles.glassLabel, { color: ended ? palette('nuit', accent).onAccent : H.text }]}>Revoir le voyage</RNText>
+                    <Icon name="sparkles" size={16} color={palette('nuit', accent).onAccent} />
+                    <RNText style={[styles.glassLabel, { color: palette('nuit', accent).onAccent }]}>Revoir le voyage</RNText>
                   </View>
                 </Pressable>
               ) : null}
@@ -342,7 +352,7 @@ export default function TripScreen() {
 
           {journal.available ? (
             <Section title="Carnet" icon="book" hint="Notes et photos du voyage" defaultOpen={false}>
-              <JournalSection journal={journal} days={data.days.map((d) => ({ ...d, city_id: cityOfDay(d) }))} cityName={nameOfCity} onRecap={data.destinations.length ? () => setRecap(true) : undefined} />
+              <JournalSection journal={journal} days={data.days.map((d) => ({ ...d, city_id: cityOfDay(d) }))} cityName={nameOfCity} onRecap={ended && data.destinations.length ? () => setRecap(true) : undefined} />
             </Section>
           ) : null}
         </View>
@@ -382,6 +392,8 @@ export default function TripScreen() {
 
         {tab === 'budget' ? (
         <View style={styles.page}>
+          {/* Bilan seulement une fois la dernière date passée : avant, l'onglet Budget suffit. */}
+          {ended ? <FinalBalanceCard data={data} balance={balance} onOpenFriends={() => setTab('amis')} /> : null}
           <BudgetCard data={data} onChanged={reload} activitiesPanel={session ? <ToPayCard data={data} userId={session.user.id} onChanged={reload} embedded /> : undefined} />
           <ConverterCard data={data} />
           {session ? <Button label="Ajouter une dépense" icon="expense" onPress={() => setQuickOpen(true)} /> : null}
@@ -445,7 +457,7 @@ export default function TripScreen() {
       <PlusMenu visible={plusOpen} onPick={onPlus} onClose={() => setPlusOpen(false)} />
       {recap ? (
         <Recap visible onClose={() => setRecap(false)} title={trip.title} dates={dates} currency={trip.currency} days={data.days} destinations={data.destinations}
-          items={data.items} expenses={data.expenses} journal={journal} members={data.members} cityName={(d) => nameOfCity(cityOfDay(d))} />
+          items={data.items} expenses={data.expenses} journal={journal} members={data.members} cityName={(d) => nameOfCity(cityOfDay(d))} balance={balance} />
       ) : null}
       {session ? (
         <QuickExpenseSheet visible={quickOpen} data={data} userId={session.user.id} onClose={() => setQuickOpen(false)}

@@ -21,6 +21,7 @@ import { useAppearance } from '../src/theme/store';
 import { useTheme } from '../src/theme/useTheme';
 import { Icon } from '../src/ui/Icon';
 import { Skeleton } from '../src/ui/motion';
+import { seenSouvenirs, souvenirsReady } from '../src/lib/souvenirs';
 
 
 // Textes posés sur la photo : toujours clairs, quel que soit le mode du téléphone.
@@ -50,6 +51,7 @@ export default function Home() {
     ? { text: colors.text, soft: colors.text2, eyebrow: colors.accent, glassBg: colors.surface, glassLine: colors.lineStrong }
     : { text: ON_PHOTO, soft: ON_PHOTO_SOFT, eyebrow: palette('nuit', accent).accent2, glassBg: 'rgba(7, 9, 11, 0.45)', glassLine: 'rgba(245, 245, 242, 0.25)' };
   const [trips, setTrips] = useState<TripSummary[] | null>(null);
+  const [seen, setSeen] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [savedAt, setSavedAt] = useState<number | null>(null);
   const [joinCode, setJoinCode] = useState('');
@@ -83,7 +85,7 @@ export default function Home() {
   const [heroSize, setHeroSize] = useState({ w: 0, h: 0 });
   const zoom = useRef(new Animated.Value(0)).current;
   const leaving = useRef(false);
-  useFocusEffect(useCallback(() => { leaving.current = false; zoom.setValue(0); }, [zoom]));
+  useFocusEffect(useCallback(() => { leaving.current = false; zoom.setValue(0); void seenSouvenirs().then(setSeen); }, [zoom]));
   const startTrip = useCallback((params?: Record<string, string>) => {
     if (leaving.current) return;
     leaving.current = true;
@@ -185,6 +187,12 @@ export default function Home() {
                         <RNText style={[styles.statusLabel, { color: colors.onAccent }]}>{tripStatusLabel(tripStatus(t.starts_on, t.ends_on, today))}</RNText>
                       </View>
                     )}
+                    {!t.title.startsWith(SIMPLE_PREFIX) && souvenirsReady(t, today, seen) ? (
+                      <View style={[styles.statusPill, { backgroundColor: ON_PHOTO, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
+                        <Icon name="sparkles" size={13} color="#0E2A35" />
+                        <RNText style={[styles.statusLabel, { color: '#0E2A35' }]}>Récap prêt</RNText>
+                      </View>
+                    ) : null}
                     {t.id === newestId ? (
                       <View style={[styles.statusPill, { backgroundColor: ON_PHOTO, flexDirection: 'row', alignItems: 'center', gap: 4 }]}>
                         <Icon name="sparkles" size={13} color="#0E2A35" />
