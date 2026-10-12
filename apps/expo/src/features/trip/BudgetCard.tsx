@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { EmptyState } from '../../ui/EmptyState';
 import { Pressable, View } from 'react-native';
 import { Button, Card, Chip, ChevronBadge, ErrorNote, Field, Text } from '../../ui';
 import { Icon } from '../../ui/Icon';
@@ -180,7 +181,7 @@ export function BudgetCard({ data, onChanged, activitiesPanel }: { data: TripDat
 
       <View style={{ gap: space.sm, marginTop: space.md }}>
         <Text variant="label">Dernières dépenses</Text>
-        {expenses.length === 0 ? <Text variant="muted">Aucune dépense pour l'instant. Ajoute tes réservations au fur et à mesure.</Text> : [...expenses].reverse().slice(0, 8).map((e) => {
+        {expenses.length === 0 ? <EmptyState icon="budget" title="Aucune dépense pour l'instant" text="Note tes réservations et tes achats au fil du voyage : le total et qui doit quoi se calculent tout seuls." /> : [...expenses].reverse().slice(0, 8).map((e) => {
           const who = e.paid_by ? (members.find((m) => m.user_id === e.paid_by)?.profiles?.display_name ?? 'membre') : null;
           return (
             <View key={e.id} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: space.md }}>

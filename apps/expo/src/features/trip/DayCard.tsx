@@ -24,6 +24,7 @@ import { dayTips } from '../../domain/advice.ts';
 import { formatMoney } from '../../lib/format';
 import type { Point } from '../../domain/routes.ts';
 import { PlacePicker } from './PlacePicker';
+import { EmptyState } from '../../ui/EmptyState';
 import { PlaceSheet } from './PlaceSheet';
 import { useAuth } from '../../auth/AuthProvider';
 import { formatDuration } from '../../lib/search';
@@ -197,7 +198,10 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
         {(['A', 'B', 'C'] as const).map((p) => <Chip key={p} label={`Plan ${p}`} selected={plan === p} onPress={() => setPlan(p)} />)}
       </View>
 
-      {schedule.length === 0 ? <Text variant="muted">Rien de prévu dans ce plan.</Text> : null}
+      {schedule.length === 0 ? (plan === 'A' ? (
+        <EmptyState icon="day" title="Journée libre pour l'instant" text="Ajoute un lieu à visiter, ou laisse le programme automatique remplir la journée selon tes envies."
+          action={{ label: 'Ajouter un lieu', onPress: () => setAdding('place') }} />
+      ) : <Text variant="muted">Rien de prévu dans ce plan.</Text>) : null}
       {schedule.length === 0 && plan !== 'A' && planA.length > 0 ? (
         <Button label={plan === 'B' ? 'Créer une journée allégée depuis le plan A' : 'Créer un plan à l\'abri depuis le plan A'} variant="ghost" onPress={() => createAlt(plan === 'B' ? 'light' : 'shelter')} />
       ) : null}

@@ -24,6 +24,7 @@ import { useTheme } from '../../theme/useTheme';
 import { FloatingNav } from '../nav/FloatingNav';
 import { SettingsButton } from '../nav/SettingsButton';
 import { PlaceCard, PlacePic } from './PlaceCard';
+import { EmptyState } from '../../ui/EmptyState';
 import { PlaceSheet } from '../trip/PlaceSheet';
 import type { NavTab } from '../nav/FloatingNav';
 
@@ -190,7 +191,7 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
             <>
               <Card>
                 <Text variant="label">Ma sélection · {selected.length} lieu{selected.length > 1 ? 'x' : ''}</Text>
-                {selected.length === 0 ? <Text variant="muted">Touche le cœur des lieux de l'onglet Lieux : leur budget s'additionne ici.</Text> : (
+                {selected.length === 0 ? <EmptyState icon="heart" title="Garde les lieux qui te tentent" text="Touche le cœur d'un lieu dans l'onglet Lieux : il arrive ici, avec son budget estimé." action={{ label: 'Voir les lieux', onPress: () => setTab('lieux') }} /> : (
                   <>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
                       <Text variant="muted" style={{ flex: 1 }}>Personnes</Text>

@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
-import { Redirect, useLocalSearchParams } from 'expo-router';
+import React, { useEffect, useState } from 'react';
+import { Redirect, router, useLocalSearchParams } from 'expo-router';
+import { wasWelcomed } from '../src/lib/welcome';
 import { Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../src/auth/AuthProvider';
@@ -24,13 +25,18 @@ const safeNext = (next: string | string[] | undefined): string => {
 
 export default function SignIn() {
   const { session, signIn, signUp, signInWithGoogle, resetPassword } = useAuth();
-  const { next } = useLocalSearchParams<{ next?: string }>();
+  const { next, mode: startMode } = useLocalSearchParams<{ next?: string; mode?: string }>();
   const { colors, mode: theme } = useTheme();
   const { accent } = useAppearance();
   const H = theme === 'jour' ? { text: colors.text, soft: colors.text2, eyebrow: colors.accent } : { text: ON_PHOTO, soft: ON_PHOTO_SOFT, eyebrow: palette('nuit', accent).accent2 };
   const { breakpoint } = useBreakpoint();
   const wide = breakpoint === 'desktop';
-  const [mode, setMode] = useState<'in' | 'up'>('in');
+  const [mode, setMode] = useState<'in' | 'up'>(startMode === 'up' ? 'up' : 'in');
+  // Premier lancement sur cet appareil : les trois écrans d'accueil d'abord (une seule fois).
+  useEffect(() => {
+    if (session) return;
+    void wasWelcomed().then((ok) => { if (!ok) router.replace({ pathname: '/welcome', params: next ? { next } : {} }); });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

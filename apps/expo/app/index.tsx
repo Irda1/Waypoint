@@ -11,6 +11,7 @@ import type { TripSummary, TrashedTrip } from '../src/data/trips';
 import { formatDay, tripStatusLabel } from '../src/lib/format';
 import { todayIso, tripStatus } from '../src/lib/dates';
 import { Globe } from '../src/features/globe/Globe';
+import { EmptyState } from '../src/ui/EmptyState';
 import { ROUTE_BG, routeGlobeOnScreen } from '../src/domain/routeGlobe.ts';
 import { COUNTRY_NAME } from '../src/domain/countries.ts';
 import { photoKeyFor } from '../src/lib/photoKey';
@@ -165,7 +166,8 @@ export default function Home() {
 
           <Text variant="label">{trips && trips.length > 0 ? `Mes voyages · ${trips.length}` : 'Mes voyages'}</Text>
           {trips === null ? <View style={{ gap: space.sm }}><Skeleton height={150} round={radius.card} /><Skeleton height={150} round={radius.card} /></View> : trips.length === 0 ? (
-            <Card><Text variant="body">Aucun voyage pour l'instant. Démarre le premier avec le bouton ci-dessus, ou rejoins celui d'un ami avec son lien d'invitation.</Text></Card>
+            <EmptyState icon="trip" title="Ton premier voyage t'attend" text="Choisis un pays et tes dates : Waypoint prépare un programme jour par jour. Tu as reçu un lien d'invitation ? Ouvre-le simplement sur ce téléphone."
+              action={{ label: 'Démarrer un voyage', onPress: () => startTrip() }} />
           ) : (
             <Columns>
               {[...trips].sort((a, b) => Number(tripStatus(b.starts_on, b.ends_on, today).kind === 'ongoing') - Number(tripStatus(a.starts_on, a.ends_on, today).kind === 'ongoing')).map((t) => (

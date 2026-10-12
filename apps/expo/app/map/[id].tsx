@@ -286,6 +286,7 @@ export default function TripMap() {
       {!point && (message || problem) ? <View style={{ backgroundColor: colors.bg, borderTopWidth: 1, borderTopColor: colors.line, paddingBottom: bottomInset }}>
         <View style={{ padding: space.lg, gap: space.sm }}>
           {message ? <Text variant="muted" accessibilityLiveRegion="polite">{message}</Text> : null}
+          {points.length === 0 && !discover && !useful && !notice ? <Button label="Lieux à découvrir" icon="places" onPress={() => setDiscover(true)} /> : null}
           <ErrorNote message={problem} />
         </View>
       </View> : null}
