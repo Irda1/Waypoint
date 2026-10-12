@@ -389,10 +389,10 @@ export default function TripScreen() {
 
         {tab === 'budget' ? (
         <View style={styles.page}>
-          {ended ? <FinalBalanceCard data={data} balance={balance} ended onOpenFriends={() => setTab('amis')} /> : null}
+          {/* Bilan seulement une fois la dernière date passée : avant, l'onglet Budget suffit. */}
+          {ended ? <FinalBalanceCard data={data} balance={balance} onOpenFriends={() => setTab('amis')} /> : null}
           <BudgetCard data={data} onChanged={reload} activitiesPanel={session ? <ToPayCard data={data} userId={session.user.id} onChanged={reload} embedded /> : undefined} />
           <ConverterCard data={data} />
-          {ended ? null : <FinalBalanceCard data={data} balance={balance} ended={false} onOpenFriends={() => setTab('amis')} />}
           {session ? <Button label="Ajouter une dépense" icon="expense" onPress={() => setQuickOpen(true)} /> : null}
         </View>
         ) : null}
@@ -454,7 +454,7 @@ export default function TripScreen() {
       <PlusMenu visible={plusOpen} onPick={onPlus} onClose={() => setPlusOpen(false)} />
       {recap ? (
         <Recap visible onClose={() => setRecap(false)} title={trip.title} dates={dates} currency={trip.currency} days={data.days} destinations={data.destinations}
-          items={data.items} expenses={data.expenses} journal={journal} members={data.members} cityName={(d) => nameOfCity(cityOfDay(d))} balance={balance} />
+          items={data.items} expenses={data.expenses} journal={journal} members={data.members} cityName={(d) => nameOfCity(cityOfDay(d))} balance={ended ? balance : undefined} />
       ) : null}
       {session ? (
         <QuickExpenseSheet visible={quickOpen} data={data} userId={session.user.id} onClose={() => setQuickOpen(false)}

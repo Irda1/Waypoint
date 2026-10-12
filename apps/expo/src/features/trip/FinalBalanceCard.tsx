@@ -10,10 +10,10 @@ import { POSTE_NAMES, balanceText, expensesCsv } from '../../domain/finalBalance
 import type { FinalBalance } from '../../domain/finalBalance.ts';
 import type { TripData } from '../../data/useTrip';
 
-/** Bilan du voyage (onglet Budget) : ouvert une fois le voyage terminé, replié avant (« Bilan provisoire »). */
-export function FinalBalanceCard({ data, balance, ended, onOpenFriends }: { data: TripData; balance: FinalBalance; ended: boolean; onOpenFriends: () => void }) {
+/** Bilan du voyage (onglet Budget), affiché une fois le voyage terminé. */
+export function FinalBalanceCard({ data, balance, onOpenFriends }: { data: TripData; balance: FinalBalance; onOpenFriends: () => void }) {
   const { colors } = useTheme();
-  const [open, setOpen] = useState(ended);
+  const [open, setOpen] = useState(true);
   const [note, setNote] = useState<string | null>(null);
   const { trip, members } = data;
   const money = (n: number) => formatMoney(n, trip.currency);
@@ -36,8 +36,8 @@ export function FinalBalanceCard({ data, balance, ended, onOpenFriends }: { data
     <Card>
       <Pressable accessibilityRole="button" accessibilityState={{ expanded: open }} onPress={() => setOpen(!open)} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 44 }}>
         <View style={{ flex: 1, gap: 2 }}>
-          <Text variant="label" style={{ color: colors.accent }}>{ended ? `Terminé${trip.ends_on ? ` le ${formatDay(trip.ends_on)}` : ''}` : 'Pendant le voyage'}</Text>
-          <Text variant="heading">{ended ? 'Bilan du voyage' : 'Bilan provisoire'}</Text>
+          <Text variant="label" style={{ color: colors.accent }}>Terminé{trip.ends_on ? ` le ${formatDay(trip.ends_on)}` : ''}</Text>
+          <Text variant="heading">Bilan du voyage</Text>
         </View>
         <Icon name={open ? 'chevronDown' : 'chevronRight'} size={18} tone="muted" />
       </Pressable>
