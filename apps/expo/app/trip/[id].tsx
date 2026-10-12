@@ -267,7 +267,7 @@ export default function TripScreen() {
                 <RNText style={[styles.lead, { color: H.soft }]}>{dates}</RNText>
                 {destNames ? <RNText style={[styles.route, { color: H.text }]} numberOfLines={2}>{destNames.replace(/ · /g, ' → ')}</RNText> : null}
               </View>
-              {ended && data.days.length && data.destinations.length ? (
+              {ended && data.days.length > 0 && data.destinations.length > 0 ? (
                 // Récap animé : un souvenir, proposé une fois la dernière date passée.
                 <Pressable accessibilityRole="button" onPress={() => setRecap(true)}
                   style={[styles.glass, { alignSelf: 'flex-start', marginTop: space.md, backgroundColor: palette('nuit', accent).accent, borderColor: 'transparent' }]}>
