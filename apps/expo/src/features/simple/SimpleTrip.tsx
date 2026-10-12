@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Linking, Pressable, ScrollView, Text as RNText, View } from 'react-native';
+import { Pressable, ScrollView, Text as RNText, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 import { Button, Card, Chip, Field, Text } from '../../ui';
@@ -12,7 +12,7 @@ import { listCities } from '../../data/places';
 import type { CityOption } from '../../data/places';
 import { addDestination, removeDestination } from '../../data/trips';
 import { loadCityPlaces, setTravelers } from '../../data/simple';
-import { filterPlaces, mapsUrl, openingToday, selectionBudget } from '../../domain/simple.ts';
+import { filterPlaces, openingToday, selectionBudget } from '../../domain/simple.ts';
 import type { SimplePlace } from '../../domain/simple.ts';
 import { todayIso } from '../../lib/dates.ts';
 import { formatMoney } from '../../lib/format';
@@ -23,6 +23,8 @@ import { categoryColors, fonts, radius, space } from '../../theme/tokens';
 import { useTheme } from '../../theme/useTheme';
 import { FloatingNav } from '../nav/FloatingNav';
 import { SettingsButton } from '../nav/SettingsButton';
+import { PlaceCard, PlacePic } from './PlaceCard';
+import { PlaceSheet } from '../trip/PlaceSheet';
 import type { NavTab } from '../nav/FloatingNav';
 
 const TABS: NavTab[] = [
@@ -50,6 +52,7 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
   const [query, setQuery] = useState('');
   const [found, setFound] = useState<CityOption[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [sheet, setSheet] = useState<SimplePlace | null>(null);
 
   const dests = useMemo(() => [...data.destinations].sort((a, b) => a.position - b.position), [data.destinations]);
   const cityIds = dests.map((d) => d.city_id);
@@ -119,6 +122,26 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
         <View style={{ padding: space.lg, gap: space.md, width: '100%', maxWidth: 720, alignSelf: 'center' }}>
           {tab === 'lieux' ? (
             <>
+              {/* Ma sélection mise en avant : vignettes des lieux gardés et budget estimé. */}
+              <View style={{ borderRadius: radius.card, padding: space.md, gap: space.sm, backgroundColor: colors.surface2 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.md }}>
+                  <View style={{ flex: 1 }}>
+                    <RNText style={{ fontFamily: fonts.serif, fontSize: 18, color: colors.text }}>Ma sélection</RNText>
+                    <RNText style={{ fontFamily: fonts.sans, fontSize: 13, color: colors.text2 }}>{selected.length} lieu{selected.length > 1 ? 'x' : ''} · ≈ {eur(budget.total)} pour {travelers}</RNText>
+                  </View>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Voir le budget de ma sélection" onPress={() => setTab('budget')} style={{ minHeight: 38, paddingHorizontal: space.md, borderRadius: radius.pill, justifyContent: 'center', backgroundColor: colors.accent }}>
+                    <RNText style={{ fontFamily: fonts.sansBold, fontSize: 13, color: colors.onAccent }}>Voir</RNText>
+                  </Pressable>
+                </View>
+                {selected.length ? (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
+                    {selected.map((p) => {
+                      const r = rootOf(p.category_code);
+                      return <Pressable key={p.id} accessibilityRole="button" accessibilityLabel={`Ouvrir ${p.name}`} onPress={() => setSheet(p)}><PlacePic place={p} root={r} dot={categoryColors[mode][r] ?? colors.text3} size={44} /></Pressable>;
+                    })}
+                  </ScrollView>
+                ) : <Text variant="muted">Touche le cœur d'un lieu pour le garder ici.</Text>}
+              </View>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
                 <Chip label="Toutes les villes" selected={cityId === null} onPress={() => { setCityId(null); setShown(PAGE); }} />
                 {dests.map((d) => <Chip key={d.city_id} label={d.name} selected={cityId === d.city_id} onPress={() => { setCityId(d.city_id); setShown(PAGE); }} />)}
@@ -143,39 +166,22 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
                 </Card>
               ) : null}
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: space.sm }}>
-                <Chip label={`Ma sélection (${selected.length})`} selected={onlySel} onPress={() => { setOnlySel((v) => !v); setShown(PAGE); }} />
+                <Chip label={`Ma sélection (${selected.length})`} icon="heart" selected={onlySel} onPress={() => { setOnlySel((v) => !v); setShown(PAGE); }} />
                 <Chip label="Tout" selected={root === null} onPress={() => { setRoot(null); setShown(PAGE); }} />
-                {categories.activityRoots.map((c) => <Chip key={c.code} label={c.name_fr} selected={root === c.code} onPress={() => { setRoot(root === c.code ? null : c.code); setShown(PAGE); }} />)}
+                {categories.activityRoots.map((c) => <Chip key={c.code} label={c.name_fr} icon={iconFor(c.code)} selected={root === c.code} onPress={() => { setRoot(root === c.code ? null : c.code); setShown(PAGE); }} />)}
               </ScrollView>
               {progress !== null ? <Text variant="muted" accessibilityLiveRegion="polite">Chargement des lieux… {Math.round(progress)} %</Text> : null}
               {places === null && progress === null ? <Text variant="muted">Chargement des lieux…</Text> : null}
               {places !== null && !list.length && progress === null ? <Text variant="muted">{onlySel ? 'Aucun lieu dans ta sélection : touche le cœur d’un lieu pour le garder.' : 'Aucun lieu pour ce filtre.'}</Text> : null}
-              {list.slice(0, shown).map((p) => {
-                const r = rootOf(p.category_code);
-                const dot = categoryColors[mode][r] ?? colors.text3;
-                const on = favorites.ids.has(p.id);
-                const open = openingToday(p, today);
-                return (
-                  <View key={p.id} style={{ flexDirection: 'row', gap: space.md, padding: space.md, borderRadius: radius.field, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line }}>
-                    <View accessible={false} style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: `${dot}33`, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name={iconFor(r)} size={18} color={dot} />
-                    </View>
-                    <View style={{ flex: 1, gap: 2 }}>
-                      <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 15.5, color: colors.text }}>{p.name}</RNText>
-                      <RNText style={{ fontFamily: fonts.sans, fontSize: 13, color: colors.text2 }}>
-                        {[cityId === null && dests.length > 1 ? cityName(p.city_id) : null, rootName(r), p.price_amount != null ? (p.price_amount === 0 ? 'Gratuit' : `≈ ${eur(p.price_amount)}`) : null, p.visit_duration_min ? `≈ ${formatDuration(p.visit_duration_min)}` : null].filter(Boolean).join(' · ')}
-                      </RNText>
-                      {open ? <RNText style={{ fontFamily: fonts.sans, fontSize: 12.5, color: open.startsWith('Fermé') ? colors.warm : colors.text3 }}>{open}</RNText> : null}
-                      <Pressable accessibilityRole="link" accessibilityLabel={`Ouvrir ${p.name} dans Google Maps`} onPress={() => void Linking.openURL(mapsUrl(p))} style={{ minHeight: 32, justifyContent: 'center' }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><RNText style={{ fontFamily: fonts.sansSemi, fontSize: 13, color: colors.accent }}>Google Maps</RNText><Icon name="external" size={13} /></View>
-                      </Pressable>
-                    </View>
-                    <Pressable accessibilityRole="switch" accessibilityState={{ checked: on }} accessibilityLabel={on ? `Retirer ${p.name} de ma sélection` : `Garder ${p.name}`} hitSlop={8} onPress={() => { void favorites.toggle(p.id); }} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name="heart" filled={on} size={24} tone={on ? 'accent' : 'muted'} />
-                    </Pressable>
-                  </View>
-                );
-              })}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+                {list.slice(0, shown).map((p) => {
+                  const r = rootOf(p.category_code);
+                  const open = openingToday(p, today);
+                  const line = [cityId === null && dests.length > 1 ? cityName(p.city_id) : null, p.price_amount != null ? (p.price_amount === 0 ? 'Gratuit' : `≈ ${eur(p.price_amount)}`) : null, p.visit_duration_min ? `≈ ${formatDuration(p.visit_duration_min)}` : null].filter(Boolean).join(' · ') || rootName(r);
+                  return <PlaceCard key={p.id} place={p} root={r} dot={categoryColors[mode][r] ?? colors.text3} line={line} open={open} closed={!!open?.startsWith('Fermé')}
+                    on={favorites.ids.has(p.id)} onToggle={() => { void favorites.toggle(p.id); }} onOpen={() => setSheet(p)} />;
+                })}
+              </View>
               {list.length > shown ? <Button label={`Voir plus (${list.length - shown})`} variant="ghost" onPress={() => setShown((n) => n + PAGE)} /> : null}
               <Text variant="muted" style={{ fontSize: 12 }}>Prix et durées : estimations d'après la catégorie du lieu. Lieux : © contributeurs d'OpenStreetMap · Powered by Geoapify.</Text>
               {error ? <Text variant="muted" style={{ color: colors.danger }} accessibilityRole="alert">{error}</Text> : null}
@@ -199,10 +205,15 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
                     <RNText style={{ fontFamily: fonts.serif, fontSize: 30, color: colors.text }}>≈ {eur(budget.total)}</RNText>
                     <Text variant="muted">{travelers > 1 ? `pour ${travelers} personnes · ≈ ${eur(budget.perPerson)} par personne` : 'pour une personne'}</Text>
                     {budget.byRoot.map((b) => (
-                      <View key={b.root} style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 32 }}>
-                        <Icon name={iconFor(b.root)} size={18} />
-                        <Text variant="body" style={{ flex: 1 }}>{rootName(b.root)} · {b.count}</Text>
-                        <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>≈ {eur(b.amount)}</Text>
+                      <View key={b.root} style={{ gap: 4 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, minHeight: 28 }}>
+                          <Icon name={iconFor(b.root)} size={18} />
+                          <Text variant="body" style={{ flex: 1 }}>{rootName(b.root)} · {b.count}</Text>
+                          <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>≈ {eur(b.amount)}</Text>
+                        </View>
+                        <View style={{ height: 6, borderRadius: 3, backgroundColor: colors.surface2, overflow: 'hidden' }}>
+                          <View style={{ height: '100%', borderRadius: 3, width: `${Math.max(4, Math.round((b.amount / Math.max(1, budget.byRoot[0].amount)) * 100))}%`, backgroundColor: categoryColors[mode][b.root] ?? colors.accent }} />
+                        </View>
                       </View>
                     ))}
                     {budget.unpriced ? <Text variant="muted">{budget.unpriced} lieu{budget.unpriced > 1 ? 'x' : ''} sans prix connu n'{budget.unpriced > 1 ? 'entrent' : 'entre'} pas dans le total.</Text> : null}
@@ -210,8 +221,10 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
                 )}
               </Card>
               {selected.map((p) => (
-                <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 48 }}>
-                  <Icon name={iconFor(rootOf(p.category_code))} size={20} />
+                <View key={p.id} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 56 }}>
+                  <Pressable accessibilityRole="button" accessibilityLabel={`Ouvrir ${p.name}`} onPress={() => setSheet(p)}>
+                    <PlacePic place={p} root={rootOf(p.category_code)} dot={categoryColors[mode][rootOf(p.category_code)] ?? colors.text3} size={44} />
+                  </Pressable>
                   <View style={{ flex: 1 }}>
                     <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{p.name}</Text>
                     {dests.length > 1 ? <Text variant="muted">{cityName(p.city_id)}</Text> : null}
@@ -227,6 +240,11 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
           )}
         </View>
       </ScrollView>
+      {sheet ? (
+        <PlaceSheet visible tripId={trip.id} placeId={sheet.id} name={sheet.name} category={rootName(rootOf(sheet.category_code))} root={rootOf(sheet.category_code)}
+          context={dests.length > 1 ? cityName(sheet.city_id) : undefined} dot={categoryColors[mode][rootOf(sheet.category_code)] ?? colors.text3}
+          place={sheet} currency={trip.currency || 'EUR'} travelers={travelers} closedToday={false} onClose={() => setSheet(null)} />
+      ) : null}
       <FloatingNav tabs={TABS} active={tab} onSelect={onNav} />
     </View>
   );

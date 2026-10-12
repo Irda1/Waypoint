@@ -14,6 +14,9 @@ export interface SimplePlace {
   closed_days: number[];
   opening_hours: string | null;
   popularity: number;
+  /** Pour la photo Wikipédia de la carte du lieu (étiquette « wikipedia » ou identifiant Wikidata). */
+  wikidata_id?: string | null;
+  tags?: Record<string, unknown> | null;
 }
 
 /** Google Maps ouvert sur le lieu (recherche du nom, centrée sur ses coordonnées). */
