@@ -14,7 +14,7 @@ const NAMES = {
   ticket: 'ticket', pin: 'pin', globe: 'earth', list: 'list', undo: 'refresh', swap: 'swap-horizontal',
   calendar: 'calendar', time: 'time', drop: 'water', chevronDown: 'chevron-down', chevronRight: 'chevron-forward',
   signIn: 'log-in', share: 'share-social', trash: 'trash', navigate: 'navigate', mail: 'mail', lock: 'lock-closed',
-  google: 'logo-google', sparkles: 'sparkles', call: 'call', link: 'link',
+  google: 'logo-google', sparkles: 'sparkles', call: 'call', link: 'link', book: 'book', image: 'image',
   // Catégories de lieux (codes de place_categories).
   culture: 'business', gastronomie: 'restaurant', nature: 'leaf', sorties: 'balloon', shopping: 'bag-handle',
   creatif: 'color-palette', sport: 'football', bienetre: 'flower', nocturne: 'moon', pratique: 'information-circle',
@@ -31,7 +31,7 @@ const EMOJI: Record<IconName, string> = {
   close: '✕', back: '←', add: '＋', check: '✓', heart: '♡', external: '↗', warning: '⚠️', tip: '💡', note: '📝', expense: '💶',
   walk: '🚶', bike: '🚲', transit: '🚇', car: '🚗', plane: '✈️', train: '🚆', bed: '🛏️', ticket: '🎟️', pin: '📌', globe: '🌍',
   list: '☰', undo: '↺', swap: '⇄', calendar: '📅', time: '🕒', drop: '💧', chevronDown: '▾', chevronRight: '›',
-  signIn: '→', share: '📤', trash: '🗑️', navigate: '🧭', mail: '✉️', lock: '🔒', google: 'G', sparkles: '✨', call: '📞', link: '🔗',
+  signIn: '→', share: '📤', trash: '🗑️', navigate: '🧭', mail: '✉️', lock: '🔒', google: 'G', sparkles: '✨', call: '📞', link: '🔗', book: '📖', image: '🖼️',
   culture: '🏛️', gastronomie: '🍽️', nature: '🌿', sorties: '🎡', shopping: '🛍️', creatif: '🎨', sport: '🚴', bienetre: '🧖', nocturne: '🌙', pratique: '🚉',
   sunny: '☀️', partlySunny: '⛅', cloudy: '☁️', fog: '🌫️', rainy: '🌧️', snow: '🌨️', storm: '⛈️', thermometer: '🌡️',
 };

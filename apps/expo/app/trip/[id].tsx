@@ -3,6 +3,8 @@ import { ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNText, Vie
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
+import { useJournal } from '../../src/data/journal';
+import { JournalCard, JournalSection } from '../../src/features/trip/JournalCard';
 import { useAuth } from '../../src/auth/AuthProvider';
 import { useRequireAuth } from '../../src/auth/useRequireAuth';
 import { Button, Card, Columns, ErrorNote, Field, Screen, Section, Text } from '../../src/ui';
@@ -133,6 +135,8 @@ export default function TripScreen() {
   const weather = useForecasts(spots);
   // Photos des villes sans photo en base (Wikipédia) ; en attendant, la photo du pays reste affichée.
   const cityPhotos = useCityPhotos(data?.destinations ?? []);
+  // Carnet de voyage (migration 2600) : rechargé avec les données du voyage.
+  const journal = useJournal(String(id), data);
 
   // Rappels du téléphone : reprogrammés à chaque changement du voyage (sans effet sur le web ni si les rappels sont coupés).
   useEffect(() => {
@@ -322,6 +326,12 @@ export default function TripScreen() {
             <ChecklistCard tripId={trip.id} />
             <ExportCard data={data} />
           </Section>
+
+          {journal.available ? (
+            <Section title="Carnet" icon="book" hint="Notes et photos du voyage" defaultOpen={false}>
+              <JournalSection journal={journal} days={data.days.map((d) => ({ ...d, city_id: cityOfDay(d) }))} cityName={nameOfCity} />
+            </Section>
+          ) : null}
         </View>
         </View>
         ) : null}
@@ -336,7 +346,7 @@ export default function TripScreen() {
                 const i = Math.min(dayIndex, data.days.length - 1);
                 const d = data.days[i];
                 // Changement de jour : la journée arrive du côté où l'on va (glissé latéral, 220 ms).
-                return <FadeIn key={d.id} dx={24 * dayDir} dy={0}><DayCard tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={i + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} allDayIds={data.days.map((x) => x.id)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} openAdd={pendingAdd} onOpenedAdd={() => setPendingAdd(false)} focusItemId={focusItem} /></FadeIn>;
+                return <FadeIn key={d.id} dx={24 * dayDir} dy={0}><View style={{ gap: space.lg }}><DayCard tripId={trip.id} tripTitle={trip.title} destinations={destinationOptions} day={d} number={i + 1} items={data.items} places={data.places} expenses={data.expenses} travelers={travelers} forecast={weather.forecasts.get(d.city_id ?? data.destinations[0]?.city_id ?? -1) ?? null} lodging={lodgingOf(d.stay_id, data.stays)} allDayIds={data.days.map((x) => x.id)} currency={trip.currency} dailyActivityBudget={dailyActivityBudget} onChanged={reload} openAdd={pendingAdd} onOpenedAdd={() => setPendingAdd(false)} focusItemId={focusItem} /><JournalCard tripId={trip.id} dayId={d.id} journal={journal} members={data.members} userId={session?.user.id ?? null} /></View></FadeIn>;
               })()}
             </>
           )}

@@ -9,7 +9,15 @@
     "newArchEnabled": true,
     "plugins": [
       "expo-router",
-      "expo-notifications"
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Waypoint ouvre tes photos pour les ajouter au carnet de voyage.",
+          "cameraPermission": false,
+          "microphonePermission": false
+        }
+      ]
     ],
     "android": {
       "package": "com.waypoint.app",
