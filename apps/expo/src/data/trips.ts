@@ -339,6 +339,8 @@ export async function revokeShare(tripId: string): Promise<string | null> {
 
 export interface SharedTrip {
   title: string; starts_on: string | null; ends_on: string | null; destinations: string[];
+  /** Villes dans l'ordre, avec leur position (migration 2400 ; absent avant). */
+  stops?: { name: string; lat: number; lng: number }[];
   days: { date: string; city: string | null; items: { time: string | null; name: string | null; category: string | null; note: string | null }[] }[];
 }
 
