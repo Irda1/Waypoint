@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../src/auth/AuthProvider';
@@ -51,6 +51,7 @@ import { photos } from '../../src/theme/photos';
 import { PlusMenu } from '../../src/features/nav/PlusMenu';
 import type { PlusChoice } from '../../src/features/nav/PlusMenu';
 import { FloatingNav, NAV_HEIGHT, useBottomInset } from '../../src/features/nav/FloatingNav';
+import { SettingsButton } from '../../src/features/nav/SettingsButton';
 import { SimpleTrip } from '../../src/features/simple/SimpleTrip';
 import type { NavTab } from '../../src/features/nav/FloatingNav';
 import { Icon } from '../../src/ui/Icon';
@@ -90,6 +91,7 @@ export default function TripScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
   const { colors, mode } = useTheme();
+  const insets = useSafeAreaInsets();
   const { accent } = useAppearance();
   const bottomInset = useBottomInset();
   const { data, error, loading, status, savedAt, reload } = useTrip(String(id));
@@ -236,8 +238,11 @@ export default function TripScreen() {
                 <Pressable accessibilityRole="button" accessibilityLabel="Retour à mes voyages" onPress={() => router.replace('/')} style={[styles.glass, { backgroundColor: H.glassBg, borderColor: H.glassLine }]}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}><Icon name="back" size={16} color={H.text} /><RNText style={[styles.glassLabel, { color: H.text }]}>Mes voyages</RNText></View>
                 </Pressable>
-                <View style={[styles.glass, { backgroundColor: H.glassBg, borderColor: H.glassLine }]} accessibilityLiveRegion="polite">
-                  <RNText style={[styles.glassLabel, { color: H.text }]}>{savedAt ? `Copie hors ligne · ${savedLabel(savedAt)}` : STATUS[status]}</RNText>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, flexShrink: 1 }}>
+                  <View style={[styles.glass, { backgroundColor: H.glassBg, borderColor: H.glassLine, flexShrink: 1 }]} accessibilityLiveRegion="polite">
+                    <RNText numberOfLines={1} style={[styles.glassLabel, { color: H.text }]}>{savedAt ? `Copie hors ligne · ${savedLabel(savedAt)}` : STATUS[status]}</RNText>
+                  </View>
+                  <SettingsButton glass={{ bg: H.glassBg, line: H.glassLine, text: H.text }} />
                 </View>
               </View>
               <View style={styles.coverText} pointerEvents="none">
@@ -254,6 +259,7 @@ export default function TripScreen() {
           <ImageBackground source={dayPick.source} resizeMode="cover" style={styles.dayHero}>
             <View style={styles.veil} pointerEvents="none" />
             <SafeAreaView edges={['top']} style={styles.dayHeroInner}>
+              <View style={{ position: 'absolute', top: insets.top + space.sm, right: space.lg }}><SettingsButton glass={{ bg: 'rgba(7, 9, 11, 0.45)', line: 'rgba(245, 245, 242, 0.25)', text: ON_PHOTO }} /></View>
               <RNText style={[styles.eyebrow, { color: palette('nuit', accent).accent2 }]}>Jour {selIdx + 1} sur {data.days.length} · {formatDay(selDay.day_date)}</RNText>
               <RNText style={styles.poster} accessibilityRole="header">{selCity || trip.title}</RNText>
               <RNText style={styles.lead}>{selCity ? trip.title : dates}</RNText>
@@ -261,9 +267,12 @@ export default function TripScreen() {
             </SafeAreaView>
           </ImageBackground>
         ) : (
-          <SafeAreaView edges={['top']} style={styles.slimHead}>
-            <RNText style={[styles.eyebrow, { color: colors.accent }]}>{dates}</RNText>
-            <RNText style={[styles.slimTitle, { color: colors.text }]} accessibilityRole="header">{trip.title}</RNText>
+          <SafeAreaView edges={['top']} style={[styles.slimHead, { flexDirection: 'row', alignItems: 'flex-start', gap: space.md }]}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <RNText style={[styles.eyebrow, { color: colors.accent }]}>{dates}</RNText>
+              <RNText style={[styles.slimTitle, { color: colors.text }]} accessibilityRole="header">{trip.title}</RNText>
+            </View>
+            <SettingsButton />
           </SafeAreaView>
         )}
 
