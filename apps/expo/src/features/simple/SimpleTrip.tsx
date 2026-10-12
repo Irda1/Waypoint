@@ -22,6 +22,7 @@ import { Icon } from '../../ui/Icon';
 import { categoryColors, fonts, radius, space } from '../../theme/tokens';
 import { useTheme } from '../../theme/useTheme';
 import { FloatingNav } from '../nav/FloatingNav';
+import { SettingsButton } from '../nav/SettingsButton';
 import type { NavTab } from '../nav/FloatingNav';
 
 const TABS: NavTab[] = [
@@ -108,10 +109,11 @@ export function SimpleTrip({ data, reload }: { data: TripData; reload: () => voi
       <ScrollView contentContainerStyle={{ paddingBottom: 140 }} keyboardShouldPersistTaps="handled">
         <SafeAreaView edges={['top']} style={{ paddingHorizontal: space.lg, paddingTop: space.lg, gap: 4, width: '100%', maxWidth: 720, alignSelf: 'center' }}>
           <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+            <View style={{ position: 'absolute', right: 0, top: 0 }}><SettingsButton /></View>
             {countries.map((c) => <Flag key={c} code={c} width={22} />)}
             <RNText style={{ fontFamily: fonts.sansSemi, fontSize: 12, color: colors.accent }}>{dests.length} ville{dests.length > 1 ? 's' : ''} · {selected.length} gardé{selected.length > 1 ? 's' : ''}</RNText>
           </View>
-          <RNText accessibilityRole="header" style={{ fontFamily: fonts.serif, fontSize: 28, color: colors.text }}>{trip.title}</RNText>
+          <RNText accessibilityRole="header" style={{ fontFamily: fonts.serif, fontSize: 28, color: colors.text, paddingRight: 48 }}>{trip.title}</RNText>
         </SafeAreaView>
 
         <View style={{ padding: space.lg, gap: space.md, width: '100%', maxWidth: 720, alignSelf: 'center' }}>
