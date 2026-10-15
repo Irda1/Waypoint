@@ -1,4 +1,4 @@
-// Liste « À ne pas oublier » du voyage (table trip_checklist, migration 1400).
+// Liste « Valise » du voyage (table trip_checklist, migration 1400).
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import type { CheckItem } from '../domain/checklist.ts';

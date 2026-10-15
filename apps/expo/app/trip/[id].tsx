@@ -374,9 +374,9 @@ export default function TripScreen() {
             <BookingsCard tripId={trip.id} />
           </Section>
 
-          <Section title="Préparation" icon="note" hint="Météo, liste, export, dupliquer" defaultOpen={false}>
+          <Section title="Préparation" icon="note" hint="Météo, valise, export, dupliquer" defaultOpen={false}>
             <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
-            <ChecklistCard tripId={trip.id} />
+            <ChecklistCard tripId={trip.id} data={data} forecasts={weather.forecasts} />
             <ExportCard data={data} />
             <Button label="Dupliquer ce voyage" icon="undo" variant="ghost" onPress={() => setCopyOpen(true)} />
           </Section>

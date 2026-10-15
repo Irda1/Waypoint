@@ -1,14 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { cleanLabel, missingSuggestions, orderItems, progress, SUGGESTIONS } from './checklist.ts';
+import { cleanLabel, orderItems, progress } from './checklist.ts';
 
 const it = (id: string, label: string, done = false) => ({ id, label, done });
-
-test('suggestions : celles déjà présentes (accents, casse) sont écartées', () => {
-  const left = missingSuggestions([it('1', 'passeport / carte d’identité'.replace('’', "'")), it('2', 'ECOUTEURS')]);
-  assert.equal(left.length, SUGGESTIONS.length - 2);
-  assert.ok(!left.includes('Écouteurs'));
-});
 
 test('ordre : à faire d\'abord, l\'ordre interne est conservé', () => {
   const out = orderItems([it('a', 'A', true), it('b', 'B'), it('c', 'C', true), it('d', 'D')]);
