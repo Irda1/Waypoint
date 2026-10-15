@@ -6,6 +6,7 @@ import type { Booking, BookingDraft } from '../../domain/bookings.ts';
 import { removeBooking, saveBooking, useBookings } from '../../data/bookings';
 import { attachFile, extOf, fileUrl, openFile, removeFile, removeOwnFiles, useBookingFiles } from '../../data/bookingFiles';
 import type { BookingFile } from '../../data/bookingFiles';
+import { ImportEmailSheet } from './ImportEmailSheet';
 import { canKeep, forget, isKept, keep } from '../../lib/offlineFile';
 import { formatDay } from '../../lib/format';
 import { useTheme } from '../../theme/useTheme';
@@ -37,6 +38,7 @@ export function BookingsCard({ tripId, userId }: { tripId: string; userId: strin
   const [fileBusy, setFileBusy] = useState(false);
   const [fileError, setFileError] = useState<string | null>(null);
   const [, setKeptTick] = useState(0);
+  const [importing, setImporting] = useState(false);
   const filesOf = (id: string) => attached.files.filter((f) => f.booking_id === id);
 
   async function attach(bookingId: string) {
@@ -89,6 +91,16 @@ export function BookingsCard({ tripId, userId }: { tripId: string; userId: strin
     if (!err) { await removeOwnFiles(mine); mine.forEach((f) => forget(f.id, extOf(f))); void attached.reload(); }
     if (err) setError(err); else { setDraft(null); setEditId(undefined); void reload(); }
   }
+  // Réservations trouvées dans un e-mail : ajoutées d'un coup.
+  async function addImported(drafts: BookingDraft[]): Promise<string | null> {
+    for (const d of drafts) {
+      const err = await saveBooking(tripId, d);
+      if (err) { void reload(); return err; }
+    }
+    void reload();
+    return null;
+  }
+  function editImported(d: BookingDraft) { setEditId(undefined); setDraft(d); setError(null); }
   const set = (patch: Partial<BookingDraft>) => setDraft((d) => (d ? { ...d, ...patch } : d));
 
   return (
@@ -161,9 +173,16 @@ export function BookingsCard({ tripId, userId }: { tripId: string; userId: strin
         <>
           <ErrorNote message={error} />
           {!draft ? <ErrorNote message={fileError} /> : null}
-          {!loadError ? <Button label="Ajouter une réservation" variant="ghost" onPress={() => startEdit()} /> : null}
+          {!loadError ? (
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: space.sm }}>
+              <View style={{ flexGrow: 1, flexBasis: 160 }}><Button label="Importer un e-mail" icon="mail" variant="ghost" onPress={() => setImporting(true)} /></View>
+              <View style={{ flexGrow: 1, flexBasis: 160 }}><Button label="Ajouter une réservation" variant="ghost" onPress={() => startEdit()} /></View>
+            </View>
+          ) : null}
         </>
       )}
+
+      <ImportEmailSheet visible={importing} onClose={() => setImporting(false)} onAdd={addImported} onEdit={editImported} />
 
       {/* Billet ouvert : l'ouvrir, et le garder sur le téléphone pour l'avoir sans réseau. */}
       <Modal visible={!!viewing} transparent animationType="fade" onRequestClose={() => setViewing(null)}>
