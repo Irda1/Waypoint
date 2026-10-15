@@ -1,6 +1,9 @@
 # Dépendances et builds
 node_modules/
 dist/
+# Résultats des tests de parcours (Playwright)
+test-results/
+playwright-report/
 *.apk
 *.aab
 
