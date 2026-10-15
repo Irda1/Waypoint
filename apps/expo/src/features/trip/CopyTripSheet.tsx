@@ -52,7 +52,7 @@ export function CopyTripSheet({ visible, onClose, trip }: { visible: boolean; on
     setBusy(false);
     if (!res.id) { setError(res.error ?? 'Copie impossible pour le moment.'); return; }
     onClose();
-    router.replace(`/trip/${res.id}`);
+    router.replace({ pathname: '/trip/[id]', params: { id: res.id, welcome: '1' } });
   }
 
   return (

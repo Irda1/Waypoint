@@ -108,7 +108,7 @@ function CompleteWizard() {
       void AsyncStorage.setItem(tripHomeKey(res.id), h).catch(() => {});
       void AsyncStorage.setItem(HOME_KEY, h).catch(() => {});
     }
-    router.replace({ pathname: '/trip/[id]', params: { id: res.id } });
+    router.replace({ pathname: '/trip/[id]', params: { id: res.id, welcome: '1' } });
   }
 
   const props = { state, update };

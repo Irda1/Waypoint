@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ImageBackground, Pressable, ScrollView, StyleSheet, Text as RNText, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Linking from 'expo-linking';
@@ -50,7 +50,9 @@ import { ConverterCard } from '../../src/features/trip/ConverterCard';
 import { ToPayCard } from '../../src/features/trip/ToPayCard';
 import { formatDay, isIsoDate } from '../../src/lib/format';
 import { photoKeyFor } from '../../src/lib/photoKey';
-import { checkNewDay, suggestNewDay, todayIso } from '../../src/lib/dates.ts';
+import { checkNewDay, suggestNewDay, todayIso, tripStatus } from '../../src/lib/dates.ts';
+import { Celebrate } from '../../src/features/trip/Celebrate';
+import { Countdown } from '../../src/features/trip/Countdown';
 import { cityRuns } from '../../src/domain/dayruns.ts';
 import { pickSource } from '../../src/data/cityCover';
 import { useCityPhotos } from '../../src/data/cityPhoto';
@@ -95,7 +97,8 @@ function lodgingOf(stayId: string | null, stays: { id: string; name: string; add
 
 export default function TripScreen() {
   const guard = useRequireAuth();
-  const { id } = useLocalSearchParams<{ id: string }>();
+  // `welcome=1` : le voyage vient d'être créé, on joue « Bon voyage ! » une fois.
+  const { id, welcome } = useLocalSearchParams<{ id: string; welcome?: string }>();
   const { session } = useAuth();
   const { colors, mode } = useTheme();
   const insets = useSafeAreaInsets();
@@ -144,6 +147,12 @@ export default function TripScreen() {
   const journal = useJournal(String(id), data);
   const [recap, setRecap] = useState(false);
   const [copyOpen, setCopyOpen] = useState(false);
+  const [celebrated, setCelebrated] = useState<string | null>(null);
+  // Le compte à rebours de la couverture se retourne une fois par ouverture du voyage (pas à chaque retour sur l'onglet).
+  const [flipOnce, setFlipOnce] = useState(true);
+  const celebrating = welcome === '1' && celebrated !== String(id);
+  const doneFlip = useCallback(() => setFlipOnce(false), []);
+  const endCelebration = useCallback(() => { setCelebrated(String(id)); router.setParams({ welcome: undefined }); }, [id]);
   // Récap ou bilan ouvert : la pastille « Récap prêt » de l'accueil disparaît.
   useEffect(() => { if (recap || tab === 'budget') void markSouvenirsSeen(String(id)); }, [recap, tab, id]);
 
@@ -167,7 +176,12 @@ export default function TripScreen() {
     return <Screen><ErrorNote message={error ?? 'Voyage introuvable.'} /><Button label="Retour à mes voyages" onPress={() => router.replace('/')} /></Screen>;
   }
 
-  if (data.mode === 'simple') return <SimpleTrip data={data} reload={() => void reload()} />;
+  const celebration = celebrating ? (
+    <Celebrate tripId={data.trip.id} to={data.destinations[0]?.name ?? null} onDone={endCelebration}
+      title={data.trip.title.replace(/^Lieux · /, '')}
+      subtitle={data.mode === 'simple' ? data.destinations.slice(0, 3).map((d) => d.name).join(' · ') : `${data.trip.title} · ${data.days.length} jour${data.days.length > 1 ? 's' : ''} · ${data.destinations.length} ville${data.destinations.length > 1 ? 's' : ''}`} />
+  ) : null;
+  if (data.mode === 'simple') return <View style={{ flex: 1 }}><SimpleTrip data={data} reload={() => void reload()} />{celebration}</View>;
   const active = data.members.filter((m) => !m.left_at);
   const travelers = Math.max(1, active.length);
   const { trip } = data;
@@ -271,6 +285,10 @@ export default function TripScreen() {
                 <RNText style={[styles.poster, { color: H.text }]} accessibilityRole="header">{trip.title}</RNText>
                 <RNText style={[styles.lead, { color: H.soft }]}>{dates}</RNText>
                 {destNames ? <RNText style={[styles.route, { color: H.text }]} numberOfLines={2}>{destNames.replace(/ · /g, ' → ')}</RNText> : null}
+                {trip.starts_on ? (
+                  <Countdown status={tripStatus(trip.starts_on, trip.ends_on, todayIso())} startLabel={`Départ ${formatDay(trip.starts_on)}`} animate={flipOnce} waiting={celebrating} onPlayed={doneFlip}
+                    look={{ tile: palette(mode, accent).accent, onTile: palette(mode, accent).onAccent, text: H.text, soft: H.soft, accent: H.eyebrow }} />
+                ) : null}
               </View>
               {ended ? (
                 // Voyage terminé : revoir le récap animé (un souvenir), ou refaire le voyage à d'autres dates.
@@ -469,6 +487,7 @@ export default function TripScreen() {
       <FloatingNav tabs={TABS} active={tab} onSelect={onNav} />
       <PlusMenu visible={plusOpen} onPick={onPlus} onClose={() => setPlusOpen(false)} />
       <CopyTripSheet visible={copyOpen} onClose={() => setCopyOpen(false)} trip={trip} />
+      {celebration}
       {recap ? (
         <Recap visible onClose={() => setRecap(false)} title={trip.title} dates={dates} currency={trip.currency} days={data.days} destinations={data.destinations}
           items={data.items} expenses={data.expenses} journal={journal} members={data.members} cityName={(d) => nameOfCity(cityOfDay(d))} balance={balance}
