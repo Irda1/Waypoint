@@ -24,6 +24,11 @@ test('retour tardif et départ trop tôt', () => {
   assert.deepEqual(hoursIssues([], dayHours(null, null), null), []);
 });
 
+test('un trajet entre villes à 9 h n\'est pas un départ trop tôt', () => {
+  const train: TripItem = { id: 't', day_id: 'd', plan: 'A', place_id: null, title: 'Trajet Porto → Lisbonne', category_code: 'gare', start_time: '09:00', duration_min: 175, position: 1, done: false };
+  assert.deepEqual(hoursIssues(day([train, item('a', 1, '12:30', 2)]), dayHours(null, null), null), []);
+});
+
 test('journée en cours : étape actuelle, temps restant, prochaine étape', () => {
   const s = day([item('a', 1, '09:30', 1), item('b', 2, '11:00', 2)]);   // a 09:30-10:30, b 11:00-12:00
   const at = (h: number, m: number) => liveStatus(s, h * 60 + m);

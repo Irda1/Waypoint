@@ -8,6 +8,7 @@ import { useTheme } from '../../theme/useTheme';
  * où elle va tomber (mode « insert » : les lignes entre les deux se décalent d'un cran ; mode « swap » : la ligne
  * visée prend la place de celle qu'on tient). Au lâcher, `onMove(from, to)` enregistre le nouvel ordre.
  * `orderKey` change quand l'ordre enregistré change : c'est le signal pour remettre les lignes à zéro.
+ * `isFixed` : lignes qu'on ne peut pas viser (en mode « swap », elles gardent leur place).
  */
 interface Props {
   count: number;
@@ -15,18 +16,19 @@ interface Props {
   orderKey: string;
   onMove: (from: number, to: number) => void;
   renderRow: (index: number, handle: React.ReactNode) => React.ReactNode;
+  isFixed?: (index: number) => boolean;
 }
 
 type Box = { y: number; h: number };
 
-export function DragList({ count, mode, orderKey, onMove, renderRow }: Props) {
+export function DragList({ count, mode, orderKey, onMove, renderRow, isFixed }: Props) {
   const boxes = useRef<Box[]>([]);
   const drag = useRef<{ from: number; target: number } | null>(null);
   const shifts = useRef<Animated.Value[]>([]);
   const dy = useRef(new Animated.Value(0)).current;
   const [active, setActive] = useState<number | null>(null);
-  const latest = useRef({ mode, onMove, count });
-  latest.current = { mode, onMove, count };
+  const latest = useRef({ mode, onMove, count, isFixed });
+  latest.current = { mode, onMove, count, isFixed };
   while (shifts.current.length < count) shifts.current.push(new Animated.Value(0));
 
   const settle = (target: number, from: number) => {
@@ -50,7 +52,7 @@ export function DragList({ count, mode, orderKey, onMove, renderRow }: Props) {
     for (let r = 0; r < latest.current.count; r++) if (b[r] && center >= b[r].y && center < b[r].y + b[r].h) best = r;
     if (center < (b[0]?.y ?? 0)) best = 0;
     if (center >= (b[latest.current.count - 1] ? b[latest.current.count - 1].y + b[latest.current.count - 1].h : 0)) best = latest.current.count - 1;
-    return best;
+    return latest.current.isFixed?.(best) ? from : best;
   };
 
   const reset = () => {

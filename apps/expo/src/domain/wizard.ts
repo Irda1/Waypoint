@@ -229,6 +229,9 @@ export function wizardPlan(s: WizardState, candidates: Candidate[]): PlannedDay[
     travelers: Math.max(s.travelers, 1),
     activityBudgetPerDay: total ? (total * 0.15) / days : null,
     excluded: new Set(s.excluded),
+    // Noms des villes pour les trajets entre elles ; ville de départ : le premier jour commence par le trajet depuis elle.
+    cities: new Map(s.cities.map((c) => [c.id, { name: c.name }])),
+    home: s.home ? { name: s.home.name, lat: s.home.lat, lng: s.home.lng } : null,
   });
 }
 

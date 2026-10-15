@@ -56,6 +56,16 @@ export function positionBetween(before: number | null | undefined, after: number
   return (before + after) / 2;
 }
 
+// ---- Étapes fixes (posées par le programme automatique) -----------------------
+type Step = { place_id: number | null; title: string | null };
+/** Arrivée dans une ville : on peut changer son heure, pas la déplacer ni la retirer. */
+export const ARRIVAL_TITLES = ['Arrivée et installation', 'Arrivée dans la ville'] as const;
+export const isArrivalStep = (item: Step): boolean =>
+  item.place_id == null && (ARRIVAL_TITLES as readonly string[]).includes(item.title ?? '');
+/** Trajet entre deux villes (« Trajet Porto → Lisbonne ») : il part à heure fixe, les autres étapes s'organisent autour. */
+export const isTransferStep = (item: Step): boolean => item.place_id == null && /^Trajet .+ → .+/.test(item.title ?? '');
+export const isFixedStep = (item: Step): boolean => isArrivalStep(item) || isTransferStep(item);
+
 // ---- Journée -----------------------------------------------------------------
 export type DayIssue =
   | { type: 'closed_day'; itemId: string }
@@ -125,23 +135,48 @@ export function scheduleDay(args: {
 
 /**
  * Décale les étapes qui se chevauchent : chacune commence au plus tôt à la fin de la précédente + son trajet
- * (arrondi à 5 min), l'ordre est gardé. Renvoie uniquement les étapes à modifier ; `overflow` est vrai si une étape
+ * (arrondi à 5 min), l'ordre est gardé. Un trajet entre deux villes garde son heure (un train n'attend pas) : `blocked`
+ * signale une étape qui déborde sur lui. Renvoie uniquement les étapes à modifier ; `overflow` est vrai si une étape
  * ne tient plus avant minuit (elle et les suivantes ne sont pas déplacées).
  */
-export function resolveOverlaps(schedule: ScheduledItem[]): { changes: { id: string; startMin: number }[]; overflow: boolean } {
+export function resolveOverlaps(schedule: ScheduledItem[]): { changes: { id: string; startMin: number }[]; overflow: boolean; blocked: boolean } {
   const changes: { id: string; startMin: number }[] = [];
   let prevEnd: number | null = null;
+  let blocked = false;
   for (const s of schedule) {
     if (s.startMin == null) continue;
     const duration = s.endMin != null ? s.endMin - s.startMin : 60;
     let start = s.startMin;
     if (prevEnd != null) {
       const earliest = roundUp5(prevEnd + (s.travelFromPrevious?.minutes ?? 0));
-      if (start < earliest) start = earliest;
+      if (start < earliest) { if (isTransferStep(s.item)) blocked = true; else start = earliest; }
     }
-    if (start + duration > 1439) return { changes, overflow: true };
+    if (start + duration > 1439) return { changes, overflow: true, blocked };
     if (start !== s.startMin) changes.push({ id: s.item.id, startMin: start });
     prevEnd = start + duration;
   }
-  return { changes, overflow: false };
+  return { changes, overflow: false, blocked };
+}
+
+/**
+ * Nouvelle heure d'une étape fixe : l'arrivée qui suit un trajet se place à sa fin, puis les étapes d'après qui
+ * chevauchent sont décalées (celles d'avant ne bougent pas). Renvoie les autres étapes à modifier.
+ */
+export function followFixedStep(args: { date: string; plan?: 'A' | 'B' | 'C'; items: TripItem[]; places: Map<number, Place>; itemId: string; startMin: number }): { id: string; startMin: number }[] {
+  const before = scheduleDay(args);
+  const i = before.findIndex((s) => s.item.id === args.itemId);
+  if (i < 0) return [];
+  const moved = before[i];
+  const out = new Map<string, number>();
+  const arrival = isTransferStep(moved.item) ? before.slice(i + 1).find((s) => isArrivalStep(s.item)) : undefined;
+  if (arrival) out.set(arrival.item.id, args.startMin + (moved.item.duration_min ?? 60));
+  const times = new Map(out).set(args.itemId, args.startMin);
+  const after = scheduleDay({ ...args, items: args.items.map((it) => (times.has(it.id) ? { ...it, start_time: formatTime(times.get(it.id)!) } : it)) });
+  // Nouvel ordre des heures, sauf l'arrivée qui reste juste après son trajet.
+  const order = after.filter((s) => s.item.id !== arrival?.item.id);
+  const at = order.findIndex((s) => s.item.id === args.itemId);
+  const pinned = after.find((s) => s.item.id === arrival?.item.id);
+  if (pinned) order.splice(at + 1, 0, pinned);
+  for (const c of resolveOverlaps(order.slice(at)).changes) out.set(c.id, c.startMin);
+  return [...out].map(([id, startMin]) => ({ id, startMin }));
 }

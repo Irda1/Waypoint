@@ -1,5 +1,5 @@
 // Horaires d'une journée : départ / retour du logement, retour tardif, et « journée en cours ».
-import { estimateTravel, formatTime, parseTime } from './planning.ts';
+import { estimateTravel, formatTime, isFixedStep, parseTime } from './planning.ts';
 import type { ScheduledItem } from './planning.ts';
 import type { LatLng } from './types.ts';
 
@@ -19,15 +19,15 @@ export interface HoursIssue { kind: 'late_return' | 'early_start'; minutes: numb
 
 /**
  * Vérifie le programme contre les heures du jour : retour prévu (fin de la dernière étape + trajet vers le logement)
- * après l'heure de retour souhaitée, ou première étape avant l'heure de départ.
+ * après l'heure de retour souhaitée, ou première étape avant l'heure de départ (un trajet entre villes a son heure à lui).
  */
 export function hoursIssues(schedule: ScheduledItem[], hours: DayHours, lodging: LatLng | null): HoursIssue[] {
   const out: HoursIssue[] = [];
   const timed = schedule.filter((s) => s.startMin != null && s.endMin != null);
   if (timed.length === 0) return out;
-  const first = timed[0];
+  const first = timed.find((s) => !isFixedStep(s.item));
   const depart = parseTime(hours.depart);
-  if (depart != null && first.startMin! < depart) out.push({ kind: 'early_start', minutes: depart - first.startMin!, at: formatTime(first.startMin!) });
+  if (first && depart != null && first.startMin! < depart) out.push({ kind: 'early_start', minutes: depart - first.startMin!, at: formatTime(first.startMin!) });
   const last = timed[timed.length - 1];
   const wanted = parseTime(hours.return);
   if (wanted != null) {

@@ -11,7 +11,7 @@ type Row = Place & { city_id: number; popularity: number };
 export async function loadCandidates(cityIds: number[], rootOf: (code: string) => string): Promise<{ candidates: Candidate[]; error: string | null }> {
   const results = await Promise.all(cityIds.map((id) =>
     supabase.from('places')
-      .select('id,city_id,name,kind,category_code,lat,lng,price_amount,visit_duration_min,closed_days,popularity')
+      .select('id,city_id,name,kind,category_code,lat,lng,price_amount,visit_duration_min,closed_days,opening_hours,popularity')
       .eq('city_id', id).eq('kind', 'activity').eq('status', 'active')
       .order('popularity', { ascending: false }).limit(120)));
   const candidates = results.flatMap((r) => ((r.data ?? []) as Row[]).map((p) => ({ place: p as Place, cityId: p.city_id, root: rootOf(p.category_code), popularity: p.popularity })));
@@ -43,6 +43,7 @@ export async function applyPlan(tripId: string, days: { dayId: string; plan: Pla
     category_code: i.place ? null : i.root,
     start_time: formatTime(i.startMin),
     duration_min: i.place ? null : i.durationMin,
+    note: i.note ?? null,
     position: position + 1,
   })));
   if (!rows.length) return null;

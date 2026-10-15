@@ -74,14 +74,18 @@ export function StepProposals({ state, update }: StepProps<WizardState>) {
                 const dot = categoryColors[mode][i.root ?? ''] ?? colors.text3;
                 return (
                   <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: space.md, minHeight: 44 }}>
-                    <Text variant="mono" style={{ width: 48, color: colors.text2, fontSize: 14 }}>{formatTime(i.startMin)}</Text>
+                    <View style={{ width: 48 }}>
+                      <Text variant="mono" style={{ color: colors.text2, fontSize: 14 }}>{formatTime(i.startMin)}</Text>
+                      {i.kind === 'transfer' || i.kind === 'arrival' ? <Text variant="mono" style={{ color: colors.text3, fontSize: 12.5 }}>{formatTime(i.startMin + i.durationMin)}</Text> : null}
+                    </View>
                     <View accessible={false} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${dot}33`, alignItems: 'center', justifyContent: 'center' }}>
-                      <Icon name={i.place ? iconFor(i.root ?? '') : 'trip'} size={15} color={dot} />
+                      <Icon name={i.place || i.kind === 'transfer' ? iconFor(i.root ?? '') : 'trip'} size={15} color={dot} />
                     </View>
                     {/* Toucher une étape ouvre le lieu dans Google Maps ; une étape sans lieu ne fait rien. */}
                     <Pressable disabled={!i.place} accessibilityRole={i.place ? 'link' : undefined} accessibilityLabel={i.place ? `Ouvrir ${name} dans Google Maps` : name}
                       onPress={() => { if (i.place) void Linking.openURL(`https://www.google.com/maps/search/${encodeURIComponent(name)}/@${i.place.lat},${i.place.lng},17z`); }} style={{ flex: 1 }}>
                       <Text variant="body" style={{ fontFamily: fonts.sansSemi }}>{name}</Text>
+                      {i.note ? <Text variant="muted">{i.note}</Text> : null}
                     </Pressable>
                     {i.place ? (
                       <Pressable accessibilityRole="button" accessibilityLabel={`Retirer ${name}`} onPress={() => update(toggleExcluded(state, i.place!.id))} style={{ minHeight: 44, minWidth: 44, justifyContent: 'center', alignItems: 'flex-end' }}>
