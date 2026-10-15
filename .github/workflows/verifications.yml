@@ -87,8 +87,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: Tests de la collecte
-        run: node --test pipeline/test/*.test.mjs
+      - name: Tests de la collecte et des fonctions du serveur
+        run: node --test pipeline/test/*.test.mjs supabase/functions/*/*.test.ts
 
       - name: all-migrations.sql à jour
         run: node scripts/bundle-sql.mjs --check

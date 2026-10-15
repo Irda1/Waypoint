@@ -14,13 +14,14 @@ Appli (`apps/expo`) :
 - `npx expo start --web` (local, http://localhost:8081) · `npm run export:web` (dossier `dist`, même build que le site)
 - `npm run e2e` : parcours dans un navigateur (Playwright, `e2e/`) sur le site construit avec une fausse adresse Supabase ; chaque test simule le serveur (`e2e/serveur.ts`), aucune vraie base.
 
-Racine : `node --test pipeline/test/*.test.mjs` (collecte) · `bash supabase/tests/run-local.sh` (schéma + RLS, PostgreSQL jetable) · `node scripts/bundle-sql.mjs [--check]`.
+Racine : `node --test pipeline/test/*.test.mjs supabase/functions/*/*.test.ts` (collecte, fonctions Edge) · `bash supabase/tests/run-local.sh` (schéma + RLS, PostgreSQL jetable) · `node scripts/bundle-sql.mjs [--check]`.
 
 Ces vérifications tournent seules sur chaque PR et chaque fusion (`.github/workflows/verifications.yml`) : une PR rouge ne se fusionne pas.
 
 ## Structure
 - `apps/expo/app` écrans · `src/features` UI · `src/data` Supabase/hors ligne · `src/domain` logique pure testée. `*.web.ts(x)` = version web.
 - `public/globe.html`, `public/route.html` (fond animé de l'accueil), `public/regions.html` (carte des villes) et `public/map.html` sont **générés** (`domain/globe.ts`, `domain/routeGlobe.ts`, `domain/regionsMap.ts`, `domain/map.ts`) : les regénérer après modif, un test vérifie la cohérence. Images de la Terre : `public/tex` (2K chargées d'abord, 4K quand la planète est grande à l'écran).
+- `supabase/functions/notify-friends` : envoi des notifications entre amis (Firebase), un seul fichier sans dépendance, collé par Adrien dans Supabase > Edge Functions ; lancé chaque minute par une tâche Cron.
 - `supabase/migrations/` migrations ; `supabase/all-migrations.sql` est **généré**, ne pas l'éditer. Skill : `supabase-migrations`.
 - `.github/workflows/apk-app.yml` APK Android. Skill : `apk-build`. `.github/workflows/web-app.yml` site web.
 - L'ancienne maquette (`web/`, Capacitor, v0.9) a été retirée ; elle reste dans l'historique git (commit `86fbf9b`).
