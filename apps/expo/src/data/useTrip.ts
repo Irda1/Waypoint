@@ -13,7 +13,7 @@ import { supabase } from '../lib/supabase';
 import { loadOffline, saveOffline } from './offline';
 import type { Expense, Place, TripItem } from '../domain/types.ts';
 
-export interface Trip { id: string; title: string; starts_on: string | null; ends_on: string | null; currency: string; country_code?: string | null; travelers: number; styles: string[]; budget_total: number | null; memo: string; deleted_at: string | null; version: number }
+export interface Trip { id: string; title: string; starts_on: string | null; ends_on: string | null; currency: string; country_code?: string | null; travelers: number; party_type?: 'seul' | 'deux' | 'amis' | 'famille' | null; styles: string[]; budget_total: number | null; memo: string; deleted_at: string | null; version: number }
 export interface Member { user_id: string; color: string; left_at: string | null; profiles: { display_name: string; avatar_url: string | null } | null }
 export interface Day { id: string; day_date: string; city_id: number | null; stay_id: string | null; depart_time: string | null; return_time: string | null }
 export interface Stay { id: string; name: string; address: string | null; lat: number | null; lng: number | null }
@@ -53,7 +53,7 @@ const TABLES = ['trips', 'trip_members', 'trip_days', 'trip_items', 'trip_stays'
 /** Lit tout le voyage dans la base. `missing` : voyage introuvable ou plus membre ; `failure` : erreur réseau ou base. */
 export async function fetchTripData(tripId: string): Promise<{ next: TripData | null; failure: string | null; missing: boolean }> {
     const [trip, members, days, items, expenses, budget, dest, stays] = await Promise.all([
-      supabase.from('trips').select('id,title,starts_on,ends_on,currency,country_code,travelers,styles,budget_total,memo,deleted_at,version').eq('id', tripId).maybeSingle(),
+      supabase.from('trips').select('id,title,starts_on,ends_on,currency,country_code,travelers,party_type,styles,budget_total,memo,deleted_at,version').eq('id', tripId).maybeSingle(),
       supabase.from('trip_members').select('user_id,color,left_at,profiles(display_name,avatar_url)').eq('trip_id', tripId),
       supabase.from('trip_days').select('id,day_date,city_id,stay_id,depart_time,return_time').eq('trip_id', tripId).order('day_date'),
       supabase.from('trip_items').select('*').eq('trip_id', tripId),
