@@ -58,7 +58,7 @@ export function SimpleCreate({ onBack }: { onBack: () => void }) {
     const res = await createSimpleTrip(title.trim() || autoTitle, countries, cities.map((c) => c.id));
     setBusy(false);
     if (!res.id) { setError(res.error ?? 'Création impossible.'); return; }
-    router.replace({ pathname: '/trip/[id]', params: { id: res.id } });
+    router.replace({ pathname: '/trip/[id]', params: { id: res.id, welcome: '1' } });
   }
 
   const countryRow = (code: string) => (

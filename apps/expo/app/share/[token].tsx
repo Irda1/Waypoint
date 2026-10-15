@@ -47,7 +47,7 @@ export default function SharedTripPage() {
     const res = await copySharedTrip(String(token), trip?.starts_on ? start : null);
     setBusy(false);
     if (!res.id) { setCopyError(res.error ?? 'Copie impossible pour le moment.'); return; }
-    router.replace(`/trip/${res.id}`);
+    router.replace({ pathname: '/trip/[id]', params: { id: res.id, welcome: '1' } });
   }
 
   if (trip === undefined) return <Screen><Text variant="muted">Chargement…</Text></Screen>;
