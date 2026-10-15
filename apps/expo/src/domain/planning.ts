@@ -57,13 +57,17 @@ export function positionBetween(before: number | null | undefined, after: number
 }
 
 // ---- Étapes fixes (posées par le programme automatique) -----------------------
-type Step = { place_id: number | null; title: string | null };
+type Step = { place_id: number | null; title: string | null; category_code?: string | null };
 /** Arrivée dans une ville : on peut changer son heure, pas la déplacer ni la retirer. */
 export const ARRIVAL_TITLES = ['Arrivée et installation', 'Arrivée dans la ville'] as const;
 export const isArrivalStep = (item: Step): boolean =>
   item.place_id == null && (ARRIVAL_TITLES as readonly string[]).includes(item.title ?? '');
-/** Trajet entre deux villes (« Trajet Porto → Lisbonne ») : il part à heure fixe, les autres étapes s'organisent autour. */
-export const isTransferStep = (item: Step): boolean => item.place_id == null && /^Trajet .+ → .+/.test(item.title ?? '');
+/**
+ * Trajet entre deux villes posé par le programme (« Trajet Porto → Lisbonne », ou le vol ou le train réservé, qui garde
+ * son titre) : il part à heure fixe, les autres étapes s'organisent autour.
+ */
+export const isTransferStep = (item: Step): boolean =>
+  item.place_id == null && (['transport', 'gare', 'aeroport'].includes(item.category_code ?? '') || /^Trajet .+ → .+/.test(item.title ?? ''));
 export const isFixedStep = (item: Step): boolean => isArrivalStep(item) || isTransferStep(item);
 
 // ---- Journée -----------------------------------------------------------------

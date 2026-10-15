@@ -103,6 +103,8 @@ test('étapes fixes : trajet entre deux villes et arrivée (on change leur heure
   assert.equal(isFixedStep({ place_id: null, title: 'Trajet en tram' }), false);
   assert.equal(isFixedStep({ place_id: 4, title: 'Trajet Porto → Lisbonne' }), false);
   assert.equal(isFixedStep({ place_id: null, title: 'Déjeuner' }), false);
+  assert.equal(isTransferStep({ place_id: null, title: 'Vol Paris → Lisbonne', category_code: 'aeroport' }), true, 'vol réservé, titre gardé');
+  assert.equal(isTransferStep({ place_id: null, title: 'Vol pour Rome', category_code: null }), false, 'étape libre');
 });
 
 test('chevauchements : un trajet garde son heure, les étapes d\'après se décalent derrière lui', () => {

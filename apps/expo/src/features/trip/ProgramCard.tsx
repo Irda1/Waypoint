@@ -5,9 +5,10 @@ import { Button, Card, ErrorNote, Text } from '../../ui';
 import { formatMoney } from '../../lib/format';
 import { formatDuration } from '../../lib/search';
 import { formatTime } from '../../domain/planning.ts';
-import { buildPlan, dayCost } from '../../domain/itinerary.ts';
-import type { PlannedDay, Spot } from '../../domain/itinerary.ts';
+import { bookedLegs, buildPlan, dayCost } from '../../domain/itinerary.ts';
+import type { BookedLeg, PlannedDay, Spot } from '../../domain/itinerary.ts';
 import { applyPlan, loadCandidates } from '../../data/itinerary';
+import { loadBookings } from '../../data/bookings';
 import { useCategories } from '../../data/categories';
 import type { TripData } from '../../data/useTrip';
 import { useTheme } from '../../theme/useTheme';
@@ -28,7 +29,8 @@ export function ProgramCard({ data, onApplied }: { data: TripData; onApplied: ()
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [candidates, setCandidates] = useState<Awaited<ReturnType<typeof loadCandidates>>['candidates']>([]);
-  const [home, setHome] = useState<Spot | null>(null);
+  // Ville de départ et vols ou trains réservés : lus au moment de proposer, gardés pour recalculer après un « Retirer ».
+  const [context, setContext] = useState<{ home: Spot | null; booked: BookedLeg[] }>({ home: null, booked: [] });
 
   const { trip } = data;
   const busyDays = new Set(data.items.map((i) => i.day_id));
@@ -39,7 +41,7 @@ export function ProgramCard({ data, onApplied }: { data: TripData; onApplied: ()
   const activityBudget = trip.budget_total ? (trip.budget_total * 0.15) / Math.max(data.days.length, 1) : null;
 
   // Tous les jours sont passés (ceux déjà programmés servent à savoir où l'on dort), avec l'hébergement de chaque nuit.
-  function compute(cands: typeof candidates, ex: Set<number>, from: Spot | null) {
+  function compute(cands: typeof candidates, ex: Set<number>, ctx: typeof context) {
     const days = data.days.map((d) => {
       const stay = data.stays.find((s) => s.id === d.stay_id);
       return {
@@ -48,31 +50,33 @@ export function ProgramCard({ data, onApplied }: { data: TripData; onApplied: ()
       };
     });
     const cities = new Map(data.destinations.map((d) => [d.city_id, { name: d.name, lat: d.lat, lng: d.lng }]));
-    const built = buildPlan(days, cands, { interests: trip.styles, travelers, activityBudgetPerDay: activityBudget, excluded: new Set([...ex, ...inTrip]), cities, home: from });
+    const built = buildPlan(days, cands, { interests: trip.styles, travelers, activityBudgetPerDay: activityBudget, excluded: new Set([...ex, ...inTrip]), cities, home: ctx.home, booked: ctx.booked });
     setPlan(built.map((p, i) => ({ dayId: data.days[i].id, plan: p })).filter((p) => !busyDays.has(p.dayId)));
   }
 
   async function propose() {
     setBusy(true); setError(null);
-    const [res, saved] = await Promise.all([
+    const [res, saved, bookings] = await Promise.all([
       loadCandidates(cityIds, categories.rootOf),
       // Ville de départ (carte Vols ou assistant) : le premier jour commence par le trajet depuis elle.
       AsyncStorage.getItem(tripHomeKey(trip.id)).then((v) => v ?? AsyncStorage.getItem(HOME_KEY)).catch(() => null),
+      loadBookings(trip.id),
     ]);
     setBusy(false);
     if (res.error) { setError(res.error); return; }
     let from: Spot | null = null;
     try { const h = saved ? (JSON.parse(saved) as Spot) : null; from = h && typeof h.name === 'string' && typeof h.lat === 'number' && typeof h.lng === 'number' ? { name: h.name, lat: h.lat, lng: h.lng } : null; } catch { /* ignorée */ }
-    setHome(from);
+    const ctx = { home: from, booked: bookedLegs(bookings) };
+    setContext(ctx);
     setCandidates(res.candidates);
     setExcluded(new Set());
-    compute(res.candidates, new Set(), from);
+    compute(res.candidates, new Set(), ctx);
   }
 
   function remove(placeId: number) {
     const next = new Set(excluded).add(placeId);
     setExcluded(next);
-    compute(candidates, next, home);
+    compute(candidates, next, context);
   }
 
   async function apply() {
@@ -93,7 +97,7 @@ export function ProgramCard({ data, onApplied }: { data: TripData; onApplied: ()
       <Text variant="label">Programme automatique</Text>
       {plan === null ? (
         <>
-          <Text variant="muted">Waypoint peut remplir {emptyDays.length > 1 ? `les ${emptyDays.length} jours vides` : 'le jour vide'} selon tes envies, ton budget et la proximité de ton hébergement, avec les trajets entre les villes. Tu gardes la main : tu retires ce que tu ne veux pas avant de valider, et rien de ce que tu as déjà prévu n'est touché.</Text>
+          <Text variant="muted">Waypoint peut remplir {emptyDays.length > 1 ? `les ${emptyDays.length} jours vides` : 'le jour vide'} selon tes envies, ton budget et la proximité de ton hébergement, avec les trajets entre les villes (tes vols et trains réservés compris). Tu gardes la main : tu retires ce que tu ne veux pas avant de valider, et rien de ce que tu as déjà prévu n'est touché.</Text>
           <ErrorNote message={error} />
           <Button label="Proposer un programme" onPress={propose} loading={busy} />
         </>

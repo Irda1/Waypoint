@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ARRIVAL, DAY_START, TRANSFER_DEPART, buildPlan, dayCost, estimateTransfer, isFixedStep, organizeTimes } from './itinerary.ts';
+import { ARRIVAL, DAY_START, TRANSFER_DEPART, bookedLegs, buildPlan, dayCost, estimateTransfer, isFixedStep, organizeTimes } from './itinerary.ts';
 import type { Candidate } from './itinerary.ts';
 import type { LatLng, Place } from './types.ts';
 
@@ -253,4 +253,63 @@ test('chaque activité à son moment : shopping après 10 h, bien-être l\'aprè
   assert.ok(at(spa)!.startMin >= 14 * 60);
   assert.ok(at(museum)!.startMin >= 11 * 60 && at(museum)!.startMin + 120 <= 17 * 60);
   for (let i = 1; i < day.items.length; i++) assert.ok(day.items[i].startMin >= day.items[i - 1].startMin + day.items[i - 1].durationMin, `chevauchement à l'étape ${i}`);
+});
+
+test('réservations : vols et trains datés avec une heure, arrivée lue dans les notes', () => {
+  assert.deepEqual(bookedLegs([
+    { kind: 'vol', title: 'Vol Paris → Lisbonne', starts_on: '2026-10-14', start_time: '07:10', notes: 'TP 437 · arrivée 08:45' },
+    { kind: 'train', title: 'Train Porto → Lisbonne', starts_on: '2026-10-16', start_time: '15:00', notes: 'Voiture 3, arrivée 17h58' },
+    { kind: 'train', title: 'Sans heure', starts_on: '2026-10-16', start_time: null, notes: null },
+    { kind: 'hebergement', title: 'Hôtel', starts_on: '2026-10-14', start_time: '15:00', notes: null },
+  ]), [
+    { date: '2026-10-14', title: 'Vol Paris → Lisbonne', mode: 'plane', depart: 7 * 60 + 10, arrive: 8 * 60 + 45 },
+    { date: '2026-10-16', title: 'Train Porto → Lisbonne', mode: 'train', depart: 15 * 60, arrive: 17 * 60 + 58 },
+  ]);
+});
+
+test('vol réservé le premier jour : le trajet suit la réservation, installation après la sortie de l\'aéroport', () => {
+  const booked = [{ date: '2026-10-14', title: 'Vol Paris → Lisbonne', mode: 'plane' as const, depart: 7 * 60 + 10, arrive: 8 * 60 + 45 }];
+  const [d] = buildPlan([D('2026-10-14', 2)], twoCities(), { ...base, cities, booked });
+  const [trip, arrival, ...rest] = d.items;
+  assert.equal(trip.title, 'Vol Paris → Lisbonne');
+  assert.equal(trip.root, 'aeroport');
+  assert.equal(trip.startMin, 7 * 60 + 10);
+  assert.equal(trip.durationMin, 95);
+  assert.equal(trip.note, 'Réservé · arrivée 08:45');
+  assert.equal(arrival.kind, 'arrival');
+  assert.equal(arrival.startMin, 9 * 60 + 45);
+  assert.ok(rest.length && rest.every((i) => i.startMin >= 10 * 60 + 15));
+  assert.ok(rest.some((i) => i.kind === 'lunch'));
+});
+
+test('train réservé l\'après-midi : visites dans la ville qu\'on quitte, dîner dans la nouvelle', () => {
+  const booked = [{ date: '2026-10-15', title: 'Train Porto → Lisbonne', mode: 'train' as const, depart: 15 * 60, arrive: null }];
+  const [, d] = buildPlan([D('2026-10-14', 1), D('2026-10-15', 2)], twoCities(), { ...base, cities, booked });
+  const trip = d.items.find((i) => i.kind === 'transfer')!;
+  assert.equal(trip.startMin, 15 * 60);
+  assert.match(trip.note ?? '', /^Réservé · arrivée vers \d\d:\d\d \(estimation\)$/);
+  const before = d.items.filter((i) => i.kind === 'visit' || i.kind === 'lunch');
+  assert.ok(before.some((i) => i.kind === 'visit'));
+  assert.ok(before.every((i) => (!i.place || i.place.lat > 40) && i.startMin + i.durationMin <= 15 * 60 - 30), 'à Porto, avant de rejoindre la gare');
+  const dinner = d.items.find((i) => i.kind === 'dinner')!;
+  assert.ok(dinner.place && dinner.place.lat < 40, 'dîner à Lisbonne');
+});
+
+test('train réservé le matin vers l\'hôtel d\'une autre ville : la journée se passe dans la nouvelle ville', () => {
+  const alfama = { name: 'Hôtel Alfama', lat: 38.7115, lng: -9.13 };
+  const booked = [{ date: '2026-10-15', title: 'Train Porto → Lisbonne', mode: 'train' as const, depart: 8 * 60, arrive: 10 * 60 + 50 }];
+  const [, d] = buildPlan([D('2026-10-14', 1), { date: '2026-10-15', cityId: 1, stay: alfama }], twoCities(), { ...base, cities, booked });
+  assert.equal(d.items[0].title, 'Train Porto → Lisbonne');
+  const placed = d.items.filter((i) => i.place);
+  assert.ok(placed.length >= 3);
+  assert.ok(placed.every((i) => i.place!.lat < 40 && i.startMin >= 11 * 60 + 40), 'tout à Lisbonne, après l\'installation');
+});
+
+test('vol retour réservé : les visites s\'arrêtent à temps pour l\'aéroport, ni dîner ni installation', () => {
+  const booked = [{ date: '2026-10-15', title: 'Vol Lisbonne → Paris', mode: 'plane' as const, depart: 19 * 60 + 25, arrive: 21 * 60 + 55 }];
+  const [, d] = buildPlan([D('2026-10-14', 2), D('2026-10-15', 2)], twoCities(), { ...base, cities, booked });
+  assert.equal(d.items.at(-1)!.title, 'Vol Lisbonne → Paris');
+  assert.ok(!d.items.some((i) => i.kind === 'dinner' || i.kind === 'arrival'));
+  assert.ok(d.items.some((i) => i.kind === 'visit'));
+  assert.ok(d.items.filter((i) => i.kind !== 'transfer').every((i) => i.startMin + i.durationMin <= 19 * 60 + 25 - 150), 'à l\'aéroport 2 h 30 avant');
 });

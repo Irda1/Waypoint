@@ -72,6 +72,8 @@ export interface PlanOptions {
   cities?: Map<number, { name: string; lat?: number | null; lng?: number | null }>;
   /** Ville de départ : le premier jour commence par le trajet depuis elle (sinon arrivée vers 14 h). */
   home?: Spot | null;
+  /** Vols et trains réservés (voir `bookedLegs`) : ils remplacent l'heure estimée du trajet de leur jour. */
+  booked?: BookedLeg[];
 }
 
 export const DAY_START = 9 * 60 + 30;
@@ -132,6 +134,29 @@ const TRANSFER_LABEL: Record<TransferMode, string> = { car: 'Train ou voiture', 
 const TRANSFER_CODE: Record<TransferMode, string> = { car: 'transport', train: 'gare', plane: 'aeroport' };
 const transferNote = (t: Transfer): string =>
   `${TRANSFER_LABEL[t.mode]}, environ ${hm(t.minutes)}${t.mode === 'plane' ? ' porte à porte' : ''} (estimation, ${Math.round(t.km)} km)`;
+
+/** Vol ou train réservé : heures locales de départ et, si on la connaît, d'arrivée. */
+export interface BookedLeg { date: string; title: string; mode: 'plane' | 'train'; depart: number; arrive: number | null }
+
+/**
+ * Vols et trains réservés qui ont une date et une heure de départ. L'heure d'arrivée est lue dans les notes
+ * (« arrivée 08:45 », écrit par l'import d'e-mail, ou « arrivée 8h45 » saisi à la main).
+ */
+export function bookedLegs(list: { kind: string; title: string; starts_on: string | null; start_time: string | null; notes: string | null }[]): BookedLeg[] {
+  const out: BookedLeg[] = [];
+  for (const b of list) {
+    const depart = parseTime(b.start_time);
+    if ((b.kind !== 'vol' && b.kind !== 'train') || !b.starts_on || depart == null) continue;
+    const m = b.notes?.match(/arriv[ée]e\s*:?\s*(\d{1,2})[:h](\d{2})/i);
+    out.push({ date: b.starts_on, title: b.title, mode: b.kind === 'vol' ? 'plane' : 'train', depart, arrive: m ? parseTime(`${m[1]}:${m[2]}`) : null });
+  }
+  return out;
+}
+/** Avant un trajet réservé : aller à l'aéroport et embarquer, ou rejoindre la gare ; après : rejoindre l'hébergement. */
+const BOOKED_MARGIN = { plane: { before: 150, after: 60 }, train: { before: 30, after: 20 } } as const;
+/** Durée du vol ou du train seul (sans les marges), quand l'heure d'arrivée manque. */
+const rideMinutes = (mode: 'plane' | 'train', a: LatLng | null, b: LatLng | null): number =>
+  !a || !b ? 120 : roundUp5(mode === 'plane' ? (distanceKm(a, b) / 800) * 60 + 30 : ((distanceKm(a, b) * 1.2) / 130) * 60);
 
 // ---------------------------------------------------------------- Choix des lieux
 
@@ -273,6 +298,13 @@ function bestOrder(chosen: Scored[], ctx: DayContext): Simulation | null {
 
 // ---------------------------------------------------------------- Programme
 
+/** Ville d'une journée ; `cityId` null : hors du voyage (ville de départ, destination d'un trajet réservé). */
+interface Stop { cityId: number | null; name: string | null; point: LatLng | null; stay: Spot | null }
+/** Trajet entre deux villes : ses heures, puis les marges avant (rejoindre la gare, embarquer) et après (rejoindre l'hébergement). */
+interface Leg { title: string; root: string; note: string; depart: number; arrive: number; before: number; after: number }
+/** Créneau de visites dans une ville : une boucle de `stop.point` à `to`, entre `start` et `end`. */
+interface Slot { stop: Stop; sights: Scored[]; foods: Scored[]; start: number; end: number; firstLeg: boolean; to: LatLng; anchor: LatLng }
+
 export function buildPlan(days: PlanDay[], candidates: Candidate[], opts: PlanOptions): PlannedDay[] {
   const excluded = opts.excluded ?? new Set<number>();
   const cities = fillCities(days);
@@ -299,6 +331,16 @@ export function buildPlan(days: PlanDay[], candidates: Candidate[], opts: PlanOp
   });
   const used = new Set<number>();
   const hours = new Map<number, WeekHours | null>();
+  // Lieux encore libres d'une ville ce jour-là.
+  const poolOf = (id: number | null, date: string): Scored[] => (id != null ? byCity.get(id) ?? [] : []).filter((c) => !used.has(c.place.id) && isOpen(c.place, date));
+  // Trajets réservés d'un jour, réunis en un seul (correspondance : premier départ, dernière arrivée).
+  const bookedOn = (date: string): BookedLeg | null => {
+    const list = (opts.booked ?? []).filter((b) => b.date === date).sort((a, b) => a.depart - b.depart);
+    if (!list.length) return null;
+    const n = list.length - 1;
+    return { ...list[0], arrive: list[n].arrive, mode: list.some((b) => b.mode === 'plane') ? 'plane' : 'train',
+      title: n ? `${list[0].title} (+ ${n} correspondance${n > 1 ? 's' : ''})` : list[0].title };
+  };
 
   return days.map((day, index): PlannedDay => {
     const cityId = cities[index];
@@ -323,109 +365,147 @@ export function buildPlan(days: PlanDay[], candidates: Candidate[], opts: PlanOp
     const stayHere = day.stay && nightCity[index] === cityId ? day.stay : null;
     const prevCity = index > 0 ? nightCity[index - 1] : null;
     const prevStay = index > 0 ? days[index - 1].stay ?? null : null;
+    const tonight = nightCity[index];
+    const booked = bookedOn(day.date);
 
-    // D'où l'on vient ce matin : la ville de la nuit précédente, ou la ville de départ le premier jour.
-    let origin: { name: string; point: LatLng } | null = null;
+    // Où l'on se réveille et où l'on dort, quand ce n'est pas la ville du jour (`cityId` null : hors du voyage).
+    let wake: Stop | null = null;
+    let sleep: Stop | null = null;
     let arrivalOnly = false;
     if (index === 0) {
-      if (opts.home && center && here && distanceKm(opts.home, center) >= SAME_CITY_KM) origin = { name: opts.home.name, point: opts.home };
-      else if (!opts.home || !center || !here) arrivalOnly = true;
+      if (opts.home && center && distanceKm(opts.home, center) >= SAME_CITY_KM) wake = { cityId: null, name: opts.home.name, point: opts.home, stay: null };
+      else if (!opts.home || !center) arrivalOnly = true;
     } else if (prevCity !== cityId) {
-      const point = prevStay ?? (prevCity != null ? centers.get(prevCity) : null);
-      const from = nameOf(prevCity);
-      if (point && from && here && center) origin = { name: from, point }; else arrivalOnly = true;
+      wake = { cityId: prevCity, name: nameOf(prevCity), point: prevStay ?? (prevCity != null ? centers.get(prevCity) ?? null : null), stay: prevStay };
     }
-    const inbound = origin ? estimateTransfer(origin.point, stayHere ?? center!) : null;
-    if (inbound && inbound.minutes > MAX_TRANSFER) { origin = null; arrivalOnly = true; }
-    // Hôtel du soir dans une autre ville : la journée finit par le trajet vers lui.
-    const tonight = nightCity[index];
-    const tonightName = nameOf(tonight);
-    const evening = day.stay && tonight != null && tonight !== cityId && here && tonightName ? { stay: day.stay, cityId: tonight, name: tonightName } : null;
+    if (day.stay && tonight != null && tonight !== cityId) sleep = { cityId: tonight, name: nameOf(tonight), point: day.stay, stay: day.stay };
+    const main: Stop = { cityId, name: here, point: (!wake && !arrivalOnly && prevCity === cityId ? prevStay : null) ?? stayHere ?? center ?? sights[0]?.place ?? foods[0].place, stay: stayHere };
 
-    const settle = (at: number, stay: Spot | null) => {
+    // Trajet réservé ce jour-là : celui du matin s'il part avant midi, sinon celui du soir. Sans changement de ville prévu,
+    // c'est une arrivée le premier jour (ville de départ inconnue), sinon un départ (retour, excursion).
+    let bookedRole: 'in' | 'out' | null = null;
+    if (booked) {
+      bookedRole = (wake || arrivalOnly) && !(sleep && booked.depart >= 12 * 60) ? 'in' : 'out';
+      if (bookedRole === 'in' && !wake) { wake = { cityId: null, name: null, point: null, stay: null }; arrivalOnly = false; }
+      if (bookedRole === 'out' && !sleep) sleep = { cityId: null, name: null, point: null, stay: null };
+    }
+    const estimate = (a: Stop, b: Stop): Transfer | null => {
+      if (!a.name || !b.name || !a.point || !b.point) return null;
+      const t = estimateTransfer(a.point, b.point);
+      return t.minutes <= MAX_TRANSFER ? t : null;
+    };
+    const inEst = wake && bookedRole !== 'in' ? estimate(wake, main) : null;
+    if (wake && bookedRole !== 'in' && !inEst) { wake = null; arrivalOnly = true; }
+    const outEst = sleep && bookedRole !== 'out' ? estimate(main, sleep) : null;
+    if (sleep && bookedRole !== 'out' && !outEst) sleep = null;
+
+    const legOf = (a: Stop, b: Stop, est: Transfer | null, departAt: (minutes: number) => number): Leg => {
+      if (!est && booked) {
+        const known = booked.arrive != null && booked.arrive > booked.depart;
+        const arrive = known ? booked.arrive! : Math.min(booked.depart + rideMinutes(booked.mode, a.point, b.point), 1439);
+        return { title: booked.title, root: TRANSFER_CODE[booked.mode], depart: booked.depart, arrive, ...BOOKED_MARGIN[booked.mode],
+          note: `Réservé · arrivée ${known ? formatTime(arrive) : `vers ${formatTime(arrive)} (estimation)`}` };
+      }
+      const depart = departAt(est!.minutes);
+      return { title: `Trajet ${a.name} → ${b.name}`, root: TRANSFER_CODE[est!.mode], depart, arrive: depart + est!.minutes, before: 15, after: 0, note: transferNote(est!) };
+    };
+    const settle = (at: number, stay: Spot | null) =>
       items.push({ kind: 'arrival', place: null, title: ARRIVAL_TITLES[0], root: null, startMin: at, durationMin: SETTLE_MIN, badges: [], note: stay ? `${stay.name} : on dépose les bagages` : null });
-      return at + SETTLE_MIN;
-    };
-    // Point de départ de la boucle : l'hébergement (celui de la veille si l'on n'a pas changé de ville), sinon le centre.
-    const S: LatLng = (!origin && !arrivalOnly && prevCity === cityId ? prevStay ?? stayHere : stayHere) ?? center ?? sights[0]?.place ?? foods[0].place;
-    let t = DAY_START;
-    if (origin && inbound) {
-      items.push({ kind: 'transfer', place: null, title: `Trajet ${origin.name} → ${here}`, root: TRANSFER_CODE[inbound.mode], startMin: TRANSFER_DEPART, durationMin: inbound.minutes, badges: [], note: transferNote(inbound) });
-      t = settle(TRANSFER_DEPART + inbound.minutes, stayHere);
-    } else if (arrivalOnly) t = settle(ARRIVAL - SETTLE_MIN, stayHere);
+    const pushLeg = (leg: Leg) => items.push({ kind: 'transfer', place: null, title: leg.title, root: leg.root, startMin: leg.depart, durationMin: leg.arrive - leg.depart, badges: [], note: leg.note });
 
-    const out = evening ? estimateTransfer(S, evening.stay) : null;
-    const leave = out && out.minutes <= MAX_TRANSFER ? out : null;
-    const depart = leave ? Math.max(t, Math.floor((EVENING_ARRIVAL - leave.minutes) / 5) * 5) : null;
-    const transferDay = origin != null || arrivalOnly || leave != null;
+    // Trajet du matin (départ 9 h), arrivée et installation à son arrivée ; trajet du soir pour arriver vers 18 h.
+    const inLeg = wake ? legOf(wake, main, inEst, () => TRANSFER_DEPART) : null;
+    let ready = DAY_START;
+    if (inLeg) { pushLeg(inLeg); settle(inLeg.arrive + inLeg.after, stayHere); ready = inLeg.arrive + inLeg.after + SETTLE_MIN; }
+    else if (arrivalOnly) { settle(ARRIVAL - SETTLE_MIN, stayHere); ready = ARRIVAL; }
+    const outLeg = sleep ? legOf(main, sleep, outEst, (m) => Math.max(ready, Math.floor((EVENING_ARRIVAL - m) / 5) * 5)) : null;
+    if (outLeg) { pushLeg(outLeg); if (sleep!.cityId != null) settle(outLeg.arrive + outLeg.after, sleep!.stay); }
+
+    // Les créneaux de visite, dans l'ordre de la journée : avant le trajet du matin (dans la ville quittée), dans la ville
+    // du jour, après le trajet du soir (dans la nouvelle ville). Chaque boucle part de l'hébergement et y revient.
+    const windows: Slot[] = [];
+    const add = (stop: Stop | null, pool: Scored[], start: number, end: number, firstLeg: boolean, to: LatLng | null, anchor?: LatLng) => {
+      if (stop?.cityId != null && stop.point && end - start >= 60) windows.push({ stop, sights: pool.filter((c) => c.root !== FOOD && c.root !== NIGHT), foods: pool.filter((c) => c.root === FOOD), start, end, firstLeg, to: to ?? stop.point, anchor: anchor ?? stop.point });
+    };
+    if (inLeg && wake) add(wake, poolOf(wake.cityId, day.date), DAY_START, inLeg.depart - inLeg.before, false, null);
+    add(main, open, ready, outLeg ? outLeg.depart - outLeg.before : VISIT_LIMIT, inLeg != null || arrivalOnly, outLeg ? null : stayHere, focused ? day.focus! : undefined);
+    if (outLeg && sleep) add(sleep, poolOf(sleep.cityId, day.date), outLeg.arrive + outLeg.after + SETTLE_MIN, VISIT_LIMIT, true, null);
+    // Déjeuner dans le premier créneau qui couvre midi (un peu plus tard juste après une arrivée) ; sinon on mange en route.
+    const lunchSlot = windows.find((w) => w.start <= ARRIVAL + SETTLE_MIN && w.end >= LUNCH_FROM + LUNCH_MIN);
+    const ctxOf = (w: Slot): DayContext => ({
+      weekday: weekdayOf(day.date), start: w.start, firstLeg: w.firstLeg, from: w.stop.point!, to: w.to, end: w.end,
+      lunchLatest: w === lunchSlot ? Math.max(LUNCH_LATEST, w.start + 30) : null, foods: w.foods, taken, interests: opts.interests, hours,
+    });
+
+    // Les visites : les plus proches de l'hébergement (ou du quartier) parmi les mieux notées, une famille à la fois,
+    // ajoutées tant qu'un ordre respecte tous les créneaux ; le plus long créneau d'abord.
+    const transferDay = inLeg != null || outLeg != null || arrivalOnly;
     const limit = Math.min(opts.maxVisits ?? 3, 4);
-    const maxVisits = transferDay ? Math.min(limit, 2) : limit;
-    const end = depart != null ? depart - 15 : VISIT_LIMIT;
-    const ctx: DayContext = {
-      weekday: weekdayOf(day.date), start: t, firstLeg: origin != null || arrivalOnly, from: S,
-      to: leave ? S : stayHere ?? S,
-      end,
-      // Déjeuner entre 12 h et 13 h 30 (un peu plus tard juste après une arrivée) ; arrivé en ville après 14 h : on a mangé en route.
-      lunchLatest: t <= ARRIVAL + SETTLE_MIN && end >= LUNCH_FROM + LUNCH_MIN ? Math.max(LUNCH_LATEST, t + 30) : null,
-      foods, taken, interests: opts.interests, hours,
-    };
-
-    // Les visites : les plus proches du point de départ (ou du quartier) parmi les mieux notées, une famille à la fois,
-    // ajoutées tant qu'un ordre respecte tous les créneaux.
-    const anchor = focused ? day.focus! : S;
+    let left = transferDay ? Math.min(limit, 2) : limit;
     const price = (c: Scored) => (c.place.price_amount ?? 0) * opts.travelers;
     let budgetLeft = opts.activityBudgetPerDay ?? Infinity;
-    const chosen: Scored[] = [];
-    let plan: Simulation | null = null;
-    while (chosen.length < maxVisits) {
-      const value = (c: Scored) => c.score - 0.25 * distanceKm(anchor, c.place)
-        - (chosen.length ? 0.1 * Math.min(...chosen.map((x) => distanceKm(x.place, c.place))) : 0)
-        - 0.6 * chosen.filter((x) => x.root === c.root).length;
-      const ranked = sights
-        .filter((c) => !chosen.includes(c) && price(c) <= budgetLeft)
-        .map((c) => ({ c, v: value(c) }))
-        .sort((a, b) => b.v - a.v || a.c.place.id - b.c.place.id)
-        .slice(0, 25);
-      let found: { c: Scored; sim: Simulation } | null = null;
-      for (const { c } of ranked) {
-        const sim = bestOrder([...chosen, c], ctx);
-        if (sim) { found = { c, sim }; break; }
+    const plans = new Map<Slot, Simulation>();
+    let visits = 0;
+    for (const w of [...windows].sort((a, b) => (b.end - b.start) - (a.end - a.start))) {
+      const ctx = ctxOf(w);
+      const chosen: Scored[] = [];
+      while (chosen.length < left) {
+        const value = (c: Scored) => c.score - 0.25 * distanceKm(w.anchor, c.place)
+          - (chosen.length ? 0.1 * Math.min(...chosen.map((x) => distanceKm(x.place, c.place))) : 0)
+          - 0.6 * chosen.filter((x) => x.root === c.root).length;
+        const ranked = w.sights
+          .filter((c) => !taken.has(c.place.id) && !chosen.includes(c) && price(c) <= budgetLeft)
+          .map((c) => ({ c, v: value(c) }))
+          .sort((a, b) => b.v - a.v || a.c.place.id - b.c.place.id)
+          .slice(0, 25);
+        let found: { c: Scored; sim: Simulation } | null = null;
+        for (const { c } of ranked) {
+          const sim = bestOrder([...chosen, c], ctx);
+          if (sim) { found = { c, sim }; break; }
+        }
+        if (!found) break;
+        chosen.push(found.c);
+        plans.set(w, found.sim);
+        budgetLeft -= price(found.c);
       }
-      if (!found) break;
-      chosen.push(found.c);
-      plan = found.sim;
-      budgetLeft -= price(found.c);
-    }
-    let pos: LatLng = S;
-    if (plan) {
       for (const c of chosen) take(c);
-      if (plan.lunch) take(plan.lunch);
-      items.push(...plan.items);
-      t = plan.end;
-      pos = plan.pos;
+      const lunch = plans.get(w)?.lunch;
+      if (lunch) take(lunch);
+      left -= chosen.length;
+      visits += chosen.length;
     }
+    // Pas de visite dans le créneau de midi mais ailleurs dans la journée : le déjeuner seul.
+    if (lunchSlot && !plans.has(lunchSlot) && visits) {
+      const sim = bestOrder([], ctxOf(lunchSlot));
+      if (sim) { plans.set(lunchSlot, sim); if (sim.lunch) take(sim.lunch); }
+    }
+    for (const sim of plans.values()) items.push(...sim.items);
 
-    // Trajet du soir : départ pour arriver vers 18 h, installation, puis dîner près du nouvel hôtel.
-    let dinnerFoods = foods;
-    let lodging: LatLng = stayHere ?? S;
-    if (evening && leave && depart != null) {
-      items.push({ kind: 'transfer', place: null, title: `Trajet ${here} → ${evening.name}`, root: TRANSFER_CODE[leave.mode], startMin: depart, durationMin: leave.minutes, badges: [], note: transferNote(leave) });
-      t = settle(depart + leave.minutes, evening.stay);
-      pos = evening.stay;
-      lodging = evening.stay;
-      dinnerFoods = (byCity.get(evening.cityId) ?? []).filter((c) => c.root === FOOD && !used.has(c.place.id) && isOpen(c.place, day.date));
+    // Dîner dans la ville où l'on dort, près de l'hébergement ; avant de partir si l'on quitte le voyage tard le soir.
+    const endOf = (list: PlannedItem[]) => list.reduce((m, i) => Math.max(m, i.startMin + i.durationMin), DAY_START);
+    const last = sleep ?? main;
+    const lastSlot = windows.find((w) => w.stop === last);
+    let dinner: { foods: Scored[]; pos: LatLng; lodging: LatLng; t: number } | null = null;
+    if (last.cityId != null) {
+      dinner = { foods: last === main ? foods : poolOf(last.cityId, day.date).filter((c) => c.root === FOOD), pos: (lastSlot && plans.get(lastSlot)?.pos) ?? last.point!, lodging: last.stay ?? last.point!, t: endOf(items) };
+    } else if (outLeg && outLeg.depart - outLeg.before >= DINNER_AT + DINNER_MIN) {
+      const mainSlot = windows.find((w) => w.stop === main);
+      const sim = mainSlot ? plans.get(mainSlot) : undefined;
+      dinner = { foods, pos: sim?.pos ?? main.point!, lodging: main.point!, t: sim ? sim.end : ready };
     }
-    if (chosen.length || dinnerFoods.length) {
-      const spot = pickFood(dinnerFoods, taken, pos, lodging, 0.2, 0.4);
-      const start = roundUp5(Math.max(DINNER_AT, t + (spot ? estimateTravel(pos, spot.place).minutes : 0)));
+    let pos: LatLng = dinner?.pos ?? main.point!;
+    let t = dinner?.t ?? endOf(items);
+    if (dinner && (visits || dinner.foods.length)) {
+      const spot = pickFood(dinner.foods, taken, dinner.pos, dinner.lodging, 0.2, 0.4);
+      const start = roundUp5(Math.max(DINNER_AT, t + (spot ? estimateTravel(dinner.pos, spot.place).minutes : 0)));
       if (spot) { take(spot); items.push({ kind: 'dinner', place: spot.place, title: null, root: FOOD, startMin: start, durationMin: DINNER_MIN, badges: badgesOf(spot, opts.interests) }); pos = spot.place; }
       else items.push({ kind: 'dinner', place: null, title: 'Dîner', root: FOOD, startMin: start, durationMin: DINNER_MIN, badges: [] });
       t = start + DINNER_MIN;
     }
 
     // Étape de nuit si l'utilisateur aime sortir : un lieu proche du dîner, après 21 h 45 (pas un soir de trajet).
-    if (!leave && opts.interests.includes(NIGHT)) {
-      const night = pickFood(open.filter((c) => c.root === NIGHT), taken, pos, lodging, 0.3, 0);
+    if (!outLeg && opts.interests.includes(NIGHT)) {
+      const night = pickFood(open.filter((c) => c.root === NIGHT), taken, pos, main.stay ?? main.point!, 0.3, 0);
       if (night) { take(night); items.push({ kind: 'visit', place: night.place, title: null, root: NIGHT, startMin: roundUp5(Math.max(t + 15, 21 * 60 + 45)), durationMin: durationOf(night.place), badges: badgesOf(night, opts.interests) }); }
     }
     items.sort((a, b) => a.startMin - b.startMin);
