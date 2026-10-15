@@ -12,6 +12,7 @@ Compagnon de voyage collaboratif (Expo + Supabase). Contexte complet : `docs/CON
 Appli (`apps/expo`) :
 - `npm install` · `npm test` (tests du domaine) · `npm run typecheck` (doit rester propre)
 - `npx expo start --web` (local, http://localhost:8081) · `npm run export:web` (dossier `dist`, même build que le site)
+- `npm run e2e` : parcours dans un navigateur (Playwright, `e2e/`) sur le site construit avec une fausse adresse Supabase ; chaque test simule le serveur (`e2e/serveur.ts`), aucune vraie base.
 
 Racine : `node --test pipeline/test/*.test.mjs` (collecte) · `bash supabase/tests/run-local.sh` (schéma + RLS, PostgreSQL jetable) · `node scripts/bundle-sql.mjs [--check]`.
 

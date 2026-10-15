@@ -1,5 +1,5 @@
-# Vérifications automatiques de chaque PR (et de main) : tests et typage de l'appli, tests de la collecte,
-# all-migrations.sql à jour, schéma et sécurité (RLS) de la base sur un PostgreSQL jetable.
+# Vérifications automatiques de chaque PR (et de main) : tests et typage de l'appli, parcours dans un navigateur,
+# tests de la collecte, all-migrations.sql à jour, schéma et sécurité (RLS) de la base sur un PostgreSQL jetable.
 # Aucun secret utilisé. Une PR dont une vérification échoue s'affiche en rouge : on corrige avant de fusionner.
 name: Vérifications
 
@@ -41,6 +41,40 @@ jobs:
       - name: Typage
         working-directory: apps/expo
         run: npm run typecheck
+
+  parcours:
+    name: Parcours dans le navigateur
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: apps/expo/package-lock.json
+
+      - name: Installer les dépendances
+        working-directory: apps/expo
+        run: npm install --no-audit --no-fund
+
+      - name: Navigateur Chromium
+        working-directory: apps/expo
+        run: npx playwright install --with-deps chromium
+
+      # Site construit avec une fausse adresse Supabase : chaque test simule lui-même le serveur (aucun secret, aucune vraie base).
+      - name: Parcours (connexion, accueil, programme, onglet Jour, réservations, partage)
+        working-directory: apps/expo
+        run: npx playwright test
+
+      - name: Captures des parcours en échec
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: parcours-echecs
+          path: apps/expo/test-results
+          retention-days: 7
 
   base:
     name: Collecte, SQL et sécurité de la base

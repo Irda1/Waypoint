@@ -10,6 +10,7 @@
     "web": "expo start --web",
     "export:web": "expo export --platform web",
     "test": "node --test \"src/**/*.test.ts\"",
+    "e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -40,6 +41,7 @@
     "react-native-webview": "*"
   },
   "devDependencies": {
+    "@playwright/test": "1.56.1",
     "@types/node": "^26.6.3",
     "@types/react": "*",
     "typescript": "*"
