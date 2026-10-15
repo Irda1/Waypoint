@@ -580,5 +580,43 @@ select test.as_anon();
 select test.throws($$select public.copy_shared_trip('partage-copie-test', '2027-07-01')$$, '42501', 'anonyme : pas de copie');
 select test.as_admin();
 
+-- ===========================================================================
+-- Billets joints aux réservations, stockage privé (migration 2800)
+-- ===========================================================================
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+insert into public.trips (id, title) values ('e6000000-0000-0000-0000-000000000001', 'Billets d''Alice');
+insert into public.trip_bookings (id, trip_id, kind, title) values ('e7000000-0000-0000-0000-000000000001', 'e6000000-0000-0000-0000-000000000001', 'vol', 'Vol Paris → Lisbonne');
+insert into public.trip_booking_files (trip_id, booking_id, path, name, size, content_type, created_by) values ('e6000000-0000-0000-0000-000000000001', 'e7000000-0000-0000-0000-000000000001',
+  'e6000000-0000-0000-0000-000000000001/e7000000-0000-0000-0000-000000000001/f1.pdf', 'Carte d''embarquement.pdf', 180000, 'application/pdf', 'bbbbbbbb-0000-0000-0000-000000000002');
+select test.ok((select created_by = 'aaaaaaaa-0000-0000-0000-000000000001' from public.trip_booking_files where path like '%/f1.pdf'), 'billets : fichier joint, auteur non usurpable');
+select test.throws($$insert into public.trip_booking_files (trip_id, booking_id, path, name, content_type) values ('e6000000-0000-0000-0000-000000000001', 'e7000000-0000-0000-0000-000000000001', 'e6000000-0000-0000-0000-000000000001/e7000000-0000-0000-0000-000000000001/x.exe', 'x.exe', 'application/x-msdownload')$$, '23514', 'billets : seulement PDF et images');
+select test.throws($$insert into public.trip_booking_files (trip_id, booking_id, path, name, content_type) values ('d6000000-0000-0000-0000-000000000001', 'e7000000-0000-0000-0000-000000000001', 'd6000000-0000-0000-0000-000000000001/e7000000-0000-0000-0000-000000000001/x.pdf', 'x.pdf', 'application/pdf')$$, '23503', 'billets : la réservation doit être du même voyage');
+insert into storage.objects (bucket_id, name) values ('trip-files', 'e6000000-0000-0000-0000-000000000001/e7000000-0000-0000-0000-000000000001/f1.pdf');
+select test.ok((select count(*) from storage.objects where bucket_id = 'trip-files') = 1, 'billets : une membre envoie et voit son fichier');
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select test.ok((select count(*) from public.trip_booking_files where trip_id = 'e6000000-0000-0000-0000-000000000001') = 0, 'billets : invisibles hors du voyage');
+select test.ok((select count(*) from storage.objects where bucket_id = 'trip-files') = 0, 'billets : fichiers stockés invisibles hors du voyage');
+select test.throws($$insert into storage.objects (bucket_id, name) values ('trip-files', 'e6000000-0000-0000-0000-000000000001/e7000000-0000-0000-0000-000000000001/intrus.pdf')$$, '42501', 'billets : envoi refusé hors du voyage');
+select test.as_admin();
+insert into public.trip_members (trip_id, user_id) values ('e6000000-0000-0000-0000-000000000001', 'bbbbbbbb-0000-0000-0000-000000000002');
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select test.ok((select count(*) from public.trip_booking_files where trip_id = 'e6000000-0000-0000-0000-000000000001') = 1, 'billets : visibles par un autre voyageur');
+delete from public.trip_booking_files where path like '%/f1.pdf';
+delete from storage.objects where name like '%/f1.pdf';
+select test.ok((select count(*) from public.trip_booking_files where path like '%/f1.pdf') = 1, 'billets : on ne supprime pas le fichier d''un autre');
+do $$ begin
+  for i in 2..5 loop
+    insert into public.trip_booking_files (trip_id, booking_id, path, name, content_type) values ('e6000000-0000-0000-0000-000000000001', 'e7000000-0000-0000-0000-000000000001',
+      'e6000000-0000-0000-0000-000000000001/e7000000-0000-0000-0000-000000000001/f' || i || '.jpg', 'Billet ' || i, 'image/jpeg');
+  end loop;
+end $$;
+select test.throws($$insert into public.trip_booking_files (trip_id, booking_id, path, name, content_type) values ('e6000000-0000-0000-0000-000000000001', 'e7000000-0000-0000-0000-000000000001', 'e6000000-0000-0000-0000-000000000001/e7000000-0000-0000-0000-000000000001/f6.jpg', 'Billet 6', 'image/jpeg')$$, '23514', 'billets : au plus 5 fichiers par réservation');
+delete from public.trip_booking_files where path like '%/f2.jpg';
+select test.ok((select count(*) from public.trip_booking_files where path like '%/f2.jpg') = 0, 'billets : on supprime son propre fichier');
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+delete from public.trip_bookings where id = 'e7000000-0000-0000-0000-000000000001';
+select test.ok((select count(*) from public.trip_booking_files where booking_id = 'e7000000-0000-0000-0000-000000000001') = 0, 'billets : supprimés avec la réservation');
+select test.as_admin();
+
 do $$ begin raise notice ''; raise notice 'TOUS LES TESTS PASSENT'; end $$;
 rollback;

@@ -17,7 +17,8 @@
           "cameraPermission": false,
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-sharing"
     ],
     "android": {
       "package": "com.waypoint.app",

@@ -371,7 +371,7 @@ export default function TripScreen() {
           <Section title="Transports et nuits" icon="plane" hint="Vols, hébergements, réservations" defaultOpen={false}>
             <FlightsCard data={data} />
             <StayCard data={data} userId={session?.user.id ?? null} onChanged={reload} />
-            <BookingsCard tripId={trip.id} />
+            <BookingsCard tripId={trip.id} userId={session?.user.id ?? null} />
           </Section>
 
           <Section title="Préparation" icon="note" hint="Météo, valise, export, dupliquer" defaultOpen={false}>
