@@ -2,6 +2,7 @@
 # Release GitHub « app-N » avec waypoint-app.apk. S'installe à côté de l'ancienne maquette (autre identifiant : com.waypoint.app).
 # Lien fixe vers le dernier APK : releases/download/app-latest/waypoint-app.apk
 # Secrets requis : SUPABASE_URL (déjà présent pour la collecte) et SUPABASE_ANON_KEY (clé « anon » publique du projet Supabase).
+# Facultatif : GOOGLE_SERVICES_JSON (fichier Firebase de l'appli Android) pour les notifications des amis.
 name: APK de l'appli
 
 on:
@@ -48,6 +49,20 @@ jobs:
       - name: Installer les dépendances
         working-directory: apps/expo
         run: npm ci --no-audit --no-fund
+
+      # Notifications des amis : fichier Firebase pris dans le secret, jamais dans le dépôt. Sans lui, l'APK se construit sans elles.
+      - name: Firebase (notifications des amis)
+        working-directory: apps/expo
+        env:
+          GOOGLE_SERVICES_JSON: ${{ secrets.GOOGLE_SERVICES_JSON }}
+        run: |
+          if [ -n "$GOOGLE_SERVICES_JSON" ]; then
+            printf '%s' "$GOOGLE_SERVICES_JSON" > google-services.json
+            node -e "const f='app.json',j=JSON.parse(require('fs').readFileSync(f));j.expo.android={...j.expo.android,googleServicesFile:'./google-services.json'};require('fs').writeFileSync(f,JSON.stringify(j,null,2))"
+            echo "Firebase configuré."
+          else
+            echo "::warning::Secret GOOGLE_SERVICES_JSON absent : APK sans notifications des amis."
+          fi
 
       - name: Créer le projet Android
         working-directory: apps/expo

@@ -17,6 +17,9 @@ import type { IconName } from '../src/ui/Icon';
 import { useTheme } from '../src/theme/useTheme';
 import { loadNotifPrefs, remindersEnabled, remindersSupported, saveNotifPrefs, setRemindersEnabled } from '../src/lib/reminders';
 import { BUILD_ID } from '../src/lib/env';
+import { pushSupported, registerPush } from '../src/lib/push';
+import { DEFAULT_FRIEND_PREFS, FRIEND_KINDS, loadFriendPrefs, saveFriendPrefs } from '../src/data/friendNotifs';
+import type { FriendPrefs } from '../src/data/friendNotifs';
 import { DEFAULT_PREFS, MINUTES_CHOICES } from '../src/domain/reminders.ts';
 import type { NotifPrefs } from '../src/domain/reminders.ts';
 
@@ -107,6 +110,23 @@ export default function Settings() {
   const [remindNote, setRemindNote] = useState<string | null>(null);
   const [prefs, setPrefs] = useState<NotifPrefs>(DEFAULT_PREFS);
   useEffect(() => { void remindersEnabled().then(setRemind); void loadNotifPrefs().then(setPrefs); }, []);
+  // Notifications des amis (serveur) : choix gardés avec le compte.
+  const [friends, setFriends] = useState<FriendPrefs>(DEFAULT_FRIEND_PREFS);
+  const [friendsMissing, setFriendsMissing] = useState(false);
+  const [friendsNote, setFriendsNote] = useState<string | null>(null);
+  useEffect(() => { if (pushSupported) void loadFriendPrefs().then((r) => { setFriends(r.prefs); setFriendsMissing(r.missing); }); }, []);
+  async function changeFriends(next: FriendPrefs) {
+    if (!session) return;
+    setFriendsNote(null);
+    if (next.enabled && !friends.enabled) {
+      const r = await registerPush(true);
+      if (r === 'denied') { setFriendsNote('Les notifications sont refusées : autorise-les dans les réglages du téléphone pour Waypoint.'); return; }
+      if (r === 'error') setFriendsNote('Ce téléphone n\'a pas pu s\'inscrire : réessaie après la prochaine mise à jour de l\'appli.');
+    }
+    setFriends(next);
+    const err = await saveFriendPrefs(session.user.id, next);
+    if (err) setFriendsNote(err);
+  }
   function changePrefs(next: NotifPrefs) { setPrefs(next); void saveNotifPrefs(next); setRemindNote('Choix enregistrés : les rappels se reprogramment à l\'ouverture de chaque voyage.'); }
   const { colors, mode } = useTheme();
   const pref = useAppearance();
@@ -213,6 +233,17 @@ export default function Settings() {
               </>
             ) : null}
             {remindNote ? <Text variant="muted" accessibilityLiveRegion="polite" style={{ paddingHorizontal: space.md, paddingBottom: space.md }}>{remindNote}</Text> : null}
+          </Group>
+        ) : null}
+
+        {pushSupported ? (
+          <Group title="Activité des amis">
+            <Row title="Notifications des amis" hint={friendsMissing ? 'Pas encore disponible (mise à jour de la base à faire).' : 'Quand quelqu\'un change un de tes voyages, même appli fermée.'}
+              right={<Switch value={friends.enabled && !friendsMissing} disabled={friendsMissing} onValueChange={() => { void changeFriends({ ...friends, enabled: !friends.enabled }); }} trackColor={{ true: colors.accent, false: colors.lineStrong }} accessibilityLabel="Notifications des amis" />} />
+            {friends.enabled && !friendsMissing ? FRIEND_KINDS.map((k) => (
+              <Row key={k.key} title={k.title} hint={k.hint} right={<Switch value={friends[k.key]} onValueChange={() => { void changeFriends({ ...friends, [k.key]: !friends[k.key] }); }} trackColor={{ true: colors.accent, false: colors.lineStrong }} accessibilityLabel={k.title} />} />
+            )) : null}
+            {friendsNote ? <Text variant="muted" accessibilityLiveRegion="polite" style={{ paddingHorizontal: space.md, paddingBottom: space.md }}>{friendsNote}</Text> : null}
           </Group>
         ) : null}
 

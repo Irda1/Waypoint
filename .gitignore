@@ -27,6 +27,9 @@ Thumbs.db
 .env
 .env.*
 !.env.example
+# Fichiers Firebase (notifications) : dans les secrets GitHub et Supabase, jamais dans le dépôt
+google-services.json
+*firebase-adminsdk*.json
 
 # Projet Android de l'appli Expo, généré par la CI
 /apps/expo/android/

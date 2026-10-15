@@ -618,5 +618,34 @@ delete from public.trip_bookings where id = 'e7000000-0000-0000-0000-00000000000
 select test.ok((select count(*) from public.trip_booking_files where booking_id = 'e7000000-0000-0000-0000-000000000001') = 0, 'billets : supprimés avec la réservation');
 select test.as_admin();
 
+-- ===========================================================================
+-- Notifications entre amis (migration 2900)
+-- ===========================================================================
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+insert into public.trips (id, title) values ('f2900000-0000-0000-0000-000000000001', 'Notifications');
+insert into public.trip_days (id, trip_id, day_date) values ('f2900000-0000-0000-0000-000000000002', 'f2900000-0000-0000-0000-000000000001', '2026-11-02');
+insert into public.trip_items (trip_id, day_id, title) values ('f2900000-0000-0000-0000-000000000001', 'f2900000-0000-0000-0000-000000000002', 'Musée du test');
+update public.trip_items set done = true where trip_id = 'f2900000-0000-0000-0000-000000000001';
+select test.throws($$select * from public.notif_queue$$, '42501', 'notifications : file d''attente inaccessible aux voyageurs');
+select test.as_admin();
+select test.ok((select count(*) from public.notif_queue where trip_id = 'f2900000-0000-0000-0000-000000000001' and kind = 'programme') = 1
+  and (select action || ' ' || label from public.notif_queue where trip_id = 'f2900000-0000-0000-0000-000000000001' and kind = 'programme') = 'ajout Musée du test',
+  'notifications : une étape ajoutée est mise en file (cocher « fait » ne compte pas)');
+insert into public.trip_items (trip_id, day_id, title) values ('f2900000-0000-0000-0000-000000000001', 'f2900000-0000-0000-0000-000000000002', 'Ajout du serveur');
+select test.ok((select count(*) from public.notif_queue where label = 'Ajout du serveur') = 0, 'notifications : rien pour les changements faits par le serveur');
+select test.as_user('aaaaaaaa-0000-0000-0000-000000000001');
+select public.register_push_device('jeton-telephone-0123456789');
+select test.ok((select count(*) from public.push_devices) = 1, 'notifications : un voyageur inscrit son téléphone');
+select test.throws($$insert into public.push_devices (token, user_id) values ('jeton-pirate-0123456789', 'bbbbbbbb-0000-0000-0000-000000000002')$$, '42501', 'notifications : inscription directe d''un téléphone refusée');
+insert into public.notification_prefs (depenses) values (false);
+select test.ok((select depenses from public.notification_prefs) = false, 'notifications : chacun règle ses choix');
+select test.as_user('bbbbbbbb-0000-0000-0000-000000000002');
+select test.ok((select count(*) from public.push_devices) = 0, 'notifications : téléphones des autres invisibles');
+select test.ok((select count(*) from public.notification_prefs) = 0, 'notifications : choix des autres invisibles');
+select test.throws($$insert into public.notification_prefs (user_id) values ('aaaaaaaa-0000-0000-0000-000000000001')$$, '42501', 'notifications : impossible de régler les choix d''un autre');
+select public.register_push_device('jeton-telephone-0123456789');
+select test.as_admin();
+select test.ok((select user_id from public.push_devices where token = 'jeton-telephone-0123456789') = 'bbbbbbbb-0000-0000-0000-000000000002', 'notifications : un téléphone suit le dernier compte connecté');
+
 do $$ begin raise notice ''; raise notice 'TOUS LES TESTS PASSENT'; end $$;
 rollback;

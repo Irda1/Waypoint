@@ -1,8 +1,10 @@
 import React, { useEffect } from 'react';
 import { Pressable, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { Stack, usePathname, type ErrorBoundaryProps } from 'expo-router';
-import { AuthProvider } from '../src/auth/AuthProvider';
+import { Stack, router, usePathname, type ErrorBoundaryProps } from 'expo-router';
+import { AuthProvider, useAuth } from '../src/auth/AuthProvider';
+import { loadFriendPrefs } from '../src/data/friendNotifs';
+import { pushSupported, registerPush, useOpenFromNotification } from '../src/lib/push';
 import { installErrorReporting, reportError, setErrorScreen } from '../src/data/errors';
 import { useTheme } from '../src/theme/useTheme';
 import { useAppFonts } from '../src/theme/useAppFonts';
@@ -18,6 +20,7 @@ export default function RootLayout() {
   if (!ready) return <View style={{ flex: 1, backgroundColor: colors.bg }} />;
   return (
     <AuthProvider>
+      <FriendNotifications />
       <StatusBar style={mode === 'nuit' ? 'light' : 'dark'} />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.bg } }}>
         {/* Nouveau voyage : s'ouvre en fondu, à la suite du zoom sur la planète de l'accueil. */}
@@ -25,6 +28,17 @@ export default function RootLayout() {
       </Stack>
     </AuthProvider>
   );
+}
+
+/** Notifications des amis : inscrit ce téléphone au démarrage (si elles sont activées) et ouvre le voyage d'une notification touchée. */
+function FriendNotifications() {
+  const { session } = useAuth();
+  useOpenFromNotification((tripId) => router.push({ pathname: '/trip/[id]', params: { id: tripId } }));
+  useEffect(() => {
+    if (!session || !pushSupported) return;
+    void loadFriendPrefs().then(({ prefs, missing }) => { if (!missing && prefs.enabled) void registerPush(true); });
+  }, [session?.user.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
 }
 
 /** Écran de secours quand un écran plante : l'erreur part dans les rapports (si connecté) et on peut réessayer. */
