@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { draftToRow, emptyDraft, sortBookings, validateDraft } from './bookings.ts';
+import { checkFile, draftToRow, emptyDraft, fileSize, fileType, sortBookings, validateDraft } from './bookings.ts';
 import type { Booking } from './bookings.ts';
 
 const b = (id: string, title: string, starts_on: string | null, start_time: string | null = null): Booking => ({ id, kind: 'vol', title, reference: null, starts_on, start_time, url: null, notes: null });
@@ -23,4 +23,18 @@ test('validation : titre, date, heure, lien', () => {
 test('ligne de base : vides → null, textes nettoyés', () => {
   const row = draftToRow({ ...emptyDraft(), title: '  Vol  ', reference: ' AB12 ' });
   assert.deepEqual(row, { kind: 'vol', title: 'Vol', reference: 'AB12', starts_on: null, start_time: null, url: null, notes: null });
+});
+
+test('billets joints : type, taille, nombre', () => {
+  assert.equal(fileType('Billet.PDF', null), 'application/pdf');
+  assert.equal(fileType('photo.jpeg', ''), 'image/jpeg');
+  assert.equal(fileType('x', 'image/jpg'), 'image/jpeg');
+  assert.equal(fileType('scan.heic', 'image/heic'), null);
+  assert.equal(checkFile('a.pdf', 'application/pdf', 200_000, 0), null);
+  assert.equal(checkFile('a.pdf', 'application/pdf', 11 * 1024 * 1024, 0), 'Fichier trop lourd : 10 Mo au plus.');
+  assert.equal(checkFile('a.heic', 'image/heic', 1000, 0), 'Format non pris en charge : PDF, JPEG, PNG ou WebP.');
+  assert.equal(checkFile('a.pdf', 'application/pdf', 1000, 5), 'Au plus 5 fichiers par réservation.');
+  assert.equal(fileSize(184_000), '180 Ko');
+  assert.equal(fileSize(2_500_000), '2,4 Mo');
+  assert.equal(fileSize(null), '');
 });
