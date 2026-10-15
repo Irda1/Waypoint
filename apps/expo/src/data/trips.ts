@@ -187,7 +187,7 @@ export async function copyItemsToPlan(args: { tripId: string; dayId: string; pla
   if (args.items.length === 0) return null;
   const rows = args.items.map((i) => ({
     trip_id: args.tripId, day_id: args.dayId, plan: args.plan, place_id: i.place_id, title: i.title, category_code: i.category_code,
-    start_time: i.start_time, duration_min: i.duration_min, position: i.position,
+    start_time: i.start_time, duration_min: i.duration_min, position: i.position, note: i.note ?? null,
   }));
   const { error } = await supabase.from('trip_items').insert(rows);
   return error?.message ?? null;

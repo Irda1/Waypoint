@@ -4,14 +4,14 @@ import { Button, Card, Chip, ErrorNote, Field, PayBadge, Text } from '../../ui';
 import { useTheme } from '../../theme/useTheme';
 import { categoryColors, fonts, radius, space } from '../../theme/tokens';
 import { formatDay, isTime } from '../../lib/format';
-import { formatTime, resolveOverlaps, scheduleDay, weekdayOf } from '../../domain/planning.ts';
+import { distanceKm, followFixedStep, formatTime, isFixedStep, parseTime, resolveOverlaps, scheduleDay, weekdayOf } from '../../domain/planning.ts';
 import { checkOpening } from '../../domain/openingHours.ts';
 import { isArrivalStep, organizeTimes } from '../../domain/itinerary.ts';
 import { applyTimes } from '../../data/itinerary';
 import { amountDue, paymentState, posteForCategory } from '../../domain/budget.ts';
 import type { Expense, Place, TripItem } from '../../domain/types.ts';
 import { swapItems } from '../../domain/reorder.ts';
-import { iconFor } from '../../theme/categoryIcons';
+import { iconForCode } from '../../theme/categoryIcons';
 import { Icon } from '../../ui/Icon';
 import { DragList } from './DragList';
 import { addExpense, addItem, applyItemMoves, clearItemExpenses, copyItemsToPlan, deleteItem, setDayHours, setItemTime } from '../../data/trips';
@@ -80,6 +80,8 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
   const [returnInput, setReturnInput] = useState('');
 
   const schedule = scheduleDay({ date: day.day_date, plan, items: items.filter((i) => i.day_id === day.id), places });
+  // Hébergement du soir dans une autre ville (trajet en fin de journée) : pas de trajet à pied depuis lui le matin.
+  const startLodging = lodging && schedule[0]?.place && distanceKm(lodging, schedule[0].place) < 50 ? lodging : null;
   const planA = plan === 'A' ? schedule : scheduleDay({ date: day.day_date, plan: 'A', items: items.filter((i) => i.day_id === day.id), places });
   async function createAlt(kind: 'light' | 'shelter') {
     const keep = new Set(deriveAltPlan(kind, planA.map((s) => ({
@@ -87,6 +89,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
       root: categories.rootOf(s.place?.category_code ?? s.item.category_code ?? ''),
       durationMin: s.startMin != null && s.endMin != null ? s.endMin - s.startMin : s.item.duration_min ?? s.place?.visit_duration_min ?? 60,
       travelMin: s.travelFromPrevious?.minutes ?? 0,
+      fixed: isFixedStep(s.item),
     }))));
     const err = await copyItemsToPlan({ tripId, dayId: day.id, plan: plan === 'C' ? 'C' : 'B', items: planA.filter((s) => keep.has(s.item.id)).map((s) => s.item) });
     setError(err);
@@ -152,9 +155,10 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
 
   const hasOverlap = schedule.some((s) => s.issues.some((i) => i.type === 'overlap'));
   async function fixOverlaps() {
-    const { changes, overflow } = resolveOverlaps(schedule);
+    const { changes, overflow, blocked } = resolveOverlaps(schedule);
     const err = changes.length ? await applyTimes(changes) : null;
-    setError(err ?? (overflow ? 'Certaines étapes ne tiennent pas avant minuit : retire-en une ou raccourcis la journée.' : null));
+    setError(err ?? (overflow ? 'Certaines étapes ne tiennent pas avant minuit : retire-en une ou raccourcis la journée.'
+      : blocked ? 'Un trajet garde son heure : avance ou raccourcis l\'étape qui le précède.' : null));
     onChanged();
   }
   /** Bouton « $ » : payé / pas payé (marque l'étape payée par moi, ou retire les dépenses rattachées). */
@@ -169,6 +173,8 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
   }
 
   async function dragMove(from: number, to: number) {
+    // Trajet et arrivée restent à leur place : on ne les échange pas avec une autre étape.
+    if (isFixedStep(schedule[from].item) || isFixedStep(schedule[to].item)) return;
     const moves = swapItems(schedule.map((x) => ({ id: x.item.id, start_time: x.item.start_time, position: x.item.position })), from, to);
     if (!moves.length) return;
     setError(await applyItemMoves(moves));
@@ -177,7 +183,13 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
 
   async function saveTime(itemId: string) {
     if (editTime && !isTime(editTime)) { setError('Heure au format 09:30.'); return; }
-    const err = await setItemTime(itemId, editTime || null);
+    let err = await setItemTime(itemId, editTime || null);
+    // Étape fixe : l'arrivée suit la fin du trajet et les étapes d'après se décalent si elles chevauchent.
+    const start = parseTime(editTime);
+    if (!err && start != null && schedule.some((s) => s.item.id === itemId && isFixedStep(s.item))) {
+      const changes = followFixedStep({ date: day.day_date, plan, items: items.filter((i) => i.day_id === day.id), places, itemId, startMin: start });
+      if (changes.length) err = await applyTimes(changes);
+    }
     setError(err);
     if (!err) { setEditing(null); onChanged(); }
   }
@@ -275,8 +287,10 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
         </View>
       ) : null}
       <View>
-        <DragList count={schedule.length} mode="swap" orderKey={schedule.map((x) => `${x.item.id}@${x.item.start_time ?? ''}@${x.item.position}`).join(',')} onMove={dragMove} renderRow={(index, handle) => {
+        <DragList count={schedule.length} mode="swap" orderKey={schedule.map((x) => `${x.item.id}@${x.item.start_time ?? ''}@${x.item.position}`).join(',')} onMove={dragMove}
+          isFixed={(index) => isFixedStep(schedule[index].item)} renderRow={(index, handle) => {
           const s = schedule[index];
+          const fixed = isFixedStep(s.item);
           const state = paymentState(s.item, s.place, expenses, travelers);
           const category = s.place?.category_code ?? s.item.category_code ?? '';
           const dot = categoryColors[mode][categories.rootOf(category)] ?? colors.text3;
@@ -284,10 +298,10 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
           const name = s.place?.name ?? s.item.title ?? 'Étape';
           return (
             <View style={focusItemId === s.item.id ? { borderRadius: radius.field, backgroundColor: colors.surface2, borderWidth: 1, borderColor: colors.accent, padding: space.xs } : live?.states[index] === 'current' ? { borderRadius: radius.field, backgroundColor: `${colors.accent}17`, paddingHorizontal: space.xs } : undefined}>
-              {index === 0 && lodging && s.place ? <LegRow from={lodging} to={s.place} fromName={lodging.name} toName={s.place.name} /> : null}
+              {index === 0 && startLodging && s.place ? <LegRow from={startLodging} to={s.place} fromName={startLodging.name} toName={s.place.name} /> : null}
               {index > 0 && schedule[index - 1].place && s.place ? <LegRow from={schedule[index - 1].place!} to={s.place} fromName={schedule[index - 1].place!.name} toName={s.place.name} /> : null}
               <View style={{ flexDirection: 'row', alignItems: 'stretch', gap: space.sm, minHeight: 56 }}>
-                {schedule.length > 1 ? handle : null}
+                {schedule.length > 1 ? (fixed ? <View style={{ width: 30 }} /> : handle) : null}
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={`Modifier l'heure de ${name}`}
@@ -301,7 +315,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                 </Pressable>
                 <View style={{ alignItems: 'center', width: 28 }}>
                   <View accessible={false} style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: `${dot}33`, alignItems: 'center', justifyContent: 'center' }}>
-                    <Icon name={iconFor(categories.rootOf(category))} size={15} color={dot} />
+                    <Icon name={isArrivalStep(s.item) ? 'trip' : iconForCode(category, categories.rootOf(category))} size={15} color={dot} />
                   </View>
                   {!isLast ? <View style={{ flex: 1, width: 1, backgroundColor: colors.lineStrong, marginTop: 4 }} /> : null}
                 </View>
@@ -312,6 +326,7 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                     </Pressable>
                     {s.place?.price_amount != null ? <Text variant="muted" style={{ fontSize: 12.5 }}>{s.place.price_amount === 0 ? 'Gratuit' : `≈ ${formatMoney(s.place.price_amount * travelers, currency)}`}</Text> : null}
                   </View>
+                  {s.item.note ? <Text variant="muted">{s.item.note}</Text> : null}
                   {live ? <Text variant="muted" style={{ color: live.states[index] === 'current' ? colors.accent : colors.text3, fontFamily: fonts.sansSemi }}>{live.states[index] === 'past' ? 'Passé' : live.states[index] === 'current' ? 'En cours' : 'À venir'}</Text> : null}
                   {(() => {
                     const dur = s.startMin != null && s.endMin != null ? s.endMin - s.startMin : s.item.duration_min ?? s.place?.visit_duration_min ?? null;
@@ -338,8 +353,8 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
                       </View>
                     </View>
                   ) : null}
-                  {/* L'arrivée dans le pays ou la ville reste dans la journée : on peut seulement changer son heure. */}
-                  {isArrivalStep(s.item) ? (
+                  {/* Le trajet et l'arrivée dans une ville restent dans la journée : on peut seulement changer leur heure. */}
+                  {fixed ? (
                     <Text variant="muted" style={{ fontSize: 12.5 }}>Étape fixe : touche l'heure pour la changer.</Text>
                   ) : (
                   <View style={{ flexDirection: 'row', gap: space.lg, alignItems: 'center' }}>
@@ -442,17 +457,17 @@ export function DayCard({ tripId, tripTitle, destinations, day, number, items, p
         if (!s) return null;
         const category = s.place?.category_code ?? s.item.category_code ?? '';
         return (
-          <PlaceSheet visible tripId={tripId} placeId={s.place?.id ?? null} name={s.place?.name ?? s.item.title ?? 'Étape'} category={categories.byCode.get(category)?.name_fr ?? 'Étape'} root={categories.rootOf(category)}
+          <PlaceSheet visible tripId={tripId} placeId={s.place?.id ?? null} name={s.place?.name ?? s.item.title ?? 'Étape'} category={isFixedStep(s.item) ? 'Étape fixe' : categories.byCode.get(category)?.name_fr ?? 'Étape'} root={categories.rootOf(category)}
             dot={categoryColors[mode][categories.rootOf(category)] ?? colors.text3} place={s.place ?? null} currency={currency} travelers={travelers}
             closedToday={s.issues.some((i) => i.type === 'closed_day')}
-            from={(() => { const i = schedule.findIndex((x) => x.item.id === sheetId); const prev = i > 0 ? schedule[i - 1].place : null; return prev ? { ...prev, name: prev.name } : i === 0 ? lodging ?? null : null; })()}
+            from={(() => { const i = schedule.findIndex((x) => x.item.id === sheetId); const prev = i > 0 ? schedule[i - 1].place : null; return prev ? { ...prev, name: prev.name } : i === 0 ? startLodging : null; })()}
             due={amountDue(s.item, s.place, expenses, travelers)}
             onPay={session ? async () => {
               const err = await addExpense({ tripId, label: s.place?.name ?? s.item.title ?? 'Étape', poste: posteForCategory(categories.rootOf(category)), amount: amountDue(s.item, s.place, expenses, travelers), currency, paidBy: session.user.id, itemId: s.item.id });
               if (!err) onChanged();
               return err;
             } : undefined}
-            onRemove={async () => { setError(await deleteItem(s.item.id)); onChanged(); }} onClose={() => setSheetId(null)} />
+            onRemove={isFixedStep(s.item) ? undefined : async () => { setError(await deleteItem(s.item.id)); onChanged(); }} onClose={() => setSheetId(null)} />
         );
       })()}
     </Card>

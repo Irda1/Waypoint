@@ -20,3 +20,9 @@ test('plan à l\'abri : retire nature et sport, garde le reste dans l\'ordre', (
   assert.deepEqual(deriveAltPlan('shelter', stops), ['b', 'd']);
   assert.deepEqual(deriveAltPlan('shelter', [stop('a', 'nature', 90)]), []);
 });
+
+test('plans de repli : le trajet entre villes et l\'arrivée restent, même longs', () => {
+  const stops = [{ ...stop('t', 'transport', 180), fixed: true }, { ...stop('i', '', 30), fixed: true }, stop('a', 'culture', 120), stop('b', 'gastronomie', 75), stop('c', 'culture', 60)];
+  assert.deepEqual(deriveAltPlan('light', stops), ['t', 'i', 'b', 'c']);
+  assert.deepEqual(deriveAltPlan('shelter', stops), ['t', 'i', 'a', 'b', 'c']);
+});

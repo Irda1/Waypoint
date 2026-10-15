@@ -38,6 +38,8 @@ export interface TripItem {
   duration_min: number | null;
   position: number;
   done: boolean;
+  /** Précision libre (ex. « Train, environ 3 h » sous un trajet posé par le programme). */
+  note?: string | null;
 }
 
 export interface LatLng {

@@ -23,6 +23,12 @@ export function useBookings(tripId: string) {
   return { bookings, error, loading, reload };
 }
 
+/** Réservations du voyage pour le programme automatique ; aucune si la table manque (migration 1300). */
+export async function loadBookings(tripId: string): Promise<Booking[]> {
+  const { data } = await supabase.from('trip_bookings').select('id,kind,title,reference,starts_on,start_time,url,notes').eq('trip_id', tripId);
+  return (data ?? []) as Booking[];
+}
+
 export async function saveBooking(tripId: string, draft: BookingDraft, id?: string): Promise<string | null> {
   const row = draftToRow(draft);
   const { error } = id

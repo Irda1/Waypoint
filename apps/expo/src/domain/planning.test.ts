@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { parseTime, formatTime, roundUp5, distanceKm, estimateTravel, positionBetween, weekdayOf, scheduleDay, resolveOverlaps } from './planning.ts';
+import { parseTime, formatTime, roundUp5, distanceKm, estimateTravel, positionBetween, weekdayOf, scheduleDay, resolveOverlaps, followFixedStep, isFixedStep, isTransferStep } from './planning.ts';
 import type { Place, TripItem } from './types.ts';
 
 test('heures : lecture, format, arrondi', () => {
@@ -94,4 +94,34 @@ test('chevauchements : les étapes sont décalées en cascade, dans l\'ordre, tr
   assert.equal(r.overflow, false);
   assert.deepEqual(resolveOverlaps(scheduleDay({ date: '2026-12-14', items: [mk('a', '09:00', 60), mk('b', '10:00', 60)], places: new Map() })).changes, [], 'rien à décaler');
   assert.equal(resolveOverlaps(scheduleDay({ date: '2026-12-14', items: [mk('a', '22:00', 120), mk('b', '22:30', 60)], places: new Map() })).overflow, true, 'ne tient pas avant minuit');
+});
+
+test('étapes fixes : trajet entre deux villes et arrivée (on change leur heure, on ne les déplace pas)', () => {
+  assert.equal(isTransferStep({ place_id: null, title: 'Trajet Porto → Lisbonne' }), true);
+  assert.equal(isFixedStep({ place_id: null, title: 'Trajet Porto → Lisbonne' }), true);
+  assert.equal(isFixedStep({ place_id: null, title: 'Arrivée et installation' }), true);
+  assert.equal(isFixedStep({ place_id: null, title: 'Trajet en tram' }), false);
+  assert.equal(isFixedStep({ place_id: 4, title: 'Trajet Porto → Lisbonne' }), false);
+  assert.equal(isFixedStep({ place_id: null, title: 'Déjeuner' }), false);
+  assert.equal(isTransferStep({ place_id: null, title: 'Vol Paris → Lisbonne', category_code: 'aeroport' }), true, 'vol réservé, titre gardé');
+  assert.equal(isTransferStep({ place_id: null, title: 'Vol pour Rome', category_code: null }), false, 'étape libre');
+});
+
+test('chevauchements : un trajet garde son heure, les étapes d\'après se décalent derrière lui', () => {
+  const mk = (id: string, start: string, dur: number, title = id): TripItem => ({ id, plan: 'A', position: 1, start_time: start, duration_min: dur, place_id: null, title } as unknown as TripItem);
+  const sched = scheduleDay({ date: '2026-12-14', places: new Map(), items: [
+    mk('visite', '13:00', 150), mk('train', '15:00', 180, 'Trajet Porto → Lisbonne'), mk('arrivee', '17:30', 30, 'Arrivée et installation'), mk('diner', '18:00', 90),
+  ] });
+  const r = resolveOverlaps(sched);
+  assert.equal(r.blocked, true, 'la visite déborde sur le trajet : signalé, pas corrigé');
+  assert.deepEqual(r.changes, [{ id: 'arrivee', startMin: 18 * 60 }, { id: 'diner', startMin: 18 * 60 + 30 }]);
+});
+
+test('heure d\'une étape fixe changée : l\'arrivée suit la fin du trajet, les étapes suivantes se décalent, celles d\'avant restent', () => {
+  const mk = (id: string, start: string, dur: number, title = id): TripItem => ({ id, plan: 'A', position: 1, start_time: start, duration_min: dur, place_id: null, title } as unknown as TripItem);
+  const items = [mk('cafe', '08:00', 30), mk('train', '09:00', 180, 'Trajet Porto → Lisbonne'), mk('arrivee', '12:00', 30, 'Arrivée et installation'), mk('dej', '12:40', 75), mk('musee', '14:15', 90)];
+  const res = followFixedStep({ date: '2026-12-14', items, places: new Map(), itemId: 'train', startMin: 10 * 60 });
+  assert.deepEqual(Object.fromEntries(res.map((c) => [c.id, formatTime(c.startMin)])), { arrivee: '13:00', dej: '13:30', musee: '14:45' });
+  assert.deepEqual(followFixedStep({ date: '2026-12-14', items, places: new Map(), itemId: 'train', startMin: 8 * 60 }).map((c) => [c.id, formatTime(c.startMin)]), [['arrivee', '11:00']], 'plus tôt : seule l\'arrivée suit');
+  assert.deepEqual(followFixedStep({ date: '2026-12-14', items, places: new Map(), itemId: 'inconnue', startMin: 600 }), []);
 });
