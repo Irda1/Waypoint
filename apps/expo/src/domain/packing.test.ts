@@ -37,12 +37,20 @@ test('Japon en hiver sans prévisions : passeport, adaptateur, espèces, saison'
   const jp: PackContext = { ...base, country: 'JP', currency: 'JPY', party: 'deux', month: 1, lat: 35.7, weather: { covered: false, min: null, max: null, rainy: [] }, activities: [{ code: 'temple', name: 'Kinkaku-ji', date: '2027-01-10' }] };
   const l = labels(jp);
   assert.ok(l.includes('Passeport') && l.includes('Assurance voyage'));
+  assert.ok(l.includes('Visit Japan Web (formulaire d\'arrivée)') && l.includes('Formalités d\'entrée vérifiées'));
   assert.ok(l.includes('Adaptateur de prise type A'));
   assert.ok(l.includes('Un peu d\'espèces en JPY'));
   assert.ok(l.includes('Manteau chaud'));
   assert.ok(l.includes('Tenue couvrant épaules et genoux'));
   assert.ok(!l.includes('Doudou et jeux pour le trajet'));
   assert.deepEqual(packFacts(jp), ['8 nuits', 'prises type A : adaptateur', 'JPY']);
+});
+
+test('Formalités : démarche connue du pays, vérification hors Europe, rien en Europe', () => {
+  const us = packingIdeas({ ...base, country: 'US', currency: 'USD' });
+  assert.equal(us.find((i) => i.label === 'ESTA (autorisation de voyage)')?.group, 'Papiers');
+  assert.ok(labels({ ...base, country: 'MA', currency: 'MAD' }).includes('Formalités d\'entrée vérifiées'));
+  assert.ok(!labels(base).includes('Formalités d\'entrée vérifiées'));
 });
 
 test('groupOf et newIdeas : quantité ignorée, écartées et déjà présentes retirées', () => {
