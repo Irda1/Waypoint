@@ -1,4 +1,4 @@
-// Collecte des lieux d'une ville DEPUIS L'APPLI (Geoapify Places si une clé est fournie, sinon OpenStreetMap via Overpass), en quelques secondes.
+// Collecte des lieux d'une ville DEPUIS L'APPLI (Geoapify Places par la fonction Supabase « places-search » si elle répond, sinon OpenStreetMap via Overpass), en quelques secondes.
 //
 // Même tri que le pipeline (osm.ts est une copie exacte de pipeline/src/lib/osm.mjs), mais :
 //  - les 4 groupes de requêtes partent en même temps, chacun sur un serveur différent au départ ;
@@ -118,16 +118,15 @@ export function geoapifyToElement(f: GeoapifyFeature): OverpassElement | null {
   return { type, id, lat: p.lat, lon: p.lon, tags };
 }
 
-type GeoFetch = (url: string) => Promise<{ ok: boolean; status: number; json: () => Promise<unknown> }>;
+/** Une page de recherche Geoapify ; la clé reste sur le serveur (fonction Supabase « places-search »). */
+export interface GeoQuery { categories: string; lat: number; lng: number; radiusM: number; offset: number }
+export type GeoSearch = (q: GeoQuery) => Promise<{ features?: GeoapifyFeature[] }>;
 
 /** Lit un groupe via Geoapify Places : `pages` pages de 500 lieux, du plus proche au plus lointain du centre. */
-export async function geoapifyElements(group: string, a: { lat: number; lng: number; radiusM: number; key: string; pages?: number; fetchImpl?: GeoFetch }): Promise<OverpassElement[]> {
+export async function geoapifyElements(group: string, a: { lat: number; lng: number; radiusM: number; pages?: number; search: GeoSearch }): Promise<OverpassElement[]> {
   const out: OverpassElement[] = [];
   for (let page = 0; page < (a.pages ?? 1); page++) {
-    const url = `https://api.geoapify.com/v2/places?categories=${GEOAPIFY_CATEGORIES[group]}&filter=circle:${a.lng},${a.lat},${Math.round(a.radiusM)}&bias=proximity:${a.lng},${a.lat}&limit=500&offset=${page * 500}&apiKey=${a.key}`;
-    const res = await (a.fetchImpl ?? (fetch as unknown as GeoFetch))(url);
-    if (!res.ok) throw new Error(`Geoapify HTTP ${res.status}`);
-    const features = ((await res.json()) as { features?: GeoapifyFeature[] }).features ?? [];
+    const features = (await a.search({ categories: GEOAPIFY_CATEGORIES[group], lat: a.lat, lng: a.lng, radiusM: Math.round(a.radiusM), offset: page * 500 })).features ?? [];
     for (const f of features) { const el = geoapifyToElement(f); if (el) out.push(el); }
     if (features.length < 500) break;
   }
@@ -145,7 +144,7 @@ export interface CollectResult { rows: Record<string, unknown>[]; failedGroups: 
  * Lit les lieux d'une ville. Les 4 groupes partent ensemble ; un groupe en échec est retenté une fois.
  * Le groupe « attractions » est indispensable : sans lui la ville serait « prête » mais vide, donc on échoue.
  */
-export async function collectCityPlaces(city: CityInput, opts: HedgeOptions & { onGroup?: (done: number, total: number) => void; retryDelayMs?: number; geoapifyKey?: string; geoFetch?: GeoFetch; radiusScale?: number } = {}): Promise<CollectResult> {
+export async function collectCityPlaces(city: CityInput, opts: HedgeOptions & { onGroup?: (done: number, total: number) => void; retryDelayMs?: number; geoapify?: GeoSearch; radiusScale?: number } = {}): Promise<CollectResult> {
   const groups = Object.keys(GROUPS);
   const scale = opts.radiusScale ?? 1;
   const radiusM = Math.min(radiusForCity(city.population) * scale, MAX_RADIUS_M);
@@ -159,8 +158,8 @@ export async function collectCityPlaces(city: CityInput, opts: HedgeOptions & { 
     const query = buildFastQuery(group, { lat: city.lat, lng: city.lng, radiusM });
     let elements: OverpassElement[] | null = null;
     // Geoapify d'abord (rapide) ; erreur ou résultat vide : on retombe sur Overpass pour ce groupe.
-    if (opts.geoapifyKey) {
-      try { const g = await geoapifyElements(group, { lat: city.lat, lng: city.lng, radiusM, key: opts.geoapifyKey, pages: scale > 1 ? 3 : 1, fetchImpl: opts.geoFetch }); if (g.length) elements = g; } catch { /* repli Overpass */ }
+    if (opts.geoapify) {
+      try { const g = await geoapifyElements(group, { lat: city.lat, lng: city.lng, radiusM, pages: scale > 1 ? 3 : 1, search: opts.geoapify }); if (g.length) elements = g; } catch { /* repli Overpass */ }
     }
     for (let attempt = 0; attempt < 2 && elements === null; attempt++) {
       try {

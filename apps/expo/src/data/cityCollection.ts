@@ -7,9 +7,9 @@
 //    à la file du robot GitHub (request_city_collection), comme avant.
 // 4. Si quelqu'un d'autre est déjà en train de collecter cette ville, on attend qu'elle devienne prête.
 import { collectCityPlaces } from '../domain/cityCollect.ts';
+import type { GeoSearch } from '../domain/cityCollect.ts';
 import { fractionProgress } from '../domain/collection.ts';
 import type { CollectionProgress } from '../domain/collection.ts';
-import { GEOAPIFY_KEY } from '../lib/env';
 import { supabase } from '../lib/supabase';
 import { cityCollectionStatuses, requestCityCollection } from './places';
 
@@ -37,6 +37,13 @@ export function collectCityNow(cityId: number, onFraction?: (f: number) => void)
   return entry.promise;
 }
 
+/** Recherche Geoapify par la fonction Supabase « places-search » (la clé reste sur le serveur). En erreur : repli OpenStreetMap. */
+const searchPlaces: GeoSearch = async (q) => {
+  const { data, error } = await supabase.functions.invoke('places-search', { body: q });
+  if (error) throw error;
+  return data as Awaited<ReturnType<GeoSearch>>;
+};
+
 /** Préchauffage : lance le chargement d'une ville en arrière-plan, sans rien afficher (les erreurs sont ignorées). */
 export function warmCity(cityId: number): void {
   void collectCityNow(cityId).catch(() => undefined);
@@ -58,7 +65,7 @@ async function collectCityOnce(cityId: number, onFraction?: (f: number) => void)
     const { data: city, error } = await supabase.from('cities').select('id,lat,lng,population').eq('id', cityId).maybeSingle();
     if (error || !city) throw new Error(error?.message ?? 'ville introuvable');
     const { rows } = await collectCityPlaces(city as { id: number; lat: number; lng: number; population: number | null }, {
-      geoapifyKey: GEOAPIFY_KEY,
+      geoapify: searchPlaces,
       onGroup: (done, total) => onFraction?.(0.05 + 0.85 * (done / total)),
     });
     const res = await supabase.rpc('ingest_city_places', { p_city: cityId, p_places: rows });
@@ -90,7 +97,7 @@ export async function extendCityNow(cityId: number, scale: number, onFraction?: 
     const { data: city, error } = await supabase.from('cities').select('id,lat,lng,population').eq('id', cityId).maybeSingle();
     if (error || !city) throw new Error(error?.message ?? 'ville introuvable');
     const { rows } = await collectCityPlaces(city as { id: number; lat: number; lng: number; population: number | null }, {
-      geoapifyKey: GEOAPIFY_KEY, radiusScale: scale,
+      geoapify: searchPlaces, radiusScale: scale,
       onGroup: (done, total) => onFraction?.(0.05 + 0.85 * (done / total)),
     });
     const res = await supabase.rpc('ingest_city_places', { p_city: cityId, p_places: rows });
