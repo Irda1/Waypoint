@@ -21,6 +21,20 @@ export interface PackContext {
 
 // Carte d'identité et carte européenne d'assurance maladie : Union européenne, EEE et Suisse.
 const EUROPE = new Set(['AT', 'BE', 'BG', 'CY', 'CZ', 'DE', 'DK', 'EE', 'ES', 'FI', 'FR', 'GR', 'HR', 'HU', 'IE', 'IT', 'LT', 'LU', 'LV', 'MT', 'NL', 'PL', 'PT', 'RO', 'SE', 'SI', 'SK', 'IS', 'LI', 'NO', 'CH']);
+// Démarches à faire avant le départ, pour un passeport français (les règles changent : la valise renvoie aussi vers
+// France Diplomatie). Seulement des formalités bien établies ; ailleurs, la vérification générale suffit.
+const FORMALITIES: Record<string, [string, string]> = {
+  US: ['ESTA (autorisation de voyage)', 'États-Unis : à demander en ligne avant le départ'],
+  CA: ['AVE (autorisation de voyage électronique)', 'Canada : obligatoire pour arriver en avion'],
+  GB: ['ETA (autorisation de voyage électronique)', 'Royaume-Uni : à demander en ligne avant le départ'],
+  AU: ['eVisitor (visa électronique gratuit)', 'Australie : à demander en ligne avant le départ'],
+  NZ: ['NZeTA (autorisation de voyage)', 'Nouvelle-Zélande : à demander en ligne avant le départ'],
+  JP: ['Visit Japan Web (formulaire d\'arrivée)', 'Japon : sans visa jusqu\'à 90 jours, à remplir avant le départ pour passer plus vite'],
+  IN: ['e-Visa', 'Inde : visa obligatoire, demande en ligne'],
+  TH: ['TDAC (carte d\'arrivée en ligne)', 'Thaïlande : à remplir dans les 3 jours avant l\'arrivée'],
+  KE: ['eTA (autorisation de voyage)', 'Kenya : à demander en ligne avant le départ'],
+  EG: ['Visa (en ligne ou à l\'arrivée)', 'Égypte : obligatoire'],
+};
 // Prises où une fiche française (C/E/F) ne rentre pas.
 const PLUG: Record<string, string> = {
   GB: 'G', IE: 'G', MT: 'G', CY: 'G', HK: 'G', SG: 'G', MY: 'G', AE: 'G', QA: 'G', KE: 'G',
@@ -50,6 +64,9 @@ export function packingIdeas(c: PackContext): PackIdea[] {
     add('Papiers', 'Carte européenne d\'assurance maladie', 'soins en Europe');
   } else if (c.country) {
     add('Papiers', 'Passeport', 'hors Europe : obligatoire');
+    const f = FORMALITIES[c.country];
+    if (f) add('Papiers', f[0], f[1]);
+    add('Papiers', 'Formalités d\'entrée vérifiées', 'visa, validité du passeport : France Diplomatie > Conseils aux voyageurs');
     add('Papiers', 'Assurance voyage', 'soins à l\'étranger');
   }
   add('Papiers', 'Billets et réservations', 'toujours utile');

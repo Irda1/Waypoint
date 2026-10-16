@@ -1,6 +1,6 @@
 // Composants communs : mêmes écrans sur téléphone, tablette et web, mise en page adaptée à la largeur.
 import React from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, View } from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, Text as RNText, TextInput, View } from 'react-native';
 import type { StyleProp, TextInputProps, TextStyle, ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { fonts, radius, space } from '../theme/tokens';
@@ -165,6 +165,33 @@ export function Section({ title, icon, hint, defaultOpen = true, children }: { t
       </Pressable>
       {open ? <FadeIn>{children}</FadeIn> : null}
     </View>
+  );
+}
+
+/**
+ * Fenêtre centrée (85 % de la hauteur, légère marge sur les côtés) devant l'écran assombri : ✕, fond ou Retour la ferment.
+ * Contenu qui défile sans barre visible.
+ */
+export function Popup({ visible, title, icon, onClose, children }: { visible: boolean; title: string; icon?: IconName; onClose: () => void; children: React.ReactNode }) {
+  const { colors } = useTheme();
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable accessibilityLabel="Fermer" onPress={onClose} style={{ flex: 1, backgroundColor: 'rgba(3, 5, 6, 0.6)', alignItems: 'center', justifyContent: 'center', padding: space.md }}>
+        <Pressable onPress={() => {}} accessibilityViewIsModal style={{ width: '100%', maxWidth: 640, height: '85%', backgroundColor: colors.bg, borderRadius: 24, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, overflow: 'hidden' }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: space.sm, paddingHorizontal: space.lg, paddingVertical: space.md, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line }}>
+            {icon ? <Icon name={icon} size={18} /> : null}
+            <RNText accessibilityRole="header" style={{ flex: 1, fontFamily: fonts.serif, fontSize: 22, lineHeight: 28, color: colors.text }}>{title}</RNText>
+            <Pressable accessibilityRole="button" accessibilityLabel="Fermer" onPress={onClose} hitSlop={8}
+              style={{ width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface2 }}>
+              <Icon name="close" size={18} tone="text" />
+            </Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: space.lg, gap: space.lg }} keyboardShouldPersistTaps="handled">
+            {children}
+          </ScrollView>
+        </Pressable>
+      </Pressable>
+    </Modal>
   );
 }
 

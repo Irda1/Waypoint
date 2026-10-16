@@ -122,6 +122,17 @@ TP 438  Lisbonne (LIS) 19:25 → Paris (CDG) 22:55`);
     .toEqual(['Vol Paris → Lisbonne 2027-05-08 07:10', 'Vol Lisbonne → Paris 2027-05-15 19:25']);
 });
 
+test('préparation : la fenêtre s\'ouvre et met le voyage à la corbeille', async ({ page }) => {
+  await signIn(page);
+  const writes = await fakeServer(page, tripTables());
+  await page.goto(`/trip/${TRIP}`);
+  await page.getByRole('button', { name: /^Préparation/ }).click();
+  await expect(page.getByText('Valise', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Supprimer ce voyage' }).click();
+  await page.getByRole('button', { name: 'Oui, mettre à la corbeille' }).click();
+  await expect.poll(() => writes.filter((w) => w.method === 'PATCH' && w.table === 'trips').map((w) => w.query)).toEqual([`?id=eq.${TRIP}`]);
+});
+
 test('partage : la page publique d\'un voyage s\'ouvre sans compte', async ({ page }) => {
   await page.addInitScript(() => localStorage.setItem('waypoint.welcomed', '1'));
   await fakeServer(page, { place_categories: categories }, {

@@ -12,7 +12,7 @@ import { finalBalance } from '../../src/domain/finalBalance.ts';
 import { markSouvenirsSeen } from '../../src/lib/souvenirs';
 import { useAuth } from '../../src/auth/AuthProvider';
 import { useRequireAuth } from '../../src/auth/useRequireAuth';
-import { Button, Card, Columns, ErrorNote, Field, Screen, Section, Text } from '../../src/ui';
+import { Button, Card, Columns, ErrorNote, Field, Popup, Screen, Section, Text } from '../../src/ui';
 import { useTrip } from '../../src/data/useTrip';
 import { addDay, addDestination, createInvite, createShare, getShareToken, removeDestination } from '../../src/data/trips';
 import type { CityOption } from '../../src/data/places';
@@ -119,6 +119,8 @@ export default function TripScreen() {
   const [quickOpen, setQuickOpen] = useState(false);
   const [added, setAdded] = useState<{ id: string | null; summary: string } | null>(null);
   useEffect(() => { if (!added) return; const t = setTimeout(() => setAdded(null), 5000); return () => clearTimeout(t); }, [added]);
+  // Fenêtre ouverte de l'onglet Voyage (Transports et nuits, Préparation, Carnet).
+  const [panel, setPanel] = useState<'transport' | 'prep' | 'carnet' | null>(null);
   const [confirmTrash, setConfirmTrash] = useState(false);
   const [trashError, setTrashError] = useState<string | null>(null);
   const [pendingAdd, setPendingAdd] = useState(false);
@@ -177,7 +179,7 @@ export default function TripScreen() {
   }
 
   const celebration = celebrating ? (
-    <Celebrate tripId={data.trip.id} to={data.destinations[0]?.name ?? null} onDone={endCelebration}
+    <Celebrate tripId={data.trip.id} cities={data.destinations} onDone={endCelebration}
       title={data.trip.title.replace(/^Lieux · /, '')}
       subtitle={data.mode === 'simple' ? data.destinations.slice(0, 3).map((d) => d.name).join(' · ') : `${data.trip.title} · ${data.days.length} jour${data.days.length > 1 ? 's' : ''} · ${data.destinations.length} ville${data.destinations.length > 1 ? 's' : ''}`} />
   ) : null;
@@ -368,24 +370,20 @@ export default function TripScreen() {
             <UnplannedCard data={data} onChanged={reload} />
           </Section>
 
-          <Section title="Transports et nuits" icon="plane" hint="Vols, hébergements, réservations" defaultOpen={false}>
-            <FlightsCard data={data} />
-            <StayCard data={data} userId={session?.user.id ?? null} onChanged={reload} />
-            <BookingsCard tripId={trip.id} userId={session?.user.id ?? null} />
-          </Section>
-
-          <Section title="Préparation" icon="note" hint="Météo, valise, export, dupliquer" defaultOpen={false}>
-            <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
-            <ChecklistCard tripId={trip.id} data={data} forecasts={weather.forecasts} />
-            <ExportCard data={data} />
-            <Button label="Dupliquer ce voyage" icon="undo" variant="ghost" onPress={() => setCopyOpen(true)} />
-          </Section>
-
-          {journal.available ? (
-            <Section title="Carnet" icon="book" hint="Notes et photos du voyage" defaultOpen={false}>
-              <JournalSection journal={journal} days={data.days.map((d) => ({ ...d, city_id: cityOfDay(d) }))} cityName={nameOfCity} onRecap={ended && data.destinations.length ? () => setRecap(true) : undefined} />
-            </Section>
-          ) : null}
+          <View style={{ flexDirection: 'row', gap: space.sm }}>
+            {([
+              { key: 'transport', title: 'Transports et nuits', icon: 'plane', hint: 'Vols, hébergements, réservations' },
+              { key: 'prep', title: 'Préparation', icon: 'note', hint: 'Météo, valise, export' },
+              { key: 'carnet', title: 'Carnet', icon: 'book', hint: 'Notes et photos' },
+            ] as const).filter((t) => t.key !== 'carnet' || journal.available).map((t) => (
+              <Pressable key={t.key} accessibilityRole="button" accessibilityLabel={`${t.title}, ${t.hint}`} onPress={() => setPanel(t.key)}
+                style={({ pressed }) => ({ flex: 1, minHeight: 92, gap: 4, padding: space.md, borderRadius: radius.card, borderWidth: StyleSheet.hairlineWidth, borderColor: colors.line, backgroundColor: colors.surface, opacity: pressed ? 0.8 : 1 })}>
+                <Icon name={t.icon} size={20} />
+                <RNText style={{ fontFamily: fonts.sansBold, fontSize: 14, lineHeight: 18, color: colors.text }}>{t.title}</RNText>
+                <RNText style={{ fontFamily: fonts.sans, fontSize: 12, lineHeight: 16, color: colors.text3 }}>{t.hint}</RNText>
+              </Pressable>
+            ))}
+          </View>
         </View>
         </View>
         ) : null}
@@ -464,18 +462,6 @@ export default function TripScreen() {
 
           <ShareCard tripId={trip.id} title={trip.title} />
 
-          <Card>
-            <Text variant="label">Supprimer le voyage</Text>
-            {confirmTrash ? (
-              <View style={{ gap: space.sm }}>
-                <Text variant="body">« {trip.title} » ira dans la corbeille de l'accueil, pour tous les voyageurs. Tu pourras le restaurer.</Text>
-                <Button label="Oui, mettre à la corbeille" onPress={async () => { const err = await deleteTrip(trip.id); if (err) setTrashError(err); else router.replace('/'); }} />
-                <Button label="Annuler" variant="ghost" onPress={() => { setConfirmTrash(false); setTrashError(null); }} />
-                <ErrorNote message={trashError} />
-              </View>
-            ) : <Button label="Supprimer ce voyage" variant="ghost" onPress={() => setConfirmTrash(true)} />}
-          </Card>
-
         </View>
         ) : null}
         </FadeIn>
@@ -486,6 +472,33 @@ export default function TripScreen() {
       </Pressable>
       <FloatingNav tabs={TABS} active={tab} onSelect={onNav} />
       <PlusMenu visible={plusOpen} onPick={onPlus} onClose={() => setPlusOpen(false)} />
+      <Popup visible={panel === 'transport'} title="Transports et nuits" icon="plane" onClose={() => setPanel(null)}>
+        <FlightsCard data={data} />
+        <StayCard data={data} userId={session?.user.id ?? null} onChanged={reload} />
+        <BookingsCard tripId={trip.id} userId={session?.user.id ?? null} />
+      </Popup>
+      <Popup visible={panel === 'prep'} title="Préparation" icon="note" onClose={() => { setPanel(null); setConfirmTrash(false); setTrashError(null); }}>
+        <WeatherCard destinations={data.destinations} forecasts={weather.forecasts} loading={weather.loading} error={weather.error} start={trip.starts_on} end={trip.ends_on} />
+        <ChecklistCard tripId={trip.id} data={data} forecasts={weather.forecasts} />
+        <ExportCard data={data} />
+        <Button label="Dupliquer ce voyage" icon="undo" variant="ghost" onPress={() => { setPanel(null); setCopyOpen(true); }} />
+        <Card>
+          <Text variant="label">Supprimer le voyage</Text>
+          {confirmTrash ? (
+            <View style={{ gap: space.sm }}>
+              <Text variant="body">« {trip.title} » ira dans la corbeille de l'accueil, pour tous les voyageurs. Tu pourras le restaurer.</Text>
+              <Button label="Oui, mettre à la corbeille" onPress={async () => { const err = await deleteTrip(trip.id); if (err) setTrashError(err); else { setPanel(null); router.replace('/'); } }} />
+              <Button label="Annuler" variant="ghost" onPress={() => { setConfirmTrash(false); setTrashError(null); }} />
+              <ErrorNote message={trashError} />
+            </View>
+          ) : <Button label="Supprimer ce voyage" variant="ghost" onPress={() => setConfirmTrash(true)} />}
+        </Card>
+      </Popup>
+      {journal.available ? (
+        <Popup visible={panel === 'carnet'} title="Carnet" icon="book" onClose={() => setPanel(null)}>
+          <JournalSection journal={journal} days={data.days.map((d) => ({ ...d, city_id: cityOfDay(d) }))} cityName={nameOfCity} onRecap={ended && data.destinations.length ? () => { setPanel(null); setRecap(true); } : undefined} />
+        </Popup>
+      ) : null}
       <CopyTripSheet visible={copyOpen} onClose={() => setCopyOpen(false)} trip={trip} />
       {celebration}
       {recap ? (
