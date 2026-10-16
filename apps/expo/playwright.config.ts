@@ -14,6 +14,6 @@ export default defineConfig({
     url: 'http://localhost:4173',
     timeout: 300_000,
     reuseExistingServer: !process.env.CI,
-    env: { EXPO_PUBLIC_SUPABASE_URL: 'https://e2e.supabase.co', EXPO_PUBLIC_SUPABASE_ANON_KEY: 'cle-publique-factice-des-tests-de-parcours', EXPO_PUBLIC_GEOAPIFY_KEY: '' },
+    env: { EXPO_PUBLIC_SUPABASE_URL: 'https://e2e.supabase.co', EXPO_PUBLIC_SUPABASE_ANON_KEY: 'cle-publique-factice-des-tests-de-parcours' },
   },
 });

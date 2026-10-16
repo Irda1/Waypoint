@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { buildFastQuery, collectCityPlaces, geoapifyToElement, hedgedOverpass, toPayload } from './cityCollect.ts';
+import type { GeoQuery } from './cityCollect.ts';
 import { buildOverpassQuery } from './osm.ts';
 
 test('osm.ts est une copie exacte de pipeline/src/lib/osm.mjs', () => {
@@ -112,36 +113,36 @@ test('Geoapify : un lieu devient un élément OSM ; sans identifiant OSM il est 
   assert.equal(geoapifyToElement({ properties: { lat: 1, lon: 2, datasource: { raw: { tourism: 'museum' } } } }), null);
 });
 
-test('collecte avec clé Geoapify : sans Overpass quand Geoapify répond, repli Overpass pour un groupe vide', async () => {
-  const urls: string[] = [];
+test('collecte avec Geoapify : sans Overpass quand Geoapify répond, repli Overpass pour un groupe vide', async () => {
+  const asked: GeoQuery[] = [];
   const r = await collectCityPlaces(city, {
-    mirrors: ['a'], retryDelayMs: 1, geoapifyKey: 'K',
-    geoFetch: (u) => { urls.push(u); return Promise.resolve({ ok: true, status: 200, json: async () => ({ features: u.includes('categories=tourism') ? [geoMuseum] : [] }) }); },
+    mirrors: ['a'], retryDelayMs: 1,
+    geoapify: (q) => { asked.push(q); return Promise.resolve({ features: q.categories.startsWith('tourism') ? [geoMuseum] : [] }); },
     fetchImpl: (_u, init) => ok(decodeURIComponent(init.body.slice(5)).includes('restaurant') ? [diner] : []),
   });
-  assert.equal(urls.length, 4);
-  assert.match(urls[0], /filter=circle:135\.76,35\.01,\d+&.*limit=500&offset=0&apiKey=K$/);
+  assert.equal(asked.length, 4);
+  assert.deepEqual({ ...asked[0], radiusM: 0 }, { categories: asked[0].categories, lat: 35.01, lng: 135.76, radiusM: 0, offset: 0 });
   assert.deepEqual(r.rows.map((x) => x.name).sort(), ['Chez Lui', 'Musée']);
 });
 
 test('collecte : Geoapify en erreur, tout retombe sur Overpass', async () => {
   const r = await collectCityPlaces(city, {
-    mirrors: ['a'], retryDelayMs: 1, geoapifyKey: 'K',
-    geoFetch: () => Promise.resolve({ ok: false, status: 429, json: async () => ({}) }),
+    mirrors: ['a'], retryDelayMs: 1,
+    geoapify: () => Promise.reject(new Error('places-search : 429')),
     fetchImpl: (_u, init) => ok(decodeURIComponent(init.body.slice(5)).includes('tourism') ? [museum] : []),
   });
   assert.deepEqual(r.rows.map((x) => x.name), ['Musée']);
 });
 
 test('élargir la zone : rayon multiplié (plafonné) et plusieurs pages Geoapify tant qu\'elles sont pleines', async () => {
-  const urls: string[] = [];
+  const asked: GeoQuery[] = [];
   const full = Array.from({ length: 500 }, (_, i) => ({ properties: { name: `M${i}`, lat: 35.01, lon: 135.76, datasource: { raw: { osm_type: 'n', osm_id: i + 1, tourism: 'museum', name: `M${i}` } } } }));
   await collectCityPlaces(city, {
-    mirrors: ['a'], retryDelayMs: 1, geoapifyKey: 'K', radiusScale: 100,
-    geoFetch: (u) => { urls.push(u); return Promise.resolve({ ok: true, status: 200, json: async () => ({ features: u.includes('categories=tourism') ? full : [] }) }); },
+    mirrors: ['a'], retryDelayMs: 1, radiusScale: 100,
+    geoapify: (q) => { asked.push(q); return Promise.resolve({ features: q.categories.startsWith('tourism') ? full : [] }); },
     fetchImpl: () => ok([]),
   });
-  assert.ok(urls.every((u) => u.includes('circle:135.76,35.01,30000')), 'rayon plafonné à 30 km');
-  assert.equal(urls.filter((u) => u.includes('categories=tourism')).length, 3, '3 pages pour les attractions');
-  assert.ok(urls.some((u) => u.includes('offset=1000')));
+  assert.ok(asked.every((q) => q.radiusM === 30000), 'rayon plafonné à 30 km');
+  assert.equal(asked.filter((q) => q.categories.startsWith('tourism')).length, 3, '3 pages pour les attractions');
+  assert.ok(asked.some((q) => q.offset === 1000));
 });
